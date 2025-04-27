@@ -1,3 +1,4 @@
+session_start();
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -158,7 +159,7 @@
         </div>
 
         <?php
-        session_start();
+        
 
         $serverName = "francerecord.database.windows.net";
         $connectionOptions = array(
