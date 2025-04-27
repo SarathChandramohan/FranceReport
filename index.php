@@ -153,7 +153,7 @@ function connectDB() {
                         $_SESSION['email'] = $email;
                         $_SESSION['logged_in'] = true;
 
-                        header("Location: timesheet.php");
+                        header("Location: timesheet-wrapper.php");
                         exit;
                     } else {
                         $errorMsg = "Email ou mot de passe incorrect.";
