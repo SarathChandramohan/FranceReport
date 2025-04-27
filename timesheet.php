@@ -1,13 +1,4 @@
 <?php
-echo "Hello from timesheet-wrapper.php!"; // <--- THIS IS LINE 2
-// Include session management
-require_once 'session-management.php';
-
-// Require login to access this page
-requireLogin();
-?>
-
-<?php
 // 1. Ensure no output before this PHP block
 // No spaces, blank lines, or BOM before <?php
 
