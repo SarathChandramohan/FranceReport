@@ -170,17 +170,35 @@
         );
 
         function connectDB() {
-            global $serverName, $connectionOptions;
-            try {
-                $conn = sqlsrv_connect($serverName, $connectionOptions);
-                if($conn === false) {
-                    return false;
+    global $serverName, $connectionOptions;
+    try {
+        $conn = sqlsrv_connect($serverName, $connectionOptions);
+        if($conn === false) {
+            // Log the specific SQLSRV errors if connection fails
+            $errors = sqlsrv_errors();
+            if ($errors !== null) {
+                error_log("SQLSRV Connection Error:");
+                foreach ($errors as $error) {
+                    error_log("  SQLSTATE: " . $error['SQLSTATE']);
+                    error_log("  Code: " . $error['code']);
+                    error_log("  Message: " . $error['message']);
                 }
-                return $conn;
-            } catch(Exception $e) {
-                return false;
+            } else {
+                error_log("SQLSRV Connection failed, but no specific errors reported by sqlsrv_errors().");
             }
+            return false;
         }
+        return $conn;
+    } catch(Exception $e) {
+        // Log the exception details
+        error_log("Caught Exception:");
+        error_log("  Message: " . $e->getMessage());
+        error_log("  File: " . $e->getFile());
+        error_log("  Line: " . $e->getLine());
+        error_log("  Trace: " . $e->getTraceAsString());
+        return false;
+    }
+}
 
         function validateEmail($email) {
             return filter_var($email, FILTER_VALIDATE_EMAIL);
