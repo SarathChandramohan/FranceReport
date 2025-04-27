@@ -1,395 +1,885 @@
 <?php
-session_start(); // <-- Move session_start to the top before anything else (no space above this line)
-function connectDB() {
-            $connectionInfo = array(
-                "UID" => "francerecordloki",
-                "pwd" => "Hesoyam@2025",
-                "Database" => "Francerecord",
-                "LoginTimeout" => 30,
-                "Encrypt" => 1,
-                "TrustServerCertificate" => 0
-            );
-            $serverName = "tcp:francerecord.database.windows.net,1433";
-        
-            $conn = sqlsrv_connect($serverName, $connectionInfo);
-        
-            if($conn === false) {
-                // Throw an exception just like PDO would
-                $errors = sqlsrv_errors();
-                $message = isset($errors[0]['message']) ? $errors[0]['message'] : 'Unknown error during SQL Server connection.';
-                throw new Exception("Erreur de connexion SQL Server: " . $message);
-            }
-        
-            return $conn;
-        }
+// 1. Ensure no output before this PHP block
+// No spaces, blank lines, or BOM before <?php
 
-        function validateEmail($email) {
-            return filter_var($email, FILTER_VALIDATE_EMAIL);
-        }
+// 2. Include session management, which starts the session and defines requireLogin()
+require_once 'session-management.php';
 
-        function hashPassword($password) {
-            return password_hash($password, PASSWORD_DEFAULT);
-        }
+// 3. Require login - This will redirect the user to index.php and exit
+// if they are not logged in.
+requireLogin();
 
-        function verifyPassword($password, $hash) {
-            return password_verify($password, $hash);
-        }
-
-        function userExists($conn, $email) {
-            $sql = "SELECT COUNT(*) AS count FROM Users WHERE email = ?";
-            $params = array($email);
-            $stmt = sqlsrv_query($conn, $sql, $params);
-            
-            if($stmt === false) {
-                return false;
-            }
-            
-            $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-            sqlsrv_free_stmt($stmt);
-            
-            return ($row['count'] > 0);
-        }
-
-        function registerUser($conn, $nom, $prenom, $email, $password) {
-            $hashedPassword = hashPassword($password);
-            
-            // 🛠️ Fixed your typo here
-            $sql = "INSERT INTO Users (nom, prenom, email, role, status, password_hash, date_creation) 
-                    VALUES (?, ?, ?, ?, ?, ?, GETDATE())";
-            $params = array($nom, $prenom, $email, "User", "Active", $hashedPassword);
-        
-            $stmt = sqlsrv_query($conn, $sql, $params);
-            if($stmt === false) {
-                error_log("Register error: " . print_r(sqlsrv_errors(), true));
-                return false;
-            }
-        
-            sqlsrv_free_stmt($stmt);
-            return true;
-        }
-
-        function authenticateUser($conn, $email, $password) {
-            $sql = "SELECT user_id, nom, prenom, password_hash FROM Users WHERE email = ?";
-            $params = array($email);
-            
-            $stmt = sqlsrv_query($conn, $sql, $params);
-            if($stmt === false) {
-                return false;
-            }
-            
-            $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-            sqlsrv_free_stmt($stmt);
-            
-            if($row && verifyPassword($password, $row['password_hash'])) {
-                return array(
-                    'user_id' => $row['user_id'],
-                    'nom' => $row['nom'],
-                    'prenom' => $row['prenom']
-                );
-            }
-            
-            return false;
-        }
-
-        $showLogin = true;
-        $errorMsg = "";
-        $successMsg = "";
-
-        if(isset($_POST['toggleForm'])) {
-            $showLogin = ($_POST['toggleForm'] === 'register') ? false : true;
-        }
-
-        if(isset($_POST['register'])) {
-            $nom = trim($_POST['nom']);
-            $prenom = trim($_POST['prenom']);
-            $email = trim($_POST['email']);
-            $password = $_POST['password'];
-            $confirm_password = $_POST['confirm_password'];
-            
-            if(empty($nom) || empty($prenom) || empty($email) || empty($password)) {
-                $errorMsg = "Tous les champs sont obligatoires.";
-            } elseif(!validateEmail($email)) {
-                $errorMsg = "Format d'email invalide.";
-            } elseif(strlen($password) < 8) {
-                $errorMsg = "Le mot de passe doit contenir au moins 8 caractères.";
-            } elseif($password !== $confirm_password) {
-                $errorMsg = "Les mots de passe ne correspondent pas.";
-            } else {
-                $conn = connectDB();
-                if($conn === false) {
-                    $errorMsg = "Erreur de connexion à la base de données.";
-                } else {
-                    if(userExists($conn, $email)) {
-                        $errorMsg = "Cette adresse email est déjà utilisée.";
-                    } else {
-                        if(registerUser($conn, $nom, $prenom, $email, $password)) {
-                            $successMsg = "Compte créé avec succès. Vous pouvez maintenant vous connecter.";
-                            $showLogin = true;
-                        } else {
-                            $errorMsg = "Erreur lors de l'inscription. Veuillez réessayer.";
-                        }
-                    }
-                    sqlsrv_close($conn);
-                }
-            }
-        }
-
-        if(isset($_POST['login'])) {
-            $email = trim($_POST['email']);
-            $password = $_POST['password'];
-            
-            if(empty($email) || empty($password)) {
-                $errorMsg = "L'email et le mot de passe sont obligatoires.";
-            } else {
-                $conn = connectDB();
-                if($conn === false) {
-                    $errorMsg = "Erreur de connexion à la base de données.";
-                } else {
-                    $user = authenticateUser($conn, $email, $password);
-                    if($user) {
-                        $_SESSION['user_id'] = $user['user_id'];
-                        $_SESSION['nom'] = $user['nom'];
-                        $_SESSION['prenom'] = $user['prenom'];
-                        $_SESSION['email'] = $email;
-                        $_SESSION['logged_in'] = true;
-
-                        header("Location:timesheet.php");
-                        exit;
-                    } else {
-                        $errorMsg = "Email ou mot de passe incorrect.";
-                    }
-                    sqlsrv_close($conn);
-                }
-            }
-        }
+// 4. If the script reaches this point, the user IS logged in.
+// Now you can safely output content.
+$user = getCurrentUser();
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion - Gestion des Ouvriers</title>
+    <title>Pointage - Gestion des Ouvriers</title>
+    <!-- Original CSS styles from timesheet.html -->
     <style>
-        /* Your existing CSS here (no changes) */
-        /* --- Apple Inspired Theme --- */
         /* Basic Reset and Font */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            /* Apple-like font stack */
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
         }
+
         body {
+            /* Light gray background */
             background-color: #f5f5f7;
+            color: #1d1d1f; /* Default dark text */
+            -webkit-font-smoothing: antialiased; /* Smoother fonts on WebKit */
+            -moz-osx-font-smoothing: grayscale; /* Smoother fonts on Firefox */
+        }
+
+        /* Container */
+        .container {
+            max-width: 1100px; /* Slightly adjusted max-width */
+            margin: 0 auto;
+            padding: 25px; /* Slightly increased padding */
+        }
+
+        /* Header */
+        header {
+            /* White header background */
+            background-color: #ffffff;
+            color: #1d1d1f; /* Dark text */
+            padding: 15px 0; /* Adjusted padding */
+            margin-bottom: 0; /* Remove bottom margin, nav handles separation */
+            border-bottom: 1px solid #d2d2d7; /* Subtle border */
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content h1 {
+            font-size: 24px; /* Slightly larger title */
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px; /* Increased gap */
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .user-avatar {
+            width: 36px; /* Slightly smaller avatar */
+            height: 36px;
+            border-radius: 50%;
+            background-color: #007aff; /* Apple blue */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Navigation */
+        nav {
+            /* Darker nav background */
+            background-color: #333; /* Dark gray */
+            padding: 12px 0;
+            margin-bottom: 30px; /* Add margin back here */
+        }
+
+        nav ul {
+            display: flex;
+            flex-wrap: wrap;
+            list-style: none;
+            gap: 10px 20px; /* Row and column gap */
+            padding-left: 0;
+            justify-content: flex-start; /* Align items to start */
+        }
+
+        nav li {
+            margin-bottom: 5px;
+        }
+
+        nav a {
+            color: #f5f5f7; /* Lighter text for dark background */
+            text-decoration: none;
+            padding: 6px 12px; /* Adjusted padding */
+            border-radius: 6px; /* Slightly more rounded */
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+            display: inline-block;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            background-color: #555; /* Slightly lighter gray on hover */
+            color: #ffffff;
+        }
+        nav a.active {
+            background-color: #007aff; /* Apple blue for active */
+            color: #ffffff;
+        }
+
+        /* Card Styling */
+        .card {
+            background-color: #ffffff;
+            border-radius: 12px; /* More rounded corners */
+            /* Subtle shadow */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px; /* Increased padding */
+            margin-bottom: 25px; /* Consistent margin */
+            border: 1px solid #e5e5e5; /* Very subtle border */
+        }
+
+        h2 {
+            margin-bottom: 25px; /* Increased margin */
+            color: #1d1d1f; /* Dark text */
+            font-size: 28px; /* Larger heading */
+            font-weight: 600;
+        }
+        h3 {
+             margin-bottom: 20px;
+             font-size: 18px;
+             font-weight: 600;
+             color: #1d1d1f;
+        }
+
+        /* Clock Section */
+        .clock-section {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .clock-card {
+            text-align: center;
+            width: 100%;
+            max-width: 450px; /* Slightly wider */
+        }
+
+        .clock-display {
+            font-size: 56px; /* Larger clock display */
+            font-weight: 300; /* Lighter font weight */
+            margin-bottom: 25px;
             color: #1d1d1f;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            letter-spacing: 1px;
+        }
+
+        .clock-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px; /* Increased gap */
+            flex-wrap: wrap;
+        }
+
+        /* Button Styling */
+        button, .btn-primary, .btn-success, .btn-danger, .btn-warning {
+            padding: 12px 24px; /* Generous padding */
+            border: none;
+            border-radius: 8px; /* Rounded corners */
+            cursor: pointer;
+            font-weight: 600; /* Bolder font */
+            font-size: 15px;
+            transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+            margin-bottom: 10px;
+            line-height: 1.2; /* Ensure text vertical alignment */
+        }
+
+        .btn-primary { background-color: #007aff; color: white; }
+        .btn-primary:hover { background-color: #0056b3; } /* Darker blue on hover */
+
+        .btn-success { background-color: #34c759; color: white; } /* Apple green */
+        .btn-success:hover { background-color: #2ca048; } /* Darker green */
+
+        .btn-danger { background-color: #ff3b30; color: white; } /* Apple red */
+        .btn-danger:hover { background-color: #d63027; } /* Darker red */
+
+        .btn-warning { background-color: #ff9500; color: white; } /* Apple orange */
+        .btn-warning:hover { background-color: #d97e00; } /* Darker orange */
+
+        /* Table Styling */
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid #e5e5e5; /* Border around table container */
+            border-radius: 8px; /* Rounded corners */
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px; /* Adjusted min-width */
+        }
+
+        table th, table td {
+            padding: 14px 16px; /* Increased padding */
+            text-align: left;
+            border-bottom: 1px solid #e5e5e5; /* Lighter border */
+            font-size: 14px;
+            color: #1d1d1f;
+        }
+        table td { color: #555; } /* Slightly lighter text for data */
+
+        table th {
+            background-color: #f9f9f9; /* Very light gray header */
+            font-weight: 600; /* Bolder header */
+            color: #333; /* Darker header text */
+            border-bottom-width: 2px; /* Thicker bottom border for header */
+        }
+
+        table tr:last-child td {
+             border-bottom: none; /* Remove border from last row */
+        }
+
+        table tr:hover {
+            background-color: #f5f5f7; /* Subtle hover */
+        }
+
+        /* Location Switch */
+        .switch {
+            position: relative; display: inline-block; width: 50px; height: 28px; /* Slightly taller */ vertical-align: middle;
+        }
+        .switch input { display: none; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* Subtle shadow on handle */
+        }
+        input:checked + .slider { background-color: #34c759; } /* Apple green */
+        input:checked + .slider:before { transform: translateX(22px); } /* Adjusted translation */
+        .slider.round { border-radius: 28px; } /* Fully rounded */
+        .slider.round:before { border-radius: 50%; }
+
+        /* Location Info */
+        #location-info {
+            background-color: #f0f0f0; /* Slightly different gray */
+            padding: 12px 15px; /* Adjusted padding */
+            border-radius: 8px;
+            margin-bottom: 20px; /* Increased margin */
+            border: 1px solid #e0e0e0;
+            text-align: center;
+            color: #6e6e73; /* Secondary text color */
+            font-size: 13px;
+        }
+        #location-status { font-weight: 600; }
+        #location-status.success { color: #34c759; }
+        #location-status.error { color: #ff3b30; }
+        #location-status.pending { color: #ff9500; } /* Apple orange for pending */
+        #location-address { font-size: 14px; margin-top: 5px; font-weight: 500; color: #1d1d1f; }
+
+        /* Location Switch Container */
+        .location-toggle-container {
+            margin-bottom: 20px; /* Increased margin */
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            width: 100%;
-            max-width: 420px;
-            padding: 25px;
-        }
-        .logo-section {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .logo-section h1 {
-            font-size: 28px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 10px;
-        }
-        .logo-section p {
-            color: #6e6e73;
-            font-size: 16px;
-            margin-bottom: 20px;
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            padding: 30px;
-            margin-bottom: 25px;
-            border: 1px solid #e5e5e5;
-        }
-        h2 {
-            margin-bottom: 25px;
-            color: #1d1d1f;
-            font-size: 22px;
-            font-weight: 600;
-            text-align: center;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #1d1d1f;
-        }
-        .form-control {
-            width: 100%;
-            padding: 12px 15px;
-            font-size: 16px;
-            border: 1px solid #d2d2d7;
+            gap: 15px; /* Increased gap */
+            padding: 12px;
+            background-color: #f0f0f0; /* Match location info bg */
             border-radius: 8px;
-            background-color: #f5f5f7;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            border: 1px solid #e0e0e0;
         }
-        .form-control:focus {
-            border-color: #0071e3;
-            box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2);
-            outline: none;
+        .location-toggle-container span:first-of-type { font-weight: 600; color: #1d1d1f; }
+        #location-status-text { font-weight: 600; font-size: 14px; }
+
+        /* Modal Styling */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); /* Darker overlay */
         }
-        .btn-primary {
-            background-color: #007aff;
-            color: white;
-            width: 100%;
-            padding: 14px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 16px;
-            transition: background-color 0.2s ease-in-out;
-            margin-top: 10px;
+        .modal-content {
+            background-color: #ffffff; margin: 8% auto; /* Adjusted margin */ padding: 30px; /* Increased padding */ border-radius: 14px; /* More rounded */ width: 90%; max-width: 700px; /* Adjusted max-width */ position: relative; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
         }
-        .btn-primary:hover {
-            background-color: #0056b3;
+        .close {
+            position: absolute; top: 15px; right: 20px; font-size: 30px; font-weight: 300; /* Lighter close button */ cursor: pointer; color: #aaa; transition: color 0.2s;
         }
-        .btn-link {
-            background: none;
-            border: none;
-            color: #007aff;
-            text-decoration: none;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 15px;
-            padding: 5px;
+        .close:hover { color: #333; }
+        #map-container {
+            height: 350px; background-color: #e5e5e5; /* Lighter placeholder bg */ margin-top: 25px; border-radius: 10px; display: flex; justify-content: center; align-items: center; overflow: hidden; /* Hide overflow */
         }
-        .btn-link:hover {
-            text-decoration: underline;
+        #map-container img { max-width: 100%; max-height: 100%; object-fit: cover; } /* Ensure image covers */
+        #map-details { margin-top: 25px; font-size: 15px; line-height: 1.6; color: #333; }
+        #map-details strong { color: #1d1d1f; font-weight: 600; }
+
+        /* Badge */
+        .badge {
+            display: inline-block; min-width: 18px; /* Slightly wider */ padding: 3px 7px; font-size: 11px; font-weight: 700; line-height: 1; color: #fff; text-align: center; white-space: nowrap; vertical-align: baseline; /* Better alignment */ background-color: #ff3b30; /* Apple red badge */ border-radius: 9px; /* Pill shape */ margin-left: 6px;
         }
-        .toggle-container {
-            text-align: center;
-            margin-top: 20px;
-        }
+
+        /* Alert Messages */
         .alert {
             padding: 12px 15px;
             margin-bottom: 20px;
             border-radius: 8px;
+            border: 1px solid transparent;
             font-size: 14px;
-        }
-        .alert-danger {
-            background-color: #ffe5e5;
-            border: 1px solid #ffcccc;
-            color: #d63027;
+            text-align: center;
         }
         .alert-success {
-            background-color: #e5ffe8;
-            border: 1px solid #ccffcc;
+            background-color: rgba(52, 199, 89, 0.1);
+            border-color: rgba(52, 199, 89, 0.3);
             color: #2ca048;
         }
+        .alert-error {
+            background-color: rgba(255, 59, 48, 0.1);
+            border-color: rgba(255, 59, 48, 0.3);
+            color: #d63027;
+        }
+        .alert-info {
+            background-color: rgba(0, 122, 255, 0.1);
+            border-color: rgba(0, 122, 255, 0.3);
+            color: #0056b3;
+        }
+
+         /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            .header-content { flex-direction: column; text-align: center; gap: 10px; }
+            .header-content h1 { font-size: 22px; }
+            nav ul { justify-content: center; gap: 8px 15px; }
+            nav a { font-size: 13px; padding: 5px 10px; }
+            h2 { font-size: 24px; }
+            .card { padding: 20px; border-radius: 10px; }
+            .clock-display { font-size: 48px; }
+            .clock-buttons button { width: calc(50% - 10px); font-size: 14px; padding: 10px 18px; }
+            .modal-content { width: 95%; margin: 5% auto; padding: 20px; }
+            #map-container { height: 300px; }
+            table th, table td { padding: 12px 14px; font-size: 13px; }
+        }
+
         @media (max-width: 480px) {
-            .container {
-                padding: 15px;
-            }
-            .card {
-                padding: 20px;
-            }
-            h2 {
-                font-size: 20px;
-            }
-            .form-control {
-                padding: 10px 12px;
-            }
-            .btn-primary {
-                padding: 12px 18px;
-            }
+             .container { padding: 15px; }
+             h2 { font-size: 22px; }
+             .clock-display { font-size: 40px; }
+             .clock-buttons button { width: 100%; }
+             table th, table td { padding: 10px 12px; font-size: 12px; }
+             .modal-content { padding: 15px; }
+             #map-container { height: 250px; }
+             #map-details { font-size: 14px; }
+             nav ul { gap: 5px 10px; }
+             nav a { font-size: 12px; padding: 4px 8px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo-section">
+    <header>
+        <div class="container header-content">
             <h1>Gestion des Ouvriers</h1>
-            <p>Système de pointage et gestion du personnel</p>
+            <div class="user-info">
+                <span><?php echo htmlspecialchars($user['prenom'] . ' ' . $user['nom']); ?></span>
+                <div class="user-avatar">
+                    <?php 
+                    // Generate initials from first and last name
+                    echo htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1))); 
+                    ?>
+                </div>
+            </div>
         </div>
+    </header>
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="dashboard.php">Tableau de bord</a></li>
+                <li><a href="timesheet.php" class="active">Pointage</a></li>
+                <li><a href="conges.php">Congés <span class="badge">2</span></a></li>
+                <li><a href="arrets.php">Arrêts Maladie</a></li>
+                <li><a href="employes.php">Employés</a></li>
+                <li><a href="planning.php">Planning <span class="badge">3</span></a></li>
+                <li><a href="chat.php">Chat <span class="badge">5</span></a></li>
+                <li><a href="messages.php">Messages RH/Direction <span class="badge">1</span></a></li>
+                <li><a href="logout.php">Déconnexion</a></li>
+            </ul>
+        </div>
+    </nav>
 
+    <div class="container">
+        <div id="pointage">
+            <h2>Pointage</h2>
+            
+            <!-- Status messages area -->
+            <div id="status-message" style="display: none;"></div>
 
+            <div class="clock-section">
+                <div class="card clock-card">
+                    <div class="clock-display" id="current-time">--:--:--</div>
 
-
-        
-      
-
-        <div class="card">
-            <?php if(!empty($errorMsg)): ?>
-                <div class="alert alert-danger"><?php echo $errorMsg; ?></div>
-            <?php endif; ?>
-            <?php if(!empty($successMsg)): ?>
-                <div class="alert alert-success"><?php echo $successMsg; ?></div>
-            <?php endif; ?>
-
-            <?php if($showLogin): ?>
-                <h2>Connexion</h2>
-                <form method="post" action="">
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" class="form-control" required>
+                    <div class="location-toggle-container">
+                        <span>Localisation:</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-location" checked>
+                            <span class="slider round"></span>
+                        </label>
+                        <span id="location-status-text" style="color: #34c759;">Activée</span>
                     </div>
-                    <div class="form-group">
-                        <label for="password">Mot de passe</label>
-                        <input type="password" id="password" name="password" class="form-control" required>
+
+                    <div id="location-info">
+                        <div id="current-location">Statut: <span id="location-status" class="pending">Obtention...</span></div>
+                        <div id="location-address"></div>
                     </div>
-                    <button type="submit" name="login" class="btn-primary">Se connecter</button>
-                </form>
-                <div class="toggle-container">
-                    <p>Pas encore de compte?</p>
-                    <form method="post" action="">
-                        <input type="hidden" name="toggleForm" value="register">
-                        <button type="submit" class="btn-link">Créer un compte</button>
-                    </form>
+
+                    <div class="clock-buttons">
+                        <button class="btn-success" id="btn-entree" onclick="enregistrerPointage('record_entry')">Enregistrer Entrée</button>
+                        <button class="btn-danger" id="btn-sortie" onclick="enregistrerPointage('record_exit')">Enregistrer Sortie</button>
+                    </div>
                 </div>
-            <?php else: ?>
-                <h2>Créer un compte</h2>
-                <form method="post" action="">
-                    <div class="form-group">
-                        <label for="nom">Nom</label>
-                        <input type="text" id="nom" name="nom" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="prenom">Prénom</label>
-                        <input type="text" id="prenom" name="prenom" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Mot de passe</label>
-                        <input type="password" id="password" name="password" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirm_password">Confirmer le mot de passe</label>
-                        <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
-                    </div>
-                    <button type="submit" name="register" class="btn-primary">Créer un compte</button>
-                </form>
-                <div class="toggle-container">
-                    <p>Déjà un compte?</p>
-                    <form method="post" action="">
-                        <input type="hidden" name="toggleForm" value="login">
-                        <button type="submit" class="btn-link">Se connecter</button>
-                    </form>
+            </div>
+            <div class="card">
+                <h3>Historique des pointages</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Entrée</th>
+                                <th>Lieu Entrée</th>
+                                <th>Sortie</th>
+                                <th>Lieu Sortie</th>
+                                <th>Total</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timesheet-history">
+                            <!-- History data will be loaded here via JavaScript -->
+                            <tr>
+                                <td colspan="7" style="text-align: center;">Chargement des données...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-            <?php endif; ?>
+            </div>
+
+            <div id="map-modal" class="modal">
+                <div class="modal-content">
+                    <span class="close" onclick="document.getElementById('map-modal').style.display='none'">&times;</span>
+                    <h3 id="map-modal-title">Localisation des pointages</h3>
+                    <div id="map-container">
+                        <img src="/api/placeholder/600/350" alt="Carte de localisation" style="max-width: 100%; max-height: 100%;">
+                    </div>
+                    <div id="map-details">
+                        <p><strong>Entrée:</strong> <span id="map-entree-time">--:--</span> - <span id="map-entree-loc">(Lieu)</span></p>
+                        <p><strong>Sortie:</strong> <span id="map-sortie-time">--:--</span> - <span id="map-sortie-loc">(Lieu)</span></p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <script>
+        // Global variables for location data
+        let currentLatitude = null;
+        let currentLongitude = null;
+        let currentLocationAddress = null;
+        
+        // Clock Update function
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+        }
+        const clockInterval = setInterval(updateClock, 1000);
+        updateClock(); // Initial call
+        
+        // Show status message function
+        function showStatusMessage(message, type = 'info') {
+            const statusDiv = document.getElementById('status-message');
+            if (!statusDiv) return;
+            
+            // Set message and class
+            statusDiv.innerHTML = message;
+            statusDiv.className = `alert alert-${type}`;
+            statusDiv.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Enhanced Mobile-Friendly Geolocation
+        function getLocation() {
+            const locationStatus = document.getElementById('location-status');
+            const locationAddress = document.getElementById('location-address');
+            
+            if (!locationStatus || !locationAddress) return; // Exit if elements not found
+            
+            // Update status to pending
+            locationStatus.textContent = "Obtention...";
+            locationStatus.className = "pending";
+            locationAddress.textContent = ""; // Clear previous address
+            
+            // Reset global location variables
+            currentLatitude = null;
+            currentLongitude = null;
+            currentLocationAddress = null;
+            
+            // Check if geolocation is available
+            if (!navigator.geolocation) {
+                locationStatus.textContent = "Non supportée";
+                locationStatus.className = "error";
+                locationAddress.textContent = "La géolocalisation n'est pas supportée par ce navigateur.";
+                return;
+            }
+            
+            // Set options with longer timeout for mobile
+            const geoOptions = {
+                enableHighAccuracy: true,
+                timeout: 15000, // Longer timeout (15 seconds) for mobile devices
+                maximumAge: 0 // Don't use cached position
+            };
+            
+            // Get current position with retry mechanism
+            let retryCount = 0;
+            const maxRetries = 2;
+            
+            function tryGetPosition() {
+                navigator.geolocation.getCurrentPosition(
+                    // Success callback
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        const accuracy = position.coords.accuracy;
+                        
+                        // Set global variables
+                        currentLatitude = lat;
+                        currentLongitude = lon;
+                        
+                        locationStatus.textContent = "Position trouvée";
+                        locationStatus.className = "success";
+                        
+                        // Display coordinates with accuracy information
+                        const locationText = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                        locationAddress.textContent = locationText;
+                        currentLocationAddress = locationText;
+                        
+                        // Check if location is accurate enough for business use
+                        if (accuracy > 100) { // If accuracy is worse than 100 meters
+                            locationAddress.textContent += ` (Précision: ~${Math.round(accuracy)}m)`;
+                            currentLocationAddress += ` (Précision: ~${Math.round(accuracy)}m)`;
+                        }
+                        
+                        // Store successful coordinates in session storage
+                        storeLastLocation(lat, lon, locationText);
+                    },
+                    // Error callback
+                    (error) => {
+                        // Try again if under max retries
+                        if (retryCount < maxRetries) {
+                            retryCount++;
+                            locationStatus.textContent = `Nouvelle tentative (${retryCount})...`;
+                            setTimeout(tryGetPosition, 1000); // Wait 1 second before retry
+                            return;
+                        }
+                        
+                        // Handle error after all retries
+                        locationStatus.textContent = "Erreur Géo.";
+                        locationStatus.className = "error";
+                        
+                        // Get specific error message
+                        let errorMsg = getGeolocationErrorMessage(error);
+                        locationAddress.textContent = errorMsg;
+                        
+                        // Fallback to last known position if available
+                        tryFallbackLocation();
+                    },
+                    geoOptions
+                );
+            }
+            
+            // Start first attempt
+            tryGetPosition();
+        }
+        
+        // Store successful location for fallback
+        function storeLastLocation(lat, lon, address) {
+            try {
+                sessionStorage.setItem('lastLat', lat);
+                sessionStorage.setItem('lastLon', lon);
+                sessionStorage.setItem('lastAddress', address);
+                sessionStorage.setItem('lastLocationTime', new Date().toISOString());
+            } catch (e) {
+                console.log('Could not store location in session storage');
+            }
+        }
+        
+        // Try to use last known location as fallback
+        function tryFallbackLocation() {
+            try {
+                const lastLat = sessionStorage.getItem('lastLat');
+                const lastLon = sessionStorage.getItem('lastLon');
+                const lastAddress = sessionStorage.getItem('lastAddress');
+                const lastTime = sessionStorage.getItem('lastLocationTime');
+                
+                if (lastLat && lastLon && lastTime) {
+                    const timeDiff = (new Date() - new Date(lastTime)) / (1000 * 60); // minutes
+                    if (timeDiff < 30) { // Use cached location if less than 30 minutes old
+                        const locationAddress = document.getElementById('location-address');
+                        const locationStatus = document.getElementById('location-status');
+                        
+                        // Set global variables
+                        currentLatitude = parseFloat(lastLat);
+                        currentLongitude = parseFloat(lastLon);
+                        currentLocationAddress = lastAddress + ` (Position d'il y a ${Math.round(timeDiff)} minutes)`;
+                        
+                        locationStatus.textContent = "Position antérieure";
+                        locationStatus.className = "warning";
+                        
+                        locationAddress.textContent = currentLocationAddress;
+                        
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.log('Could not retrieve fallback location');
+            }
+            return false;
+        }
+        
+        // Mobile check
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        function getGeolocationErrorMessage(error) {
+            // For permission denied errors on mobile, give more specific guidance
+            if (error.code === error.PERMISSION_DENIED && isMobileDevice()) {
+                return "Accès refusé. Vérifiez les paramètres de localisation de votre téléphone et autorisez ce site à accéder à votre position.";
+            }
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED: 
+                    return "Accès localisation refusé. Vérifiez les autorisations dans votre navigateur.";
+                case error.POSITION_UNAVAILABLE: 
+                    return "Position indisponible. Vérifiez que le GPS est activé ou essayez dehors pour un meilleur signal.";
+                case error.TIMEOUT: 
+                    return "Délai d'attente dépassé. Le GPS peut prendre plus de temps à l'intérieur des bâtiments.";
+                default: 
+                    return `Erreur localisation inconnue (${error.code}).`;
+            }
+        }
+        
+        // Function to make AJAX requests
+        function makeAjaxRequest(action, data, callback) {
+            // Create FormData object
+            const formData = new FormData();
+            formData.append('action', action);
+            
+            // Add other data to FormData
+            for (const key in data) {
+                if (data.hasOwnProperty(key)) {
+                    formData.append(key, data[key]);
+                }
+            }
+            
+            // Create and send the request
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'timesheet-handler.php', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            callback(null, response);
+                        } catch (e) {
+                            callback('Erreur de parsing JSON: ' + e.message);
+                        }
+                    } else {
+                        callback('Erreur réseau: ' + xhr.status);
+                    }
+                }
+            };
+            xhr.send(formData);
+        }
+        
+        // Record Time Entry
+        function enregistrerPointage(action) {
+            const toggleLocation = document.getElementById('toggle-location');
+            const locationStatus = document.getElementById('location-status');
+            
+            let latitude = null;
+            let longitude = null;
+            let address = null;
+            
+            // Check if location is enabled and available
+            if (toggleLocation && toggleLocation.checked && locationStatus) {
+                // Location is enabled, use the global variables
+                latitude = currentLatitude;
+                longitude = currentLongitude;
+                address = currentLocationAddress;
+                
+                // Check if we have valid coordinates
+                if (!latitude || !longitude) {
+                    showStatusMessage("Position non disponible. Veuillez activer et autoriser la localisation.", "error");
+                    return;
+                }
+            }
+            
+            // Prepare data object
+            const data = {
+                latitude: latitude,
+                longitude: longitude,
+                address: address
+            };
+            
+            // Show pending status
+            showStatusMessage("Envoi en cours...", "info");
+            
+            // Make AJAX request
+            makeAjaxRequest(action, data, function(error, response) {
+                if (error) {
+                    showStatusMessage("Erreur: " + error, "error");
+                    return;
+                }
+                
+                if (response.status === "success") {
+                    showStatusMessage(response.message, "success");
+                    
+                    // Refresh the history table
+                    loadTimesheetHistory();
+                } else {
+                    showStatusMessage("Erreur: " + response.message, "error");
+                }
+            });
+        }
+        
+        // Load timesheet history
+        function loadTimesheetHistory() {
+            const tableBody = document.getElementById('timesheet-history');
+            if (!tableBody) return;
+            
+            // Show loading state
+            tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Chargement des données...</td></tr>';
+            
+            // Make AJAX request to get history
+            makeAjaxRequest('get_history', {}, function(error, response) {
+                if (error) {
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Erreur: ' + error + '</td></tr>';
+                    return;
+                }
+                
+                if (response.status === "success" && Array.isArray(response.data)) {
+                    if (response.data.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Aucun pointage trouvé</td></tr>';
+                        return;
+                    }
+                    
+                    // Clear the table
+                    tableBody.innerHTML = '';
+                    
+                    // Add rows for each entry
+                    response.data.forEach(function(entry) {
+                        const row = document.createElement('tr');
+                        
+                        // Format the HTML content for the row
+                        row.innerHTML = `
+                            <td>${entry.date}</td>
+                            <td>${entry.logon_time}</td>
+                            <td>${formatLocation(entry.logon_location)}</td>
+                            <td>${entry.logoff_time}</td>
+                            <td>${formatLocation(entry.logoff_location)}</td>
+                            <td>${entry.duration || '--'}</td>
+                            <td>
+                                <button class="btn-primary" onclick="showMap(${entry.id}, '${entry.date}', '${entry.logon_time}', '${entry.logon_location}', '${entry.logoff_time}', '${entry.logoff_location}')">
+                                    Voir carte
+                                </button>
+                            </td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                    });
+                } else {
+                    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Erreur: ' + response.message + '</td></tr>';
+                }
+            });
+        }
+        
+        // Format location text to avoid overly long displays
+        function formatLocation(location) {
+            if (!location || location === 'Non enregistré') return 'Non enregistré';
+            
+            // If it contains coordinates, shorten them
+            if (location.includes('Lat:')) {
+                return 'Position GPS enregistrée';
+            }
+            
+            // Otherwise return the first 20 chars with ellipsis if needed
+            return location.length > 20 ? location.substring(0, 20) + '...' : location;
+        }
+        
+        // Show map modal with location details
+        function showMap(id, date, entreeTime, entreeLoc, sortieTime, sortieLoc) {
+            // Update modal content
+            document.getElementById('map-modal-title').textContent = 'Pointages du ' + date;
+            document.getElementById('map-entree-time').textContent = entreeTime;
+            document.getElementById('map-entree-loc').textContent = entreeLoc;
+            document.getElementById('map-sortie-time').textContent = sortieTime;
+            document.getElementById('map-sortie-loc').textContent = sortieLoc;
+            
+            // Show the modal
+            document.getElementById('map-modal').style.display = 'block';
+        }
+        
+        // Location toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleLocation = document.getElementById('toggle-location');
+            const locationStatusText = document.getElementById('location-status-text');
+            
+            if (toggleLocation && locationStatusText) {
+                toggleLocation.addEventListener('change', function() {
+                    if (this.checked) {
+                        locationStatusText.textContent = 'Activée';
+                        locationStatusText.style.color = '#34c759'; // Green
+                        getLocation(); // Get location immediately
+                    } else {
+                        locationStatusText.textContent = 'Désactivée';
+                        locationStatusText.style.color = '#ff3b30'; // Red
+                        
+                        // Reset location display
+                        const locationStatus = document.getElementById('location-status');
+                        const locationAddress = document.getElementById('location-address');
+                        
+                        if (locationStatus) locationStatus.textContent = 'Désactivée';
+                        if (locationStatus) locationStatus.className = 'error';
+                        if (locationAddress) locationAddress.textContent = '';
+                        
+                        // Reset global variables
+                        currentLatitude = null;
+                        currentLongitude = null;
+                        currentLocationAddress = null;
+                    }
+                });
+            }
+            
+            // Initial location check if toggle is on
+            if (toggleLocation && toggleLocation.checked) {
+                getLocation();
+            }
+            
+            // Load initial timesheet history
+            loadTimesheetHistory();
+        });
+        
+        // Check location every 5 minutes if enabled
+        setInterval(function() {
+            const toggleLocation = document.getElementById('toggle-location');
+            if (toggleLocation && toggleLocation.checked) {
+                getLocation();
+            }
+        }, 300000); // 5 minutes = 300000ms
+    </script>
 </body>
 </html>
+            
