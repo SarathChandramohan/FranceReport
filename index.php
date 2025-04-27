@@ -163,42 +163,22 @@ session_start(); // <-- Move session_start to the top before anything else (no s
     </div>
 
 <?php
-$serverName = "francerecord.database.windows.net";
-$connectionOptions = array(
-    "Database" => "francerecord",
-    "Uid" => "francerecordloki",
-    "PWD" => "Hesoyam@2025",
-    "TrustServerCertificate" => false,
-    "Encrypt" => true
-);
+
 
 function connectDB() {
-    global $serverName, $connectionOptions;
     try {
-        $conn = sqlsrv_connect($serverName, $connectionOptions);
-        if($conn === false) {
-            $errors = sqlsrv_errors();
-            if ($errors !== null) {
-                error_log("SQLSRV Connection Error:");
-                foreach ($errors as $error) {
-                    error_log("  SQLSTATE: " . $error['SQLSTATE']);
-                    error_log("  Code: " . $error['code']);
-                    error_log("  Message: " . $error['message']);
-                }
-            } else {
-                error_log("SQLSRV Connection failed, but no specific errors reported by sqlsrv_errors().");
-            }
-            return false;
-        }
-        return $conn;
-    } catch(Exception $e) {
-        error_log("Caught Exception:");
-        error_log("  Message: " . $e->getMessage());
-        error_log("  File: " . $e->getFile());
-        error_log("  Line: " . $e->getLine());
-        error_log("  Trace: " . $e->getTraceAsString());
-        return false;
-    }
+    $conn = new PDO("sqlsrv:server = tcp:francerecord.database.windows.net,1433; Database = Francerecord", "francerecordloki", "Hesoyam@2025");
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+}
+catch (PDOException $e) {
+    print("Error connecting to SQL Server.");
+    die(print_r($e));
+}
+
+// SQL Server Extension Sample Code:
+$connectionInfo = array("UID" => "francerecordloki", "pwd" => "Hesoyam@2025", "Database" => "Francerecord", "LoginTimeout" => 30, "Encrypt" => 1, "TrustServerCertificate" => 0);
+$serverName = "tcp:francerecord.database.windows.net,1433";
+$conn = sqlsrv_connect($serverName, $connectionInfo);
 }
 
 function validateEmail($email) {
