@@ -1,0 +1,41 @@
+server name francerecord
+francerecordloki
+Hesoyam@2025
+---------------------------
+CREATE TABLE Users (
+    user_id INT IDENTITY(1,1) PRIMARY KEY,
+    nom NVARCHAR(255) NOT NULL,           
+    prenom NVARCHAR(255) NOT NULL,       
+    email NVARCHAR(255) NOT NULL UNIQUE,
+    role VARCHAR(50) NOT NULL DEFAULT 'User',
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    password_hash NVARCHAR(255) NOT NULL, 
+    date_creation DATETIME DEFAULT GETDATE() 
+);
+--------------------------------------------------------
+
+CREATE TABLE Timesheet (
+    timesheet_id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT NOT NULL, -- Foreign key to the Users table
+    entry_date DATE NOT NULL, -- Stores just the date of the entry
+    logon_time DATETIME NULL, -- Stores the timestamp when the user logged on
+    logon_latitude DECIMAL(9, 6) NULL, -- Latitude with reasonable precision
+    logon_longitude DECIMAL(9, 6) NULL, -- Longitude with reasonable precision
+    logon_address NVARCHAR(500) NULL, -- Address string, can be nullable
+    logoff_time DATETIME NULL, -- Stores the timestamp when the user logged off
+    logoff_latitude DECIMAL(9, 6) NULL,
+    logoff_longitude DECIMAL(9, 6) NULL,
+    logoff_address NVARCHAR(500) NULL,
+
+    -- Define the foreign key constraint
+    CONSTRAINT FK_Timesheet_Users FOREIGN KEY (user_id)
+    REFERENCES Users (user_id)
+    ON DELETE CASCADE -- Optional: Define behavior on user deletion (e.g., CASCADE, NO ACTION)
+);
+
+-----------------------------------------------------------
+
+CREATE INDEX IX_Timesheet_EntryDate
+ON Timesheet (entry_date);
+
+-------------------------------------------------------------
