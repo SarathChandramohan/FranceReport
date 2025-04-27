@@ -9,8 +9,150 @@ session_start(); // <-- Move session_start to the top before anything else (no s
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - Gestion des Ouvriers</title>
     <style>
+        <style>
         /* Your existing CSS here (no changes) */
-        /* ... (no CSS changes needed) ... */
+        /* --- Apple Inspired Theme --- */
+        /* Basic Reset and Font */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        }
+        body {
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 420px;
+            padding: 25px;
+        }
+        .logo-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo-section h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+        .logo-section p {
+            color: #6e6e73;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 30px;
+            margin-bottom: 25px;
+            border: 1px solid #e5e5e5;
+        }
+        h2 {
+            margin-bottom: 25px;
+            color: #1d1d1f;
+            font-size: 22px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            background-color: #f5f5f7;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-control:focus {
+            border-color: #0071e3;
+            box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2);
+            outline: none;
+        }
+        .btn-primary {
+            background-color: #007aff;
+            color: white;
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 10px;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-link {
+            background: none;
+            border: none;
+            color: #007aff;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 15px;
+            padding: 5px;
+        }
+        .btn-link:hover {
+            text-decoration: underline;
+        }
+        .toggle-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .alert {
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .alert-danger {
+            background-color: #ffe5e5;
+            border: 1px solid #ffcccc;
+            color: #d63027;
+        }
+        .alert-success {
+            background-color: #e5ffe8;
+            border: 1px solid #ccffcc;
+            color: #2ca048;
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            .card {
+                padding: 20px;
+            }
+            h2 {
+                font-size: 20px;
+            }
+            .form-control {
+                padding: 10px 12px;
+            }
+            .btn-primary {
+                padding: 12px 18px;
+            }
+        }
     </style>
 </head>
 <body>
