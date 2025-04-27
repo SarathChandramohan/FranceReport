@@ -384,6 +384,7 @@ $user = getCurrentUser();
                 </div>
             </div>
         </div>
+        
     </header>
     <nav>
         <div class="container">
@@ -462,7 +463,7 @@ $user = getCurrentUser();
                     <span class="close" onclick="document.getElementById('map-modal').style.display='none'">&times;</span>
                     <h3 id="map-modal-title">Localisation des pointages</h3>
                     <div id="map-container">
-                        <img src="/api/placeholder/600/350" alt="Carte de localisation" style="max-width: 100%; max-height: 100%;">
+                    <div id="map" style="width:100%; height:350px;"></div>
                     </div>
                     <div id="map-details">
                         <p><strong>Entrée:</strong> <span id="map-entree-time">--:--</span> - <span id="map-entree-loc">(Lieu)</span></p>
@@ -472,12 +473,15 @@ $user = getCurrentUser();
             </div>
         </div>
     </div>
-
+<!-- Leaflet.js OpenStreetMap library -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Global variables for location data
         let currentLatitude = null;
         let currentLongitude = null;
         let currentLocationAddress = null;
+        
         
         // Clock Update function
         function updateClock() {
@@ -879,7 +883,50 @@ $user = getCurrentUser();
                 getLocation();
             }
         }, 300000); // 5 minutes = 300000ms
-    </script>
+        
+let mapInitialized = false;
+let mapInstance;
+
+function showMap(id, startDate, startTime, startLocation, endTime, endLocation) {
+    document.getElementById('map-modal').style.display = 'block';
+
+    const startCoords = extractCoordinates(startLocation);
+    const endCoords = extractCoordinates(endLocation);
+
+    document.getElementById('map-modal-title').textContent = "Pointages du " + startDate;
+    document.getElementById('map-entree-time').textContent = startTime;
+    document.getElementById('map-entree-loc').textContent = startLocation;
+    document.getElementById('map-sortie-time').textContent = endTime;
+    document.getElementById('map-sortie-loc').textContent = endLocation;
+
+    if (!mapInitialized) {
+        mapInstance = L.map('map').setView(startCoords, 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(mapInstance);
+        mapInitialized = true;
+    } else {
+        mapInstance.setView(startCoords, 13);
+        mapInstance.eachLayer(function (layer) {
+            if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                mapInstance.removeLayer(layer);
+            }
+        });
+    }
+
+    L.marker(startCoords).addTo(mapInstance).bindPopup(`Entrée: ${startTime}`).openPopup();
+    L.marker(endCoords).addTo(mapInstance).bindPopup(`Sortie: ${endTime}`);
+    L.polyline([startCoords, endCoords], { color: 'blue' }).addTo(mapInstance);
+}
+
+function extractCoordinates(locationString) {
+    const match = locationString.match(/Lat:\s*(-?\d+\.\d+),\s*Lon:\s*(-?\d+\.\d+)/);
+    if (match) {
+        return [parseFloat(match[1]), parseFloat(match[2])];
+    }
+    return [0, 0]; // fallback if parsing fails
+}
+</script>
 </body>
 </html>
             
