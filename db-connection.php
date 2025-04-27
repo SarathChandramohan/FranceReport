@@ -9,7 +9,7 @@ try {
     $password = "Hesoyam@2025";
     
     // Connection string
-    $dsn = "sqlsrv:Server=$server;Database=$database";
+    $dsn = "sqlsrv:Server=$server;Database=$database;CharacterSet=UTF-8";
     
     // Create connection with PDO
     $conn = new PDO($dsn, $username, $password, [
@@ -17,9 +17,6 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false
     ]);
-    
-    // Set character set
-    $conn->exec("SET NAMES 'utf8'");
     
 } catch(PDOException $e) {
     // Log error and display friendly message
