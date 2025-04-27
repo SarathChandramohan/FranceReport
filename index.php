@@ -166,21 +166,27 @@ session_start(); // <-- Move session_start to the top before anything else (no s
 
 
 function connectDB() {
-    try {
-    $conn = new PDO("sqlsrv:server = tcp:francerecord.database.windows.net,1433; Database = Francerecord", "francerecordloki", "Hesoyam@2025");
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-}
-catch (PDOException $e) {
-    print("Error connecting to SQL Server.");
-    die(print_r($e));
-}
+    $connectionInfo = array(
+        "UID" => "francerecordloki",
+        "pwd" => "Hesoyam@2025",
+        "Database" => "Francerecord",
+        "LoginTimeout" => 30,
+        "Encrypt" => 1,
+        "TrustServerCertificate" => 0
+    );
+    $serverName = "tcp:francerecord.database.windows.net,1433";
 
-// SQL Server Extension Sample Code:
-$connectionInfo = array("UID" => "francerecordloki", "pwd" => "Hesoyam@2025", "Database" => "Francerecord", "LoginTimeout" => 30, "Encrypt" => 1, "TrustServerCertificate" => 0);
-$serverName = "tcp:francerecord.database.windows.net,1433";
-$conn = sqlsrv_connect($serverName, $connectionInfo);
-}
+    $conn = sqlsrv_connect($serverName, $connectionInfo);
 
+    if($conn === false) {
+        // Throw an exception just like PDO would
+        $errors = sqlsrv_errors();
+        $message = isset($errors[0]['message']) ? $errors[0]['message'] : 'Unknown error during SQL Server connection.';
+        throw new Exception("Erreur de connexion SQL Server: " . $message);
+    }
+
+    return $conn;
+}
 function validateEmail($email) {
     return filter_var($email, FILTER_VALIDATE_EMAIL);
 }
