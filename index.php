@@ -160,11 +160,11 @@
         <?php
         session_start();
 
-        $serverName = "your_azure_server.database.windows.net";
+        $serverName = "francerecord.database.windows.net";
         $connectionOptions = array(
-            "Database" => "your_database",
-            "Uid" => "your_username",
-            "PWD" => "your_password",
+            "Database" => "francerecord",
+            "Uid" => "francerecordloki",
+            "PWD" => "Hesoyam@2025",
             "TrustServerCertificate" => false,
             "Encrypt" => true
         );
@@ -211,8 +211,8 @@
 
         function registerUser($conn, $nom, $prenom, $email, $password) {
             $hashedPassword = hashPassword($password);
-            $sql = "INSERT INTO Users (nom, prenom, email, password_hash, date_creation) VALUES (?, ?, ?, ?, GETDATE())";
-            $params = array($nom, $prenom, $email, $hashedPassword);
+            $sql = "INSERT INTO Users (nom, prenom, email,role,status, password_hash, date_creation) VALUES (?, ?, ?,?,? ?, GETDATE())";
+            $params = array($nom, $prenom, $email,"User","Active", $hashedPassword);
             
             $stmt = sqlsrv_query($conn, $sql, $params);
             if($stmt === false) {
