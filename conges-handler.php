@@ -107,7 +107,7 @@ function submitLeaveRequest($user_id) {
         $stmt = $conn->prepare("INSERT INTO Conges 
                                (user_id, date_debut, date_fin, type_conge, 
                                 duree, commentaire, document, status, date_demande) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, GetDate())");
         
         $stmt->execute([
             $user_id,
@@ -175,7 +175,7 @@ function cancelLeaveRequest($user_id) {
         // Update leave status to cancelled
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'cancelled', 
-                                   date_reponse = NOW() 
+                                   date_reponse = GetDate() 
                                WHERE conge_id = ?");
         $stmt->execute([$leave_id]);
         
