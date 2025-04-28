@@ -1,4 +1,4 @@
-<?php
+vid=Se<?php
 // conges-handler.php - Handles all AJAX requests for leave management operations
 
 // Include database connection
@@ -71,7 +71,7 @@ function getPendingRequests($user_id) {
                                 u.prenom as employee_firstname,
                                 u.nom as employee_lastname
                                FROM Conges c
-                               JOIN Users u ON c.user_id = u.id 
+                               JOIN Users u ON c.user_id = u.user_id 
                                WHERE c.status = 'pending' 
                                ORDER BY c.date_demande ASC");
         
@@ -135,7 +135,7 @@ function approveLeaveRequest($user_id) {
         // Update leave status to approved
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'approved', 
-                                   date_reponse = NOW(),
+                                   date_reponse = GetDate(),
                                    reponse_commentaire = ?,
                                    admin_id = ?
                                WHERE conge_id = ?");
@@ -202,7 +202,7 @@ function rejectLeaveRequest($user_id) {
         // Update leave status to rejected
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'rejected', 
-                                   date_reponse = NOW(),
+                                   date_reponse = GetDate(),
                                    reponse_commentaire = ?,
                                    admin_id = ?
                                WHERE conge_id = ?");
