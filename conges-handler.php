@@ -108,7 +108,7 @@ function approveLeaveRequest($user_id) {
     }
     
     // Get leave ID and comment
-    $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
+    $leave_id = isset($_POST['conge_id']) ? intval($_POST['conge_id']) : 0;
     $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
     
     if ($leave_id <= 0) {
@@ -171,7 +171,7 @@ function rejectLeaveRequest($user_id) {
     }
     
     // Get leave ID and comment
-    $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
+    $leave_id = isset($_POST['conge_id']) ? intval($_POST['conge_id']) : 0;
     $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
     
     if ($leave_id <= 0) {
@@ -495,7 +495,7 @@ function getLeaveDetails($user_id) {
     global $conn;
     
     // Get leave ID
-    $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
+    $leave_id = isset($_POST['conge_id']) ? intval($_POST['conge_id']) : 0;
     
     if ($leave_id <= 0) {
         respondWithError('ID de congé invalide.');
