@@ -515,10 +515,12 @@ $user = getCurrentUser();
             <!-- Tabs for Leave Management -->
             <div class="tabs-container">
                 <div class="tabs-nav">
-                    <button class="tab-button active" onclick="openTab('new-leave')">Nouvelle Demande</button>
-                    <button class="tab-button" onclick="openTab('leave-history')">Historique des Demandes</button>
-                    <button class="tab-button" onclick="openTab('leave-stats')">Solde de Congés</button>
-                </div>
+        <button class="tab-button active" onclick="openTab('new-leave')">Nouvelle Demande</button>
+        <button class="tab-button" onclick="openTab('leave-history')">Historique des Demandes</button>
+        <?php if ($user['role'] == 'Admin'): ?>
+        <button class="tab-button" onclick="openTab('admin-approvals')">Administration</button>
+        <?php endif; ?>
+    </div>
                 
                 <!-- New Leave Request Tab -->
                 <div id="new-leave" class="tab-content active">
@@ -554,12 +556,13 @@ $user = getCurrentUser();
                             </div>
 
                             <div class="form-group">
-                                <label for="document">Joindre un document (optionnel)</label>
-                                <div class="file-input-wrapper">
-                                    <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png">
-                                </div>
-                                <div id="file-name" class="file-name"></div>
-                            </div>
+    <label for="document">Joindre un document (optionnel)</label>
+    <div class="file-input-wrapper">
+        <button type="button" class="btn-success">Choisir un fichier</button>
+        <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png">
+    </div>
+    <div id="file-name" class="file-name"></div>
+</div>
 
                             <button type="submit" class="btn-primary">Soumettre la Demande</button>
                         </form>
@@ -592,7 +595,35 @@ $user = getCurrentUser();
                         </div>
                     </div>
                 </div>
-                
+                <?php if ($user['role'] == 'Admin'): ?>
+    <!-- Admin Approvals Tab (Only visible to admins) -->
+    <div id="admin-approvals" class="tab-content">
+        <div class="card">
+            <h3>Demandes en Attente</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employé</th>
+                            <th>Dates</th>
+                            <th>Type de Congé</th>
+                            <th>Durée</th>
+                            <th>Document</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-requests">
+                        <!-- Pending requests will be loaded here via JavaScript -->
+                        <tr>
+                            <td colspan="6" style="text-align: center;">Chargement des données...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
                 <!-- Leave Stats Tab -->
                 <div id="leave-stats" class="tab-content">
                     <div class="card">
@@ -636,36 +667,36 @@ $user = getCurrentUser();
     <script>
         // Tab navigation functionality
         function openTab(tabId) {
-            // Hide all tab contents
-            const tabContents = document.getElementsByClassName('tab-content');
-            for (let i = 0; i < tabContents.length; i++) {
-                tabContents[i].classList.remove('active');
-            }
-            
-            // Deactivate all tab buttons
-            const tabButtons = document.getElementsByClassName('tab-button');
-            for (let i = 0; i < tabButtons.length; i++) {
-                tabButtons[i].classList.remove('active');
-            }
-            
-            // Show the selected tab content
-            document.getElementById(tabId).classList.add('active');
-            
-            // Activate the clicked tab button (find the button that calls this tab)
-            const buttons = document.querySelectorAll('.tab-button');
-            buttons.forEach(button => {
-                if (button.getAttribute('onclick').includes(tabId)) {
-                    button.classList.add('active');
-                }
-            });
-            
-            // Load appropriate data based on tab
-            if (tabId === 'leave-history') {
-                loadCongesHistory();
-            } else if (tabId === 'leave-stats') {
-                loadCongesStats();
-            }
+    // Hide all tab contents
+    const tabContents = document.getElementsByClassName('tab-content');
+    for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].classList.remove('active');
+    }
+    
+    // Deactivate all tab buttons
+    const tabButtons = document.getElementsByClassName('tab-button');
+    for (let i = 0; i < tabButtons.length; i++) {
+        tabButtons[i].classList.remove('active');
+    }
+    
+    // Show the selected tab content
+    document.getElementById(tabId).classList.add('active');
+    
+    // Activate the clicked tab button (find the button that calls this tab)
+    const buttons = document.querySelectorAll('.tab-button');
+    buttons.forEach(button => {
+        if (button.getAttribute('onclick').includes(tabId)) {
+            button.classList.add('active');
         }
+    });
+    
+    // Load appropriate data based on tab
+    if (tabId === 'leave-history') {
+        loadCongesHistory();
+    } else if (tabId === 'admin-approvals') {
+        loadPendingRequests();
+    }
+}
         
         // Show status message function
         function showStatusMessage(message, type = 'info') {
@@ -968,7 +999,144 @@ $user = getCurrentUser();
                 }
             });
         }
+        // Load pending leave requests (for admin)
+function loadPendingRequests() {
+    const tableBody = document.getElementById('pending-requests');
+    if (!tableBody) return;
+    
+    // Show loading state
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Chargement des données...</td></tr>';
+    
+    // Make AJAX request to get pending requests
+    makeAjaxRequest('get_pending_requests', {}, function(error, response) {
+        if (error) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Erreur: ' + error + '</td></tr>';
+            return;
+        }
         
+        if (response.status === "success" && Array.isArray(response.data)) {
+            if (response.data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Aucune demande en attente</td></tr>';
+                return;
+            }
+            
+            // Clear the table
+            tableBody.innerHTML = '';
+            
+            // Add rows for each entry
+            response.data.forEach(function(entry) {
+                const row = document.createElement('tr');
+                
+                // Format the document link if exists
+                let documentLink = 'Aucun';
+                if (entry.document && entry.document !== 'null' && entry.document !== null) {
+                    documentLink = `<a href="${entry.document}" class="document-preview" target="_blank">
+                        <span class="document-icon">📄</span> Voir
+                    </a>`;
+                }
+                
+                // Format the type of leave
+                let typeConge = '';
+                switch(entry.type_conge) {
+                    case 'cp':
+                        typeConge = 'Congés Payés';
+                        break;
+                    case 'rtt':
+                        typeConge = 'RTT';
+                        break;
+                    case 'sans-solde':
+                        typeConge = 'Sans Solde';
+                        break;
+                    case 'special':
+                        typeConge = 'Congé Spécial';
+                        break;
+                    case 'maladie':
+                        typeConge = 'Congé Maladie';
+                        break;
+                    default:
+                        typeConge = entry.type_conge;
+                }
+                
+                // Format the HTML content for the row
+                row.innerHTML = `
+                    <td>${entry.employee_name}</td>
+                    <td>${entry.date_debut} au ${entry.date_fin}</td>
+                    <td>${typeConge}</td>
+                    <td>${entry.duree} jour(s)</td>
+                    <td>${documentLink}</td>
+                    <td>
+                        <button class="btn-success" onclick="approveRequest(${entry.id})">Approuver</button>
+                        <button class="btn-danger" onclick="rejectRequest(${entry.id})">Refuser</button>
+                        <button class="btn-primary" onclick="showAdminDetails(${entry.id})">Détails</button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Erreur: ' + response.message + '</td></tr>';
+        }
+    });
+}
+
+// Function to approve a leave request
+function approveRequest(leaveId) {
+    const commentaire = prompt("Commentaire pour l'approbation (optionnel):");
+    
+    // Make AJAX request to approve
+    makeAjaxRequest('approve_request', { 
+        leave_id: leaveId,
+        commentaire: commentaire || ''
+    }, function(error, response) {
+        if (error) {
+            showStatusMessage('Erreur: ' + error, 'error');
+            return;
+        }
+        
+        if (response.status === "success") {
+            showStatusMessage(response.message, 'success');
+            // Reload pending requests
+            loadPendingRequests();
+        } else {
+            showStatusMessage('Erreur: ' + response.message, 'error');
+        }
+    });
+}
+
+// Function to reject a leave request
+function rejectRequest(leaveId) {
+    const commentaire = prompt("Motif du refus (obligatoire):");
+    
+    if (!commentaire) {
+        showStatusMessage('Un motif de refus est requis.', 'error');
+        return;
+    }
+    
+    // Make AJAX request to reject
+    makeAjaxRequest('reject_request', { 
+        leave_id: leaveId,
+        commentaire: commentaire
+    }, function(error, response) {
+        if (error) {
+            showStatusMessage('Erreur: ' + error, 'error');
+            return;
+        }
+        
+        if (response.status === "success") {
+            showStatusMessage(response.message, 'success');
+            // Reload pending requests
+            loadPendingRequests();
+        } else {
+            showStatusMessage('Erreur: ' + response.message, 'error');
+        }
+    });
+}
+
+// Show leave request details for admin
+function showAdminDetails(leaveId) {
+    // This is similar to showDetails but with potential additional admin information
+    showDetails(leaveId);
+}
         // Cancel a leave request
         function cancelRequest(leaveId) {
             if (confirm("Êtes-vous sûr de vouloir annuler cette demande de congé ?")) {
