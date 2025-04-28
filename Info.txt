@@ -43,3 +43,36 @@ Select prenom,email,timesheet_id,entry_date,logon_time,logon_latitude,logon_long
 
 from Users USR left join TimeSheet TS on USR.user_id =  TS.user_id 
 -------------------------------------------------------------
+
+CREATE TABLE Conges (
+    conge_id INT IDENTITY(1,1) PRIMARY KEY, -- Auto-incrementing primary key
+    user_id INT NOT NULL, -- Foreign key to the Users table
+    date_debut DATE NOT NULL, -- Start date of the leave
+    date_fin DATE NOT NULL, -- End date of the leave
+    type_conge VARCHAR(50) NOT NULL, -- Type of leave (e.g., 'Vacation', 'Sick Leave')
+    duree DECIMAL(5,1) NOT NULL, -- Duration of the leave (e.g., in days)
+    commentaire TEXT NULL, -- Optional comments from the user requesting leave
+    document VARCHAR(255) NULL, -- Optional path or name of a supporting document
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- Current status of the leave request
+    date_demande DATETIME NOT NULL, -- Timestamp when the request was made
+    date_reponse DATETIME NULL, -- Timestamp when the request was responded to
+    reponse_commentaire TEXT NULL, -- Optional comments from the approver
+
+    -- Define the foreign key constraint linking to the Users table
+    -- This ensures that every conge entry is associated with a valid user
+    -- ON DELETE CASCADE: If a user is deleted, their conge requests are also deleted
+    -- You might consider ON DELETE NO ACTION or SET NULL depending on your requirements
+    CONSTRAINT FK_Conges_Users FOREIGN KEY (user_id)
+    REFERENCES Users (user_id)
+    ON DELETE CASCADE,
+
+    -- Existing index for filtering by user
+    INDEX idx_user_id (user_id),
+
+    -- Existing index for filtering by status
+    INDEX idx_status (status),
+
+    -- Added index for filtering or sorting by date range
+    -- This can be very useful for queries retrieving leaves within a date period
+    INDEX idx_date_range (date_debut, date_fin)
+);
