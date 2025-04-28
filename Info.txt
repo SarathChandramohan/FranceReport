@@ -39,3 +39,7 @@ CREATE INDEX IX_Timesheet_EntryDate
 ON Timesheet (entry_date);
 
 -------------------------------------------------------------
+Select prenom,email,timesheet_id,entry_date,logon_time,logon_latitude,logon_longitude,logon_address,logoff_time,logoff_latitude,logoff_longitude,logoff_address
+
+from Users USR left join TimeSheet TS on USR.user_id =  TS.user_id 
+-------------------------------------------------------------
