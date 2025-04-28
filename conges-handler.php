@@ -32,10 +32,196 @@ switch($action) {
     case 'get_details':
         getLeaveDetails($user_id);
         break;
+    case 'get_pending_requests':
+    getPendingRequests($user_id);
+    break;
+case 'approve_request':
+    approveLeaveRequest($user_id);
+    break;
+case 'reject_request':
+    rejectLeaveRequest($user_id);
+    break;
     default:
         respondWithError('Invalid action specified');
 }
+/**
+ * Gets all pending leave requests (for admin only)
+ * 
+ * @param int $user_id The user ID
+ */
+function getPendingRequests($user_id) {
+    global $conn;
+    
+    // Check if the user is an admin
+    $user = getCurrentUser();
+    if ($user['role'] !== 'Admin') {
+        respondWithError('Accès refusé. Vous devez être administrateur.');
+    }
+    
+    try {
+        // Get all pending leave requests from all users
+        $stmt = $conn->prepare("SELECT 
+                                c.conge_id as id, 
+                                c.date_debut, 
+                                c.date_fin, 
+                                c.type_conge, 
+                                c.duree, 
+                                c.document, 
+                                c.date_demande,
+                                u.prenom as employee_firstname,
+                                u.nom as employee_lastname
+                               FROM Conges c
+                               JOIN Users u ON c.user_id = u.id 
+                               WHERE c.status = 'pending' 
+                               ORDER BY c.date_demande ASC");
+        
+        $stmt->execute();
+        $pending = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Format dates and add employee name
+        foreach ($pending as &$entry) {
+            $entry['date_debut'] = date('d/m/Y', strtotime($entry['date_debut']));
+            $entry['date_fin'] = date('d/m/Y', strtotime($entry['date_fin']));
+            $entry['date_demande'] = date('d/m/Y H:i', strtotime($entry['date_demande']));
+            $entry['employee_name'] = $entry['employee_firstname'] . ' ' . $entry['employee_lastname'];
+        }
+        
+        respondWithSuccess('Pending requests retrieved successfully', $pending);
+        
+    } catch(PDOException $e) {
+        respondWithError('Erreur de base de données: ' . $e->getMessage());
+    }
+}
 
+/**
+ * Approves a leave request
+ * 
+ * @param int $user_id The user ID of the admin
+ */
+function approveLeaveRequest($user_id) {
+    global $conn;
+    
+    // Check if the user is an admin
+    $user = getCurrentUser();
+    if ($user['role'] !== 'Admin') {
+        respondWithError('Accès refusé. Vous devez être administrateur.');
+    }
+    
+    // Get leave ID and comment
+    $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
+    $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
+    
+    if ($leave_id <= 0) {
+        respondWithError('ID de congé invalide.');
+    }
+    
+    try {
+        // Check if the leave request exists and is pending
+        $stmt = $conn->prepare("SELECT status FROM Conges WHERE conge_id = ?");
+        $stmt->execute([$leave_id]);
+        $leave = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$leave) {
+            respondWithError('Demande de congé non trouvée.');
+        }
+        
+        if ($leave['status'] !== 'pending') {
+            respondWithError('Seules les demandes en attente peuvent être approuvées.');
+        }
+        
+        // Begin transaction
+        $conn->beginTransaction();
+        
+        // Update leave status to approved
+        $stmt = $conn->prepare("UPDATE Conges 
+                               SET status = 'approved', 
+                                   date_reponse = NOW(),
+                                   reponse_commentaire = ?,
+                                   admin_id = ?
+                               WHERE conge_id = ?");
+        $stmt->execute([$commentaire, $user_id, $leave_id]);
+        
+        // Commit transaction
+        $conn->commit();
+        
+        // Return success response
+        respondWithSuccess('Demande de congé approuvée avec succès.');
+        
+    } catch(PDOException $e) {
+        // Rollback transaction on error
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+        }
+        respondWithError('Erreur de base de données: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Rejects a leave request
+ * 
+ * @param int $user_id The user ID of the admin
+ */
+function rejectLeaveRequest($user_id) {
+    global $conn;
+    
+    // Check if the user is an admin
+    $user = getCurrentUser();
+    if ($user['role'] !== 'Admin') {
+        respondWithError('Accès refusé. Vous devez être administrateur.');
+    }
+    
+    // Get leave ID and comment
+    $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
+    $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
+    
+    if ($leave_id <= 0) {
+        respondWithError('ID de congé invalide.');
+    }
+    
+    if (empty($commentaire)) {
+        respondWithError('Un motif de refus est requis.');
+    }
+    
+    try {
+        // Check if the leave request exists and is pending
+        $stmt = $conn->prepare("SELECT status FROM Conges WHERE conge_id = ?");
+        $stmt->execute([$leave_id]);
+        $leave = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$leave) {
+            respondWithError('Demande de congé non trouvée.');
+        }
+        
+        if ($leave['status'] !== 'pending') {
+            respondWithError('Seules les demandes en attente peuvent être refusées.');
+        }
+        
+        // Begin transaction
+        $conn->beginTransaction();
+        
+        // Update leave status to rejected
+        $stmt = $conn->prepare("UPDATE Conges 
+                               SET status = 'rejected', 
+                                   date_reponse = NOW(),
+                                   reponse_commentaire = ?,
+                                   admin_id = ?
+                               WHERE conge_id = ?");
+        $stmt->execute([$commentaire, $user_id, $leave_id]);
+        
+        // Commit transaction
+        $conn->commit();
+        
+        // Return success response
+        respondWithSuccess('Demande de congé refusée avec succès.');
+        
+    } catch(PDOException $e) {
+        // Rollback transaction on error
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+        }
+        respondWithError('Erreur de base de données: ' . $e->getMessage());
+    }
+}
 /**
  * Submits a new leave request
  * 
