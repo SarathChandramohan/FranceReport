@@ -61,7 +61,7 @@ function getPendingRequests($user_id) {
     try {
         // Get all pending leave requests from all users
         $stmt = $conn->prepare("SELECT 
-                                c.conge_id as id, 
+                                c.user_id, 
                                 c.date_debut, 
                                 c.date_fin, 
                                 c.type_conge, 
