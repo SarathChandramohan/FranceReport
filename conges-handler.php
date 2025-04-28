@@ -10,7 +10,7 @@ requireLogin();
 
 // Get the current user ID
 $user = getCurrentUser();
-$user_id = $user['id'];
+$user_id = $user['user_id'];
 
 // Get the action from the POST request
 $action = isset($_POST['action']) ? $_POST['action'] : '';
