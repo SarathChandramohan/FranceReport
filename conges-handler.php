@@ -1,4 +1,4 @@
-vid=Se<?php
+<?php
 // conges-handler.php - Handles all AJAX requests for leave management operations
 
 // Include database connection
