@@ -180,15 +180,20 @@ function connectDB() {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
         }
         body {
-            background-color: #f5f5f7;
-            color: #1d1d1f;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
+    background-image: url('Login.webp'); /* Replace with your image file name */
+    background-size: auto; /* Display the image at its natural size */
+    background-position: left bottom; /* Align image to the left bottom */
+    background-repeat: no-repeat; /* Do not repeat the image */
+    background-attachment: fixed; /* Keep the background fixed when scrolling */
+    background-color: #333333; /* Keep a fallback background color */
+    color: #1d1d1f;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
         .container {
             width: 100%;
             max-width: 420px;
