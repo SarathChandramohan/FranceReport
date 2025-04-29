@@ -21,32 +21,51 @@ require_once 'db-connection.php';
 
 // Function to get all employees with their presence status
 function getAllEmployeesWithStatus($conn, $date) {
-    $query = "
-        SELECT 
-            u.user_id as id, 
-            u.nom, 
-            u.prenom, 
-            u.role, 
-            u.email,
-            u.status,
-            CASE 
-                WHEN c.conge_id IS NOT NULL THEN 'Congé'
-                ELSE 'Présent'
-            END AS statut
-        FROM 
-            Users u
-        LEFT JOIN 
-            Conges c ON u.user_id = c.user_id 
-                AND ? BETWEEN c.date_debut AND c.date_fin
-                AND c.status = 'approved'
-        ORDER BY 
-            u.nom, u.prenom
-    ";
+    $employees = []; // Initialize $employees as an empty array
+    try {
+        $query = "
+            SELECT
+                u.user_id as id,
+                u.nom,
+                u.prenom,
+                u.role,
+                u.email,
+                u.status,
+                CASE
+                    WHEN c.conge_id IS NOT NULL THEN 'Congé'
+                    ELSE 'Présent'
+                END AS statut
+            FROM
+                Users u
+            LEFT JOIN
+                Conges c ON u.user_id = c.user_id
+                    AND ? BETWEEN c.date_debut AND c.date_fin
+                    AND c.status = 'approved'
+            ORDER BY
+                u.nom, u.prenom
+        ";
 
-    $stmt = $conn->prepare($query);
-    $stmt->bindParam(1, $date, PDO::PARAM_STR); // Correct for PDO
-    $stmt->execute();
-    $employees = $stmt->fetchAll(PDO::FETCH_ASSOC); 
+        $stmt = $conn->prepare($query);
+        // Bind the parameter - Ensure this line uses bindParam as corrected before
+        // If you used bindValue before, keep that. bindParam is shown here:
+        $stmt->bindParam(1, $date, PDO::PARAM_STR);
+
+        $stmt->execute();
+
+        // Fetch all results into the employees array
+        // If fetchAll fails (unlikely with ERRMODE_EXCEPTION), $employees was already initialized as []
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch (PDOException $e) {
+        // Handle potential database errors. Log the error instead of just letting it fatal.
+        // In a production environment, you might show a generic error message to the user.
+        error_log("Database error in getAllEmployeesWithStatus: " . $e->getMessage());
+        // $employees is already initialized as [], so no need to set it again unless you
+        // wanted to return null on error, which we are trying to avoid for count().
+        // For this fix, we ensure it's an empty array on error.
+    }
+
+    return $employees; // Always return an array (empty or populated)
 }
 
 // Get all employees with status
