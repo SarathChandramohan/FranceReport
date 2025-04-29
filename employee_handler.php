@@ -65,12 +65,12 @@ function getEmployeeDetails($conn) {
     $stmt = $conn->prepare($query);
     $stmt->bindParam(1, $employeeId, PDO::PARAM_INT); // Correct for PDO
     $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Employé non trouvé']);
-        return;
-    }
+   $employee = $stmt->fetch(PDO::FETCH_ASSOC); // Correct for PDO
+
+if (!$employee) { // Check if fetch returned false (no row found)
+    echo json_encode(['status' => 'error', 'message' => 'Employé non trouvé']);
+    return;
+}
     
     $employee = $result->fetch_assoc();
     
@@ -98,12 +98,12 @@ function getEmployeeDetails($conn) {
     $stmt = $conn->prepare($leaveQuery);
     $stmt->bindParam(1, $employeeId, PDO::PARAM_INT); // Correct for PDO
     $stmt->execute();
-    $leaveResult = $stmt->get_result();
-    
-    if ($leaveResult->num_rows > 0) {
-        $employee['current_leave'] = $leaveResult->fetch_assoc();
-        $employee['statut'] = 'Congé'; // Update status if on leave
-    }
+    $currentLeave = $stmt->fetch(PDO::FETCH_ASSOC); // Correct for PDO
+
+if ($currentLeave) { // Check if fetch returned a row
+    $employee['current_leave'] = $currentLeave;
+    $employee['statut'] = 'Congé'; // Update status if on leave
+}
     
     // Since we don't have sick leave table, we'll skip that query
     
@@ -206,12 +206,7 @@ function getLeaveHistory($conn) {
     $stmt = $conn->prepare($query);
     $stmt->bindParam(1, $employeeId, PDO::PARAM_INT);
     $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $leaves = [];
-    while ($row = $result->fetch_assoc()) {
-        $leaves[] = $row;
-    }
+    $leaves = $stmt->fetchAll(PDO::FETCH_ASSOC); // Correct for PDO
     
     // Return the leave history
     echo json_encode(['status' => 'success', 'data' => $leaves]);
