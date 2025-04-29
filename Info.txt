@@ -76,3 +76,6 @@ CREATE TABLE Conges (
     -- This can be very useful for queries retrieving leaves within a date period
     INDEX idx_date_range (date_debut, date_fin)
 );
+
+------------------------------------------------------------------------------------------
+C:\Users\Sarath C\AppData\Local\Android\Sdk
