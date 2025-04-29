@@ -494,11 +494,11 @@ $user = getCurrentUser();
             <ul>
                 <li><a href="dashboard.php">Tableau de bord</a></li>
                 <li><a href="timesheet.php">Pointage</a></li>
-                <li><a href="conges.php" class="active">Congés </li>
-                <li><a href="employes.php">Employés</a></li>
+                <li><a href="conges.php" class="active">Congés </a></li>
+                <li><a href="employes.php" >Employés</a></li>
                 <li><a href="planning.php">Planning </a></li>
                 <li><a href="chat.php">Chat </a></li>
-                <li><a href="messages.php">Messages RH/Direction</a></li>
+                <li><a href="messages.php">Messages RH/Direction </a></li>
                 <li><a href="logout.php">Déconnexion</a></li>
             </ul>
         </div>
