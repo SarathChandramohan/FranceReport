@@ -185,7 +185,7 @@ function connectDB() {
     background-position: left bottom; /* Align image to the left bottom */
     background-repeat: no-repeat; /* Do not repeat the image */
     background-attachment: fixed; /* Keep the background fixed when scrolling */
-    background-color: #333333; /* Keep a fallback background color */
+    background-color: #222122; /* Keep a fallback background color */
     color: #1d1d1f;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -206,11 +206,11 @@ function connectDB() {
         .logo-section h1 {
             font-size: 28px;
             font-weight: 600;
-            color: #1d1d1f;
+            color: #ffffff;
             margin-bottom: 10px;
         }
         .logo-section p {
-            color: #6e6e73;
+            color: #ffffff;
             font-size: 16px;
             margin-bottom: 20px;
         }
