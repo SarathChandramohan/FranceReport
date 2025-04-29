@@ -63,7 +63,7 @@ function getEmployeeDetails($conn) {
     ";
     
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $employeeId);
+    $stmt->bindParam(1, $employeeId, PDO::PARAM_INT); // Correct for PDO
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -96,7 +96,7 @@ function getEmployeeDetails($conn) {
     ";
     
     $stmt = $conn->prepare($leaveQuery);
-    $stmt->bind_param("i", $employeeId);
+    $stmt->bindParam(1, $employeeId, PDO::PARAM_INT); // Correct for PDO
     $stmt->execute();
     $leaveResult = $stmt->get_result();
     
@@ -204,7 +204,7 @@ function getLeaveHistory($conn) {
     ";
     
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $employeeId);
+    $stmt->bindParam(1, $employeeId, PDO::PARAM_INT);
     $stmt->execute();
     $result = $stmt->get_result();
     
