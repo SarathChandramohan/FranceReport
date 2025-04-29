@@ -391,12 +391,11 @@ $user = getCurrentUser();
             <ul>
                 <li><a href="dashboard.php">Tableau de bord</a></li>
                 <li><a href="timesheet.php" class="active">Pointage</a></li>
-                <li><a href="conges.php">Congés <span class="badge">2</span></a></li>
-                <li><a href="arrets.php">Arrêts Maladie</a></li>
+                <li><a href="conges.php">Congés </a></li>
                 <li><a href="employes.php">Employés</a></li>
-                <li><a href="planning.php">Planning <span class="badge">3</span></a></li>
-                <li><a href="chat.php">Chat <span class="badge">5</span></a></li>
-                <li><a href="messages.php">Messages RH/Direction <span class="badge">1</span></a></li>
+                <li><a href="planning.php">Planning </a></li>
+                <li><a href="chat.php">Chat </a></li>
+                <li><a href="messages.php">Messages RH/Direction</a></li>
                 <li><a href="logout.php">Déconnexion</a></li>
             </ul>
         </div>
