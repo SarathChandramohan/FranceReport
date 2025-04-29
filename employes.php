@@ -46,14 +46,7 @@ function getAllEmployeesWithStatus($conn, $date) {
     $stmt = $conn->prepare($query);
     $stmt->bindParam(1, $date, PDO::PARAM_STR); // Correct for PDO
     $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $employees = [];
-    while ($row = $result->fetch_assoc()) {
-        $employees[] = $row;
-    }
-    
-    return $employees;
+    $employees = $stmt->fetchAll(PDO::FETCH_ASSOC); 
 }
 
 // Get all employees with status
