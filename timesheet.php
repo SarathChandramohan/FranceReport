@@ -47,87 +47,181 @@ $user = getCurrentUser();
         }
 
         /* Header */
-        header {
-            /* White header background */
-            background-color: #ffffff;
-            color: #1d1d1f; /* Dark text */
-            padding: 15px 0; /* Adjusted padding */
-            margin-bottom: 0; /* Remove bottom margin, nav handles separation */
-            border-bottom: 1px solid #d2d2d7; /* Subtle border */
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-content h1 {
-            font-size: 24px; /* Slightly larger title */
-            font-weight: 600;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px; /* Increased gap */
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .user-avatar {
-            width: 36px; /* Slightly smaller avatar */
-            height: 36px;
-            border-radius: 50%;
-            background-color: #007aff; /* Apple blue */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 14px;
-        }
+       
 
         /* Navigation */
-        nav {
-            /* Darker nav background */
-            background-color: #333; /* Dark gray */
-            padding: 12px 0;
-            margin-bottom: 30px; /* Add margin back here */
-        }
+       /* --- New Navigation Styles --- */
+nav {
+    background-color: #333; /* Dark gray */
+    padding: 12px 0;
+    margin-bottom: 30px;
+    position: relative; /* Needed for absolute positioning of the mobile menu */
+}
 
-        nav ul {
-            display: flex;
-            flex-wrap: wrap;
-            list-style: none;
-            gap: 10px 20px; /* Row and column gap */
-            padding-left: 0;
-            justify-content: flex-start; /* Align items to start */
-        }
+.nav-content {
+    display: flex;
+    justify-content: space-between; /* Distribute space between items */
+    align-items: center; /* Vertically align items */
+    flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+}
 
-        nav li {
-            margin-bottom: 5px;
-        }
+.nav-left, .nav-center, .nav-right {
+    display: flex; /* Use flex for internal alignment */
+    align-items: center;
+    padding: 0 10px; /* Add some padding around the sections */
+}
 
-        nav a {
-            color: #f5f5f7; /* Lighter text for dark background */
-            text-decoration: none;
-            padding: 6px 12px; /* Adjusted padding */
-            border-radius: 6px; /* Slightly more rounded */
-            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-            display: inline-block;
-            font-size: 14px;
-            font-weight: 500;
-        }
+.nav-left {
+     /* Adjust width or flex-basis if needed for your logo */
+     flex-grow: 0; /* Don't grow */
+}
 
-        nav a:hover {
-            background-color: #555; /* Slightly lighter gray on hover */
-            color: #ffffff;
-        }
-        nav a.active {
-            background-color: #007aff; /* Apple blue for active */
-            color: #ffffff;
-        }
+.nav-center {
+    flex-grow: 1; /* Allow nav links to take up available space */
+    justify-content: center; /* Center the links within the center div */
+    order: 2; /* Set order for desktop layout */
+}
+
+.nav-right {
+    flex-grow: 0; /* Don't grow */
+    order: 3; /* Set order for desktop layout */
+}
+
+.nav-links {
+    display: flex; /* Display list items in a row */
+    list-style: none;
+    gap: 10px 20px; /* Row and column gap */
+    padding: 0; /* Remove default padding */
+    margin: 0; /* Remove default margin */
+}
+
+/* Adjust existing nav a styles for consistency */
+nav a {
+    color: #f5f5f7; /* Lighter text for dark background */
+    text-decoration: none;
+    padding: 6px 12px; /* Adjusted padding */
+    border-radius: 6px; /* Slightly more rounded */
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+nav a:hover {
+    background-color: #555; /* Slightly lighter gray on hover */
+    color: #ffffff;
+}
+nav a.active {
+    background-color: #007aff; /* Apple blue for active */
+    color: #ffffff;
+}
+
+/* Style for the user info on the right */
+.user-info-nav {
+     display: flex;
+     align-items: center;
+     gap: 8px; /* Smaller gap than the old header */
+     font-size: 14px;
+     font-weight: 500;
+     color: #f5f5f7; /* Match nav link color */
+}
+
+.user-info-nav .user-avatar {
+     width: 28px; /* Smaller avatar in nav */
+     height: 28px;
+     border-radius: 50%;
+     background-color: #007aff; /* Apple blue */
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     color: white;
+     font-weight: 600;
+     font-size: 12px; /* Smaller font for initials */
+}
+
+/* Hamburger Menu Button (Hidden by default on desktop) */
+.hamburger-menu {
+    display: none; /* Hide on desktop */
+    background: none;
+    border: none;
+    color: #f5f5f7; /* White icon */
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 10px;
+    order: 1; /* Set order for mobile layout */
+}
+
+ /* --- Responsive Adjustments for Mobile Navigation --- */
+ @media (max-width: 768px) {
+     .nav-content {
+         flex-direction: row; /* Keep row layout for logo/hamburger/user */
+         justify-content: space-between;
+         align-items: center;
+     }
+
+     .nav-left {
+         order: 1; /* Logo on the left */
+         flex-grow: 0;
+     }
+
+     .nav-right {
+         order: 3; /* User info on the right */
+         flex-grow: 0;
+     }
+
+     .nav-center {
+         order: 4; /* Nav links below others */
+         flex-basis: 100%; /* Take full width */
+         justify-content: flex-start; /* Align links to the left */
+         margin-top: 10px; /* Space above links */
+         display: none; /* Hide links by default on mobile */
+         flex-direction: column; /* Stack links vertically */
+         align-items: flex-start; /* Align links to the left */
+     }
+
+     .nav-links {
+         flex-direction: column; /* Stack links vertically */
+         gap: 5px 0; /* Adjust gap for vertical list */
+         width: 100%; /* Links take full width */
+     }
+
+     nav li {
+         width: 100%; /* Make list items take full width */
+     }
+
+     nav a {
+         display: block; /* Make links block elements for better clicking */
+         padding: 8px 15px; /* Adjust padding for block links */
+     }
+
+     .hamburger-menu {
+         display: block; /* Show hamburger menu on mobile */
+         order: 2; /* Hamburger between logo and user */
+     }
+
+     /* Class to show the mobile menu when hamburger is clicked */
+     .nav-center.show {
+         display: flex; /* Show the navigation links */
+     }
+ }
+
+ /* Adjust padding for small screens to ensure nav content is not against edges */
+ @media (max-width: 480px) {
+      .nav-left, .nav-right, .hamburger-menu {
+           padding: 0 8px; /* Reduce padding on smaller screens */
+      }
+      .user-info-nav {
+           font-size: 13px;
+      }
+       .user-info-nav .user-avatar {
+          width: 24px;
+          height: 24px;
+           font-size: 11px;
+      }
+      .hamburger-menu {
+           font-size: 22px;
+      }
+ }
 
         /* Card Styling */
         .card {
@@ -371,25 +465,12 @@ $user = getCurrentUser();
     </style>
 </head>
 <body>
-    <header>
-        <div class="container header-content">
-            <h1>Gestion des Ouvriers</h1>
-            <div class="user-info">
-                <span><?php echo htmlspecialchars($user['prenom'] . ' ' . $user['nom']); ?></span>
-                <div class="user-avatar">
-                    <?php 
-                    // Generate initials from first and last name
-                    echo htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1))); 
-                    ?>
-                </div>
-            </div>
-        </div>
-        
-    </header>
     <nav>
-        <div class="container">
-            <ul>
-                <li><a href="dashboard.php">Tableau de bord</a></li>
+    <div class="container nav-content"> <div class="nav-left">
+    <img src="Logo.png" alt="Company Logo" class="company-logo">
+</div>
+        <div class="nav-center">
+             <ul class="nav-links"> <li><a href="dashboard.php">Tableau de bord</a></li>
                 <li><a href="timesheet.php" class="active">Pointage</a></li>
                 <li><a href="conges.php">Congés </a></li>
                 <li><a href="employes.php">Employés</a></li>
@@ -397,9 +478,22 @@ $user = getCurrentUser();
                 <li><a href="chat.php">Chat </a></li>
                 <li><a href="messages.php">Messages RH/Direction</a></li>
                 <li><a href="logout.php">Déconnexion</a></li>
-            </ul>
+             </ul>
         </div>
-    </nav>
+         <div class="nav-right">
+             <div class="user-info-nav"> <span><?php echo htmlspecialchars($user['prenom'] . ' ' . $user['nom'] . ' SC'); ?></span> <div class="user-avatar">
+                    <?php
+                    // Generate initials from first and last name (assuming you want SC after the name)
+                    // If you need initials like 'ACS', you'd modify this logic
+                    echo htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1)));
+                    ?>
+                </div>
+             </div>
+         </div>
+         <button class="hamburger-menu" aria-label="Toggle navigation">
+            &#9776; </button>
+    </div>
+</nav>
 
     <div class="container">
         <div id="pointage">
@@ -925,6 +1019,16 @@ function extractCoordinates(locationString) {
     }
     return [0, 0]; // fallback if parsing fails
 }
+        document.addEventListener('DOMContentLoaded', function () {
+    const hamburgerButton = document.querySelector('.hamburger-menu');
+    const navLinks = document.querySelector('.nav-center'); // Select the container of the links
+
+    if (hamburgerButton && navLinks) {
+        hamburgerButton.addEventListener('click', function () {
+            navLinks.classList.toggle('show'); // Toggle the 'show' class
+        });
+    }
+});
 </script>
 </body>
 </html>
