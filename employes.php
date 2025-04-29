@@ -17,7 +17,7 @@ $user = getCurrentUser();
 $today = date('Y-m-d');
 
 // Connect to database
-require_once 'db-connect.php';
+require_once 'db-connection.php';
 
 // Function to get all employees with their presence status
 function getAllEmployeesWithStatus($conn, $date) {
