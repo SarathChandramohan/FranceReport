@@ -23,37 +23,28 @@ require_once 'db-connection.php';
 function getAllEmployeesWithStatus($conn, $date) {
     $query = "
         SELECT 
-            u.id, 
+            u.user_id as id, 
             u.nom, 
             u.prenom, 
             u.role, 
             u.email,
-            u.telephone,
-            u.date_embauche,
+            u.status,
             CASE 
-                WHEN p.id IS NOT NULL THEN 'Présent' 
-                WHEN c.id IS NOT NULL THEN 'Congé'
-                WHEN a.id IS NOT NULL THEN 'Arrêt maladie'
-                ELSE 'Absent'
+                WHEN c.conge_id IS NOT NULL THEN 'Congé'
+                ELSE 'Présent'
             END AS statut
         FROM 
-            utilisateurs u
+            Users u
         LEFT JOIN 
-            pointages p ON u.id = p.id_utilisateur AND p.date = ?
-        LEFT JOIN 
-            conges c ON u.id = c.id_utilisateur 
+            Conges c ON u.user_id = c.user_id 
                 AND ? BETWEEN c.date_debut AND c.date_fin
                 AND c.status = 'approved'
-        LEFT JOIN 
-            arrets_maladie a ON u.id = a.id_utilisateur 
-                AND ? BETWEEN a.date_debut AND a.date_fin
-                AND a.status = 'approved'
         ORDER BY 
             u.nom, u.prenom
     ";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("sss", $date, $date, $date);
+    $stmt->bind_param("s", $date);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -739,45 +730,70 @@ foreach ($employees as $emp) {
             displayEmployeeDetails(dummyData);
         }
         
-        function displayEmployeeDetails(employee) {
-            // Set employee name in modal title
-            document.getElementById('modal-employee-name').textContent = 
-                employee.prenom + ' ' + employee.nom;
-            
-            // Generate HTML for employee details
-            let detailsHTML = `
-                <div class="detail-item">
-                    <div class="detail-label">Email</div>
-                    <div class="detail-value">${employee.email}</div>
+        
+function displayEmployeeDetails(employee) {
+    // Set employee name in modal title
+    document.getElementById('modal-employee-name').textContent = 
+        employee.prenom + ' ' + employee.nom;
+    
+    // Generate HTML for employee details
+    let detailsHTML = `
+        <div class="detail-item">
+            <div class="detail-label">Email</div>
+            <div class="detail-value">${employee.email}</div>
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">Rôle</div>
+            <div class="detail-value">${employee.role}</div>
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">Statut utilisateur</div>
+            <div class="detail-value">${employee.status}</div>
+        </div>
+        <div class="detail-item">
+            <div class="detail-label">Statut présence</div>
+            <div class="detail-value">
+                <span class="status-tag ${getStatusClass(employee.statut)}">
+                    ${employee.statut}
+                </span>
+            </div>
+        </div>
+    `;
+    
+    // Add current leave information if available
+    if (employee.current_leave) {
+        detailsHTML += `
+            <div class="detail-item" style="grid-column: span 2">
+                <div class="detail-label">Congé en cours</div>
+                <div class="detail-value">
+                    Du ${formatDate(employee.current_leave.date_debut)} au ${formatDate(employee.current_leave.date_fin)}
+                    <br>Type: ${employee.current_leave.type_conge}
+                    <br>Durée: ${employee.current_leave.duree} jour(s)
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Téléphone</div>
-                    <div class="detail-value">${employee.telephone}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Rôle</div>
-                    <div class="detail-value">${employee.role}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Date d'embauche</div>
-                    <div class="detail-value">${employee.date_embauche}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Statut</div>
-                    <div class="detail-value">
-                        <span class="status-tag ${employee.statut === 'Présent' ? 'status-present' : 'status-absent'}">
-                            ${employee.statut}
-                        </span>
-                    </div>
-                </div>
-            `;
-            
-            // Insert HTML into modal
-            document.getElementById('employee-details-content').innerHTML = detailsHTML;
-            
-            // Show the modal
-            document.getElementById('employee-modal').style.display = 'block';
-        }
+            </div>
+        `;
+    }
+    
+    // Insert HTML into modal
+    document.getElementById('employee-details-content').innerHTML = detailsHTML;
+    
+    // Show the modal
+    document.getElementById('employee-modal').style.display = 'block';
+}
+        function getStatusClass(status) {
+    switch (status) {
+        case 'Présent': return 'status-present';
+        case 'Absent': return 'status-absent';
+        case 'Congé': return 'status-conge';
+        case 'Arrêt maladie': return 'status-maladie';
+        default: return '';
+    }
+}
+        function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR');
+}
         
         function closeModal() {
             document.getElementById('employee-modal').style.display = 'none';
