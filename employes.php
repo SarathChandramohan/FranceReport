@@ -44,7 +44,7 @@ function getAllEmployeesWithStatus($conn, $date) {
     ";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $date);
+    $stmt->bindParam(1, $date, PDO::PARAM_STR); // Correct for PDO
     $stmt->execute();
     $result = $stmt->get_result();
     
