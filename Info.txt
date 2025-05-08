@@ -78,4 +78,7 @@ CREATE TABLE Conges (
 );
 
 ------------------------------------------------------------------------------------------
+ALTER TABLE Timesheet
+ADD break_minutes INT NULL;
+-----------------------------------------------------------------------------------------
 C:\Users\Sarath C\AppData\Local\Android\Sdk
