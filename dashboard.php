@@ -325,12 +325,12 @@ $activities = getRecentActivities($conn);
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-card-title">Employés présents</div>
-                <div class="stat-card-value"><?php echo $stats['employees_present']; ?></div>
+                <div class="stat-card-value"><?php echo $stats['employees_absent']; ?></div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-card-title">Employés absents</div>
-                <div class="stat-card-value"><?php echo $stats['employees_absent']; ?></div>
+                <div class="stat-card-value"><?php echo $stats['employees_present']; ?></div>
             </div>
 
             <div class="stat-card">
