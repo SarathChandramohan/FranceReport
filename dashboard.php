@@ -14,7 +14,7 @@ if ($user['role'] !== 'admin') {
     exit;
 }
 
-// 4. Get dashboard statistics (This function is assumed to be defined as in your original dashboard.php)
+// 4. Get dashboard statistics
 function getDashboardStats($conn) {
     $stats = [];
     try {
@@ -55,7 +55,7 @@ function getDashboardStats($conn) {
     }
 }
 
-// 5. Get recent activities (This function is assumed to be defined as in your original dashboard.php)
+// 5. Get recent activities
 function getRecentActivities($conn) {
     $activities = [];
     try {
@@ -109,7 +109,7 @@ function getRecentActivities($conn) {
     }
 }
 
-// 6. Get all employees for filter dropdowns (This function is assumed to be defined as in your original dashboard.php)
+// 6. Get all employees for filter dropdowns
 function getAllEmployees($conn) {
     $employees = [];
     try {
@@ -287,7 +287,7 @@ $all_employees = getAllEmployees($conn);
             transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
             background-color: #34c759; 
             color: white;
-            margin-left: 5px; 
+            margin-left: auto; /* Pushes button to the right */
         }
         .export-button:hover { background-color: #2ca048; }
 
@@ -355,8 +355,8 @@ $all_employees = getAllEmployees($conn);
             border-radius: 14px; position: relative;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15); 
         }
-        .modal-lg { max-width: 800px; } /* For larger modals like timesheet/leaves */
-        .modal-xl { max-width: 1140px; } /* For event creation with more fields */
+        .modal-lg { max-width: 800px; } 
+        .modal-xl { max-width: 1140px; } 
 
         .close-button, .modal .close { /* General close button for modals */
             color: #aaa; font-size: 28px; font-weight: 300; 
@@ -373,6 +373,8 @@ $all_employees = getAllEmployees($conn);
 
         /* Alert for modals */
         .modal-alert { display: none; margin-bottom: 15px; }
+        #congesAdminAlert, #eventCreationAlert { /* Specific styling if needed */ }
+
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -383,10 +385,11 @@ $all_employees = getAllEmployees($conn);
             h2 { font-size: 20px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
             .filter-controls { flex-direction: column; align-items: stretch; }
-            .filter-controls select, .filter-controls input[type="month"], .export-button {
+            .filter-controls select, .filter-controls input[type="month"] {
                 width: 100%; margin-bottom: 10px; 
             }
-            .export-button { margin-left: 0; }
+             .filter-controls .export-button { margin-left: 0; width: 100%;}
+
             .shortcut-buttons-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;}
             .shortcut-btn { padding: 15px; font-size: 0.8rem;}
             .shortcut-btn i { font-size: 1.8em;}
@@ -450,76 +453,6 @@ $all_employees = getAllEmployees($conn);
         </div>
 
         <div class="content-card">
-            <h2>Feuille de temps du mois (Principale)</h2>
-            <div class="filter-controls">
-                <label for="timesheet-employee-filter">Employé:</label>
-                <select id="timesheet-employee-filter">
-                    <option value="">Tous les employés</option>
-                    <?php foreach ($all_employees as $emp): ?>
-                        <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
-                            <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <label for="timesheet-month-filter">Mois:</label>
-                <input type="month" id="timesheet-month-filter" value="<?php echo date('Y-m'); ?>">
-                <button class="export-button" onclick="exportTableToCSV('timesheet-table', 'feuille_de_temps.csv')">Exporter CSV</button>
-            </div>
-            <div class="table-container">
-                <table id="timesheet-table">
-                    <thead>
-                        <tr>
-                            <th>Action</th>
-                            <th>Employé</th>
-                            <th>Date</th>
-                            <th>Entrée</th>
-                            <th>Sortie</th>
-                            <th>Durée</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="content-card">
-            <h2>Liste des congés du mois (Principale)</h2>
-            <div class="filter-controls">
-                <label for="leave-employee-filter">Employé:</label>
-                <select id="leave-employee-filter">
-                    <option value="">Tous les employés</option>
-                     <?php foreach ($all_employees as $emp): ?>
-                        <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
-                            <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <label for="leave-month-filter">Mois:</label>
-                <input type="month" id="leave-month-filter" value="<?php echo date('Y-m'); ?>">
-                 <button class="export-button" onclick="exportTableToCSV('leave-table', 'liste_conges.csv')">Exporter CSV</button>
-            </div>
-            <div class="table-container">
-                <table id="leave-table">
-                    <thead>
-                        <tr>
-                            <th>Employé</th>
-                            <th>Type de congé</th>
-                            <th>Date début</th>
-                            <th>Date fin</th>
-                            <th>Durée</th>
-                            <th>Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="content-card">
             <h2>Dernières activités</h2>
             <div class="table-container">
                 <table id="activities-table">
@@ -569,7 +502,7 @@ $all_employees = getAllEmployees($conn);
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 </div>
                 <div class="modal-body">
-                    <div id="congesAdminAlert" class="alert modal-alert" role="alert"></div>
+                    <div id="congesAdminAlert" class="alert modal-alert" role="alert" style="display:none;"></div>
                     <div class="table-container">
                         <table class="table table-striped table-sm">
                             <thead>
@@ -604,7 +537,7 @@ $all_employees = getAllEmployees($conn);
                 </div>
                 <form id="eventCreationForm">
                     <div class="modal-body">
-                        <div id="eventCreationAlert" class="alert modal-alert" role="alert"></div>
+                        <div id="eventCreationAlert" class="alert modal-alert" role="alert" style="display:none;"></div>
                         <div class="form-group">
                             <label for="eventTitleModal">Titre <span class="text-danger">*</span></label>
                             <input type="text" class="form-control form-control-sm" id="eventTitleModal" name="title" required>
@@ -658,7 +591,7 @@ $all_employees = getAllEmployees($conn);
                 <div class="modal-body">
                     <div class="filter-controls">
                         <label for="timesheetEmployeeFilterModal">Employé:</label>
-                        <select id="timesheetEmployeeFilterModal" class="form-control form-control-sm" style="width: auto;">
+                        <select id="timesheetEmployeeFilterModal" class="form-control form-control-sm" style="width: auto; flex-grow: 1; margin-right: 10px;">
                             <option value="">Tous</option>
                             <?php foreach ($all_employees as $emp): ?>
                                 <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
@@ -667,7 +600,7 @@ $all_employees = getAllEmployees($conn);
                             <?php endforeach; ?>
                         </select>
                         <label for="timesheetMonthFilterModal">Mois:</label>
-                        <input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" style="width: auto;" value="<?php echo date('Y-m'); ?>">
+                        <input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" style="width: auto; margin-right: 10px;" value="<?php echo date('Y-m'); ?>">
                          <button class="export-button btn-sm" onclick="exportTableToCSV('timesheetTableModal', 'feuille_de_temps_modal.csv')">Exporter CSV</button>
                     </div>
                     <div class="table-container">
@@ -704,7 +637,7 @@ $all_employees = getAllEmployees($conn);
                 <div class="modal-body">
                      <div class="filter-controls">
                         <label for="leaveEmployeeFilterModal">Employé:</label>
-                        <select id="leaveEmployeeFilterModal" class="form-control form-control-sm" style="width: auto;">
+                        <select id="leaveEmployeeFilterModal" class="form-control form-control-sm" style="width: auto; flex-grow: 1; margin-right: 10px;">
                             <option value="">Tous</option>
                              <?php foreach ($all_employees as $emp): ?>
                                 <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
@@ -713,7 +646,7 @@ $all_employees = getAllEmployees($conn);
                             <?php endforeach; ?>
                         </select>
                         <label for="leaveMonthFilterModal">Mois:</label>
-                        <input type="month" id="leaveMonthFilterModal" class="form-control form-control-sm" style="width: auto;" value="<?php echo date('Y-m'); ?>">
+                        <input type="month" id="leaveMonthFilterModal" class="form-control form-control-sm" style="width: auto; margin-right: 10px;" value="<?php echo date('Y-m'); ?>">
                         <button class="export-button btn-sm" onclick="exportTableToCSV('leaveTableModal', 'liste_conges_modal.csv')">Exporter CSV</button>
                     </div>
                     <div class="table-container">
@@ -775,7 +708,6 @@ $all_employees = getAllEmployees($conn);
                         document.getElementById('stats-employees-absent').textContent = data.data.stats.employees_absent;
                         document.getElementById('stats-pending-requests').textContent = data.data.stats.pending_requests;
                         updateActivitiesTable(data.data.activities);
-                        // Also refresh data in any open modals if necessary, or prompt user
                     } else {
                         console.error('Error from handler (status not success):', data.message);
                         displayGlobalError("Impossible de rafraîchir les données du tableau de bord: " + (data.message || "Erreur inconnue"));
@@ -788,17 +720,21 @@ $all_employees = getAllEmployees($conn);
         }
         
         function displayGlobalError(message) {
-            // For simplicity, using alert. In a real app, use a more sophisticated notification.
-            alert("Erreur: " + message);
+            alert("Erreur: " + message); // Simple alert, consider a more styled notification
         }
+
         function displayModalAlert(modalId, message, type = 'danger') {
-            const alertElement = $(`#${modalId}Alert`);
-            if (alertElement) {
+            const alertSelector = `#${modalId} .modal-alert`; // Target alert within the specific modal
+            const alertElement = $(alertSelector);
+            if (alertElement.length) {
                 alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass(`alert-${type}`);
-                alertElement.html(message);
+                alertElement.html(message); // Use .html() if message might contain HTML, otherwise .text()
                 alertElement.show();
+            } else {
+                console.warn(`Alert element not found for modal: ${modalId} with selector ${alertSelector}`);
             }
         }
+
 
         function updateActivitiesTable(activities) {
             const tbody = document.querySelector('#activities-table tbody');
@@ -822,87 +758,7 @@ $all_employees = getAllEmployees($conn);
                 tbody.appendChild(row);
             });
         }
-
-        // --- Main Timesheet Table Functions ---
-        function loadTimesheetData() {
-            const employeeId = document.getElementById('timesheet-employee-filter').value;
-            const monthYear = document.getElementById('timesheet-month-filter').value;
-            const tbody = document.querySelector('#timesheet-table tbody');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chargement des données...</td></tr>';
-
-            fetch(`dashboard-handler.php?action=get_monthly_timesheet&employee_id=${employeeId}&month_year=${monthYear}`)
-                .then(response => { /* ... existing error handling ... */ if (!response.ok) throw new Error('Network response was not ok.'); return response.json(); })
-                .then(data => {
-                    tbody.innerHTML = ''; 
-                    if (data.status === 'success' && data.data.timesheet.length > 0) {
-                        data.data.timesheet.forEach(entry => {
-                            const row = document.createElement('tr');
-                            let mapButtonHTML = (entry.logon_latitude && entry.logon_longitude) || (entry.logoff_latitude && entry.logoff_longitude) ?
-                                `<button class="action-button btn-sm" onclick="showTimesheetMapModal(
-                                    '${escapeHtml(entry.employee_name)}', 
-                                    '${escapeHtml(entry.entry_date)}',
-                                    '${entry.logon_latitude}', '${entry.logon_longitude}', '${escapeHtml(entry.logon_address)}', '${escapeHtml(entry.logon_time || '')}',
-                                    '${entry.logoff_latitude}', '${entry.logoff_longitude}', '${escapeHtml(entry.logoff_address)}', '${escapeHtml(entry.logoff_time || '')}'
-                                )">Carte</button>` : '--';
-                            
-                            row.innerHTML = `
-                                <td>${mapButtonHTML}</td>
-                                <td>${escapeHtml(entry.employee_name)}</td>
-                                <td>${escapeHtml(entry.entry_date)}</td>
-                                <td>${escapeHtml(entry.logon_time) || '--'}</td>
-                                <td>${escapeHtml(entry.logoff_time) || '--'}</td>
-                                <td>${escapeHtml(entry.duration) || '--'}</td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    } else if (data.status === 'success') {
-                        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune donnée.</td></tr>';
-                    } else {
-                         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ${escapeHtml(data.message)}</td></tr>`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading timesheet data:', error);
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Erreur de chargement.</td></tr>`;
-                });
-        }
         
-        // --- Main Leave Table Functions ---
-        function loadLeaveData() {
-            const employeeId = document.getElementById('leave-employee-filter').value;
-            const monthYear = document.getElementById('leave-month-filter').value;
-            const tbody = document.querySelector('#leave-table tbody');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chargement des données...</td></tr>';
-
-            fetch(`dashboard-handler.php?action=get_monthly_leaves&employee_id=${employeeId}&month_year=${monthYear}`)
-                .then(response => { /* ... existing error handling ... */ if (!response.ok) throw new Error('Network response was not ok.'); return response.json(); })
-                .then(data => {
-                    tbody.innerHTML = ''; 
-                    if (data.status === 'success' && data.data.leaves.length > 0) {
-                        data.data.leaves.forEach(leave => {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${escapeHtml(leave.employee_name)}</td>
-                                <td>${escapeHtml(leave.type_conge_display)}</td>
-                                <td>${escapeHtml(leave.date_debut)}</td>
-                                <td>${escapeHtml(leave.date_fin)}</td>
-                                <td>${escapeHtml(leave.duree)} jours</td>
-                                <td><span class="status-tag status-${escapeHtml(leave.status)}">${escapeHtml(leave.status_display)}</span></td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    } else if (data.status === 'success') {
-                         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune donnée.</td></tr>';
-                    } else {
-                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ${escapeHtml(data.message)}</td></tr>`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading leave data:', error);
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Erreur de chargement.</td></tr>`;
-                });
-        }
-
         // --- Conges Administrator Modal Functions ---
         function loadPendingLeaveRequestsForModal() {
             const tbody = $('#congesAdminTableBody');
@@ -911,14 +767,14 @@ $all_employees = getAllEmployees($conn);
 
             $.ajax({
                 url: 'conges-handler.php',
-                type: 'POST', // conges-handler.php uses POST
+                type: 'POST', 
                 data: { action: 'get_pending_requests' },
                 dataType: 'json',
                 success: function(response) {
                     tbody.empty();
                     if (response.status === 'success' && response.data.length > 0) {
                         response.data.forEach(function(req) {
-                            let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info">Voir</a>` : 'Aucun';
+                            let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>` : 'Aucun';
                             tbody.append(`
                                 <tr>
                                     <td>${escapeHtml(req.employee_name)}</td>
@@ -928,20 +784,20 @@ $all_employees = getAllEmployees($conn);
                                     <td>${docLink}</td>
                                     <td>${escapeHtml(req.date_demande)}</td>
                                     <td>
-                                        <button class="btn btn-success btn-sm" onclick="approveLeaveFromModal(${req.id})">Approuver</button>
-                                        <button class="btn btn-danger btn-sm ml-1" onclick="rejectLeaveFromModal(${req.id})">Refuser</button>
+                                        <button class="btn btn-success btn-sm py-0 px-1" onclick="approveLeaveFromModal(${req.id})">Approuver</button>
+                                        <button class="btn btn-danger btn-sm ml-1 py-0 px-1" onclick="rejectLeaveFromModal(${req.id})">Refuser</button>
                                     </td>
                                 </tr>`);
                         });
                     } else if (response.status === 'success') {
                         tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune demande en attente.</td></tr>');
                     } else {
-                        displayModalAlert('congesAdmin', response.message || 'Erreur lors du chargement des demandes.', 'danger');
+                        displayModalAlert('congesAdminModal', response.message || 'Erreur lors du chargement des demandes.', 'danger');
                         tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur.</td></tr>');
                     }
                 },
                 error: function(xhr) {
-                    displayModalAlert('congesAdmin', 'Erreur de communication avec le serveur.', 'danger');
+                    displayModalAlert('congesAdminModal', 'Erreur de communication avec le serveur.', 'danger');
                     tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur de communication.</td></tr>');
                 }
             });
@@ -949,8 +805,6 @@ $all_employees = getAllEmployees($conn);
 
         function approveLeaveFromModal(leaveId) {
             const commentaire = prompt("Commentaire pour l'approbation (optionnel):");
-            // if (commentaire === null) return; // User cancelled prompt
-
             $.ajax({
                 url: 'conges-handler.php',
                 type: 'POST',
@@ -958,21 +812,21 @@ $all_employees = getAllEmployees($conn);
                 dataType: 'json',
                 success: function(response) {
                     if (response.status === 'success') {
-                        displayModalAlert('congesAdmin', response.message, 'success');
+                        displayModalAlert('congesAdminModal', response.message, 'success');
                         loadPendingLeaveRequestsForModal();
-                        refreshDashboardData(); // Refresh main dashboard stats
+                        refreshDashboardData(); 
                     } else {
-                        displayModalAlert('congesAdmin', response.message || 'Erreur lors de l\'approbation.', 'danger');
+                        displayModalAlert('congesAdminModal', response.message || 'Erreur lors de l\'approbation.', 'danger');
                     }
                 },
-                error: function() { displayModalAlert('congesAdmin', 'Erreur de communication.', 'danger'); }
+                error: function() { displayModalAlert('congesAdminModal', 'Erreur de communication.', 'danger'); }
             });
         }
 
         function rejectLeaveFromModal(leaveId) {
             const commentaire = prompt("Motif du refus (obligatoire):");
             if (!commentaire) {
-                displayModalAlert('congesAdmin', 'Un motif de refus est requis.', 'warning');
+                displayModalAlert('congesAdminModal', 'Un motif de refus est requis.', 'warning');
                 return;
             }
             $.ajax({
@@ -982,14 +836,14 @@ $all_employees = getAllEmployees($conn);
                 dataType: 'json',
                 success: function(response) {
                     if (response.status === 'success') {
-                        displayModalAlert('congesAdmin', response.message, 'success');
+                        displayModalAlert('congesAdminModal', response.message, 'success');
                         loadPendingLeaveRequestsForModal();
-                        refreshDashboardData(); // Refresh main dashboard stats
+                        refreshDashboardData(); 
                     } else {
-                        displayModalAlert('congesAdmin', response.message || 'Erreur lors du refus.', 'danger');
+                        displayModalAlert('congesAdminModal', response.message || 'Erreur lors du refus.', 'danger');
                     }
                 },
-                error: function() { displayModalAlert('congesAdmin', 'Erreur de communication.', 'danger'); }
+                error: function() { displayModalAlert('congesAdminModal', 'Erreur de communication.', 'danger'); }
             });
         }
         
@@ -1000,13 +854,12 @@ $all_employees = getAllEmployees($conn);
             const formData = new FormData(this);
             formData.append('action', 'create_event');
 
-            // Basic client-side validation
             if (!formData.get('title') || !formData.get('start_datetime') || !formData.get('end_datetime') || formData.getAll('assigned_users[]').length === 0) {
-                displayModalAlert('eventCreation', 'Veuillez remplir tous les champs obligatoires (*).', 'warning');
+                displayModalAlert('eventCreationModal', 'Veuillez remplir tous les champs obligatoires (*).', 'warning');
                 return;
             }
             if (new Date(formData.get('end_datetime')) <= new Date(formData.get('start_datetime'))) {
-                displayModalAlert('eventCreation', 'La date de fin doit être postérieure à la date de début.', 'warning');
+                displayModalAlert('eventCreationModal', 'La date de fin doit être postérieure à la date de début.', 'warning');
                 return;
             }
 
@@ -1019,17 +872,16 @@ $all_employees = getAllEmployees($conn);
                 dataType: 'json',
                 success: function(response) {
                     if (response.status === 'success') {
-                        displayModalAlert('eventCreation', response.message + (response.event_id ? ` (ID: ${response.event_id})` : ''), 'success');
+                        displayModalAlert('eventCreationModal', response.message + (response.event_id ? ` (ID: ${response.event_id})` : ''), 'success');
                         $('#eventCreationForm')[0].reset();
-                        // Optionally close modal after a delay or refresh activities if this modal creates an "activity"
-                        // refreshDashboardData(); // If event creation is an "activity"
+                        // refreshDashboardData(); // If needed
                         setTimeout(() => { $('#eventCreationModal').modal('hide'); }, 2000);
                     } else {
-                        displayModalAlert('eventCreation', response.message || 'Erreur lors de la création de l\'événement.', 'danger');
+                        displayModalAlert('eventCreationModal', response.message || 'Erreur lors de la création de l\'événement.', 'danger');
                     }
                 },
                 error: function() {
-                    displayModalAlert('eventCreation', 'Erreur de communication avec le serveur.', 'danger');
+                    displayModalAlert('eventCreationModal', 'Erreur de communication avec le serveur.', 'danger');
                 }
             });
         });
@@ -1043,7 +895,7 @@ $all_employees = getAllEmployees($conn);
 
             $.ajax({
                 url: 'dashboard-handler.php',
-                type: 'GET', // dashboard-handler uses GET
+                type: 'GET', 
                 data: { action: 'get_monthly_timesheet', employee_id: employeeId, month_year: monthYear },
                 dataType: 'json',
                 success: function(response) {
@@ -1051,7 +903,7 @@ $all_employees = getAllEmployees($conn);
                     if (response.status === 'success' && response.data.timesheet.length > 0) {
                         response.data.timesheet.forEach(function(entry) {
                             let mapButtonHTML = (entry.logon_latitude && entry.logon_longitude) || (entry.logoff_latitude && entry.logoff_longitude) ?
-                                `<button class="action-button btn-sm" onclick="showTimesheetMapModal(
+                                `<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapModal(
                                     '${escapeHtml(entry.employee_name)}', 
                                     '${escapeHtml(entry.entry_date)}',
                                     '${entry.logon_latitude}', '${entry.logon_longitude}', '${escapeHtml(entry.logon_address)}', '${escapeHtml(entry.logon_time || '')}',
@@ -1117,7 +969,7 @@ $all_employees = getAllEmployees($conn);
             });
         }
 
-
+        // --- Map Modal Functions ---
         function showTimesheetMapModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
             const modal = document.getElementById('mapModal');
             const mapContainer = document.getElementById('map-modal-content-container');
@@ -1210,9 +1062,7 @@ $all_employees = getAllEmployees($conn);
                 const cols = row.querySelectorAll("td, th");
                 for (const col of cols) {
                     let cellContent = col.cloneNode(true);
-                    // Remove any action buttons before getting text
                     cellContent.querySelectorAll('button.action-button, button.btn, a.btn').forEach(el => el.remove());
-                    // For status tags, get their text content
                     cellContent.querySelectorAll('.status-tag').forEach(el => {
                         const statusText = el.textContent || el.innerText;
                         el.parentNode.insertBefore(document.createTextNode(statusText), el);
@@ -1224,7 +1074,7 @@ $all_employees = getAllEmployees($conn);
                 csv.push(rowData.join(","));
             }
             if (csv.length === 0) { displayGlobalError("Aucune donnée à exporter."); return; }
-            const csvFile = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" }); // Added BOM for Excel
+            const csvFile = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
             const downloadLink = document.createElement("a");
             downloadLink.download = filename;
             downloadLink.href = window.URL.createObjectURL(csvFile);
@@ -1236,37 +1086,40 @@ $all_employees = getAllEmployees($conn);
         
         document.addEventListener('DOMContentLoaded', function() {
             refreshDashboardData(); 
-            loadTimesheetData();
-            loadLeaveData();
-
-            // Main table filters
-            document.getElementById('timesheet-employee-filter').addEventListener('change', loadTimesheetData);
-            document.getElementById('timesheet-month-filter').addEventListener('change', loadTimesheetData);
-            document.getElementById('leave-employee-filter').addEventListener('change', loadLeaveData);
-            document.getElementById('leave-month-filter').addEventListener('change', loadLeaveData);
             
-            // Modal Triggers & Data Loading
+            // REMOVED: Initial load for main page tables as they are no longer directly visible
+            // loadTimesheetData();
+            // loadLeaveData();
+
+            // REMOVED: Event listeners for main page filters
+            // document.getElementById('timesheet-employee-filter').addEventListener('change', loadTimesheetData);
+            // document.getElementById('timesheet-month-filter').addEventListener('change', loadTimesheetData);
+            // document.getElementById('leave-employee-filter').addEventListener('change', loadLeaveData);
+            // document.getElementById('leave-month-filter').addEventListener('change', loadLeaveData);
+            
+            // Modal Triggers & Data Loading on Show
             $('#congesAdminModal').on('show.bs.modal', function () {
                 loadPendingLeaveRequestsForModal();
             });
+
             $('#feuilleDeTempsModal').on('show.bs.modal', function () {
-                // Reset filters to current month and "All employees"
-                $('#timesheetEmployeeFilterModal').val('');
-                $('#timesheetMonthFilterModal').val('<?php echo date('Y-m'); ?>');
+                $('#timesheetEmployeeFilterModal').val(''); // Reset filter
+                $('#timesheetMonthFilterModal').val('<?php echo date('Y-m'); ?>'); // Reset month
                 loadTimesheetDataForModal();
             });
-             $('#listeCongesModal').on('show.bs.modal', function () {
-                $('#leaveEmployeeFilterModal').val('');
-                $('#leaveMonthFilterModal').val('<?php echo date('Y-m'); ?>');
+
+            $('#listeCongesModal').on('show.bs.modal', function () {
+                $('#leaveEmployeeFilterModal').val(''); // Reset filter
+                $('#leaveMonthFilterModal').val('<?php echo date('Y-m'); ?>'); // Reset month
                 loadLeaveDataForModal();
             });
+
             $('#eventCreationModal').on('show.bs.modal', function () {
-                $('#eventCreationForm')[0].reset(); // Reset form
-                $('#eventCreationAlert').hide();
-                 // Pre-fill dates for event creation modal (e.g., today, next hour)
+                $('#eventCreationForm')[0].reset();
+                $('#eventCreationAlert').hide().removeClass('alert-success alert-danger alert-warning').text('');
                 const now = new Date();
-                const startDateTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-                const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour duration
+                const startDateTime = new Date(now.getTime() + 60 * 60 * 1000); 
+                const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); 
                 
                 function formatDateTimeLocal(date) {
                     const year = date.getFullYear();
@@ -1279,11 +1132,10 @@ $all_employees = getAllEmployees($conn);
 
                 $('#eventStartModal').val(formatDateTimeLocal(startDateTime));
                 $('#eventEndModal').val(formatDateTimeLocal(endDateTime));
-                $('#eventColorModal').val('#007bff'); // Default color
+                $('#eventColorModal').val('#007bff');
             });
 
-
-            // Modal Filters
+            // Modal Filters Event Listeners
             $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal').on('change', loadTimesheetDataForModal);
             $('#leaveEmployeeFilterModal, #leaveMonthFilterModal').on('change', loadLeaveDataForModal);
 
