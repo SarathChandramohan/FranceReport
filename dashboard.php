@@ -257,6 +257,7 @@ $all_employees = getAllEmployees($conn);
             margin-left: auto;
         }
 
+
         .export-button { 
             padding: 8px 15px;
             border-radius: 8px;
@@ -330,7 +331,7 @@ $all_employees = getAllEmployees($conn);
             background-color: rgba(0,0,0,0.5); 
         }
         #mapModal.modal {
-            z-index: 1070; 
+            z-index: 1070; /* Ensures map modal is on top of other modals */
         }
         .modal-content {
             background-color: #ffffff; margin: 5% auto; 
@@ -344,6 +345,7 @@ $all_employees = getAllEmployees($conn);
         .modal-header .close { 
             padding: 1rem 1rem;
             margin: -1rem -1rem -1rem auto;
+            /* Uses Bootstrap's default styling for '×' */
         }
         
         #map-modal-content-container { height: 350px; width: 100%; margin-bottom: 15px; }
@@ -666,8 +668,7 @@ $all_employees = getAllEmployees($conn);
                                     <th>Date</th>
                                     <th>Entrée</th>
                                     <th>Sortie</th>
-                                    <th>Pause</th> {/* New Column */}
-                                    <th>Durée Travail</th> {/* Changed Label */}
+                                    <th>Durée</th>
                                 </tr>
                             </thead>
                             <tbody id="timesheetTableBodyModal"></tbody>
@@ -723,12 +724,16 @@ $all_employees = getAllEmployees($conn);
                         return response.json();
                     })
                     .then(data => {
-                        if (data.status === 'success' && data.data) { 
-                            if (data.data.activities) { 
+                        if (data.status === 'success' && data.data) { // Ensure data.data exists
+                            // The stat cards are removed, so no need to update their specific elements by ID here
+                            // document.getElementById('stats-employees-present').textContent = data.data.stats.employees_present;
+                            // document.getElementById('stats-employees-absent').textContent = data.data.stats.employees_absent;
+                            // document.getElementById('stats-pending-requests').textContent = data.data.stats.pending_requests;
+                            if (data.data.activities) { // Check if activities exist
                                 updateActivitiesTable(data.data.activities);
                             }
                         } else {
-                            console.error('Error from handler or missing data for dashboard refresh:', data.message);
+                            console.error('Error from handler or missing data:', data.message);
                         }
                     })
                     .catch(error => {
@@ -794,10 +799,9 @@ $all_employees = getAllEmployees($conn);
         function loadPendingLeaveRequestsForModal() {
             try {
                 const tbody = $('#congesAdminTableBody');
-                if (!tbody.length) { console.error("Conges Admin table body (#congesAdminTableBody) not found."); return; }
+                if (!tbody.length) { console.error("Conges Admin table body not found."); return; }
                 tbody.html('<tr><td colspan="7" style="text-align:center;">Chargement des demandes...</td></tr>');
-                // Assuming congesAdminModal is the ID of the modal containing this table
-                $('#congesAdminModal .modal-alert').hide(); // Use a more specific selector if needed
+                $('#congesAdminAlert').hide();
 
                 $.ajax({
                     url: 'conges-handler.php',
@@ -949,13 +953,13 @@ $all_employees = getAllEmployees($conn);
 
                 if (!employeeFilter.length || !monthFilter.length || !dayFilter.length || !tbody.length) {
                     console.error("Modal filter or table body elements not found for Timesheet modal.");
-                    if(tbody.length) tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>'); // Updated colspan
+                    if(tbody.length) tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>');
                     return;
                 }
                 const employeeId = employeeFilter.val();
                 const monthYearInput = monthFilter.val();
                 const specificDay = dayFilter.val(); 
-                tbody.html('<tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>'); // Updated colspan
+                tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
                     action: 'get_monthly_timesheet',
@@ -967,7 +971,7 @@ $all_employees = getAllEmployees($conn);
                 } else if (monthYearInput && monthYearInput !== '') { 
                     ajaxData.month_year = monthYearInput;
                 } else {
-                     tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>'); // Updated colspan
+                     tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>');
                      return;
                 }
 
@@ -995,32 +999,30 @@ $all_employees = getAllEmployees($conn);
                                         '\'' + escapeHtml(String(entry.logoff_time || '')) + '\'' +
                                     ')">Carte</button>';
                                 }
-                                // Added entry.total_break_time
                                 let rowHTML = '<tr>' +
                                     '<td>' + mapButtonHTML + '</td>' +
                                     '<td>' + escapeHtml(String(entry.employee_name)) + '</td>' +
                                     '<td>' + escapeHtml(String(entry.entry_date)) + '</td>' +
                                     '<td>' + (escapeHtml(String(entry.logon_time || '--'))) + '</td>' +
                                     '<td>' + (escapeHtml(String(entry.logoff_time || '--'))) + '</td>' +
-                                    '<td>' + (escapeHtml(String(entry.total_break_time || '--'))) + '</td>' + // New Break Column
                                     '<td>' + (escapeHtml(String(entry.duration || '--'))) + '</td>' +
                                 '</tr>';
                                 tbody.append(rowHTML);
                             });
                         } else if (response.status === 'success') {
-                            tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>'); // Updated colspan
+                            tbody.html('<tr><td colspan="6" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
                         } else {
-                            tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>'); // Updated colspan
+                            tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>');
                         }
                     },
                     error: function(xhr) {
                         console.error("AJAX error loading timesheet for modal:", xhr.responseText);
-                        tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur de communication.</td></tr>'); // Updated colspan
+                        tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur de communication.</td></tr>');
                     }
                 });
             } catch (e) {
                 console.error("Error in loadTimesheetDataForModal:", e);
-                 $('#timesheetTableBodyModal').html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur interne du script.</td></tr>'); // Updated colspan
+                 $('#timesheetTableBodyModal').html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
             }
         }
         
@@ -1104,7 +1106,9 @@ $all_employees = getAllEmployees($conn);
 
                 mapTitleElem.textContent = 'Localisation pour ' + escapeHtml(employeeName) + ' - ' + escapeHtml(entryDate);
                 
-                cleanupMapResources(); // Clean up previous map instance if any
+                currentMapMarkers.forEach(marker => marker.remove());
+                currentMapMarkers = [];
+                if (map) { map.remove(); map = null; }
                 
                 mapContainer.innerHTML = ''; 
 
@@ -1170,7 +1174,7 @@ $all_employees = getAllEmployees($conn);
             } catch (e) {
                 console.error("Error in showTimesheetMapModal:", e);
                  if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
-                 $('#mapModal').modal('show'); // Attempt to show even on error to see the error message if any in modal
+                 $('#mapModal').modal('show');
             }
         }
         
@@ -1181,8 +1185,8 @@ $all_employees = getAllEmployees($conn);
                     currentMapMarkers = [];
                 }
                 if (map) {
-                    map.off(); 
-                    map.remove(); 
+                    map.off(); // Unbind all event listeners
+                    map.remove(); // Remove map from DOM
                     map = null;
                 }
             } catch(e) {
