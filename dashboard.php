@@ -267,15 +267,30 @@ $all_employees = getAllEmployees($conn);
             color: #1d1d1f;
             font-size: 14px;
             margin-right: 5px;
+            white-space: nowrap;
         }
-        .filter-controls select, .filter-controls input[type="month"] {
+        .filter-controls select.form-control-sm, 
+        .filter-controls input[type="month"].form-control-sm,
+        .filter-controls input[type="date"].form-control-sm {
             padding: 8px 12px;
             border-radius: 8px; 
             border: 1px solid #d2d2d7; 
             font-size: 14px;
             background-color: #f5f5f7; 
-            margin-right: 10px;
+            margin-right: 10px; /* Space between filter elements */
+            height: auto; /* Override Bootstrap's specific height for form-control-sm if needed */
         }
+        /* Specific for employee dropdown to ensure it takes space */
+        .filter-controls select#timesheetEmployeeFilterModal,
+        .filter-controls select#leaveEmployeeFilterModal {
+            min-width: 200px; /* Ensure minimum width */
+            flex-grow: 1; /* Allow it to grow if space is available */
+        }
+         .filter-controls > * {
+            margin-bottom: 5px; /* For wrapping scenarios */
+        }
+
+
         .export-button { 
             padding: 8px 15px;
             border-radius: 8px;
@@ -320,7 +335,7 @@ $all_employees = getAllEmployees($conn);
         table tr:hover { background-color: #f0f0f0; }
         
         .action-button { 
-            padding: 5px 10px; /* Adjusted for btn-sm effect */
+            padding: 5px 10px; 
             border-radius: 6px;
             border: none;
             background-color: #007aff; 
@@ -359,7 +374,7 @@ $all_employees = getAllEmployees($conn);
         .modal-lg { max-width: 800px; } 
         .modal-xl { max-width: 1140px; } 
 
-        .modal-header .close { /* Bootstrap's default close button styling */
+        .modal-header .close { 
             padding: 1rem 1rem;
             margin: -1rem -1rem -1rem auto;
         }
@@ -379,7 +394,9 @@ $all_employees = getAllEmployees($conn);
             h2 { font-size: 20px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
             .filter-controls { flex-direction: column; align-items: stretch; }
-            .filter-controls select, .filter-controls input[type="month"] {
+            .filter-controls select.form-control-sm, 
+            .filter-controls input[type="month"].form-control-sm,
+            .filter-controls input[type="date"].form-control-sm {
                 width: 100%; margin-bottom: 10px; margin-right: 0;
             }
              .filter-controls .export-button { margin-left: 0; width: 100%;}
@@ -577,7 +594,7 @@ $all_employees = getAllEmployees($conn);
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="feuilleDeTempsModalLabel">Feuille de Temps du Mois</h5>
+                    <h5 class="modal-title" id="feuilleDeTempsModalLabel">Feuille de Temps</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 </div>
                 <div class="modal-body">
@@ -593,7 +610,9 @@ $all_employees = getAllEmployees($conn);
                         </select>
                         <label for="timesheetMonthFilterModal">Mois:</label>
                         <input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
-                         <button class="export-button btn-sm" onclick="exportTableToCSV('timesheetTableModal', 'feuille_de_temps_modal.csv')">Exporter CSV</button>
+                        <label for="timesheetDayFilterModal">Jour:</label>
+                        <input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm">
+                        <button class="export-button btn-sm" onclick="exportTableToCSV('timesheetTableModal', 'feuille_de_temps_modal.csv')">Exporter CSV</button>
                     </div>
                     <div class="table-container">
                         <table id="timesheetTableModal" class="table table-striped table-sm">
@@ -622,7 +641,7 @@ $all_employees = getAllEmployees($conn);
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="listeCongesModalLabel">Liste des Congés du Mois</h5>
+                    <h5 class="modal-title" id="listeCongesModalLabel">Liste des Congés</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 </div>
                 <div class="modal-body">
@@ -638,6 +657,8 @@ $all_employees = getAllEmployees($conn);
                         </select>
                         <label for="leaveMonthFilterModal">Mois:</label>
                         <input type="month" id="leaveMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
+                        <label for="leaveDayFilterModal">Jour:</label>
+                        <input type="date" id="leaveDayFilterModal" class="form-control form-control-sm">
                         <button class="export-button btn-sm" onclick="exportTableToCSV('leaveTableModal', 'liste_conges_modal.csv')">Exporter CSV</button>
                     </div>
                     <div class="table-container">
@@ -730,9 +751,9 @@ $all_employees = getAllEmployees($conn);
                     alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass(`alert-${type}`);
                     alertElement.html(message); 
                     alertElement.show();
+                     setTimeout(() => { alertElement.hide(); }, 5000); // Auto-hide after 5s
                 } else {
                     console.warn(`Alert element not found for modal: ${modalId} with selector ${alertSelector}`);
-                    // Fallback to global alert if modal-specific alert isn't found
                     alert(`${type.toUpperCase()}: ${message}`);
                 }
             } catch (e) {
@@ -740,6 +761,7 @@ $all_employees = getAllEmployees($conn);
                 alert(`Notification: ${message}`);
             }
         }
+
 
         function updateActivitiesTable(activities) {
             try {
@@ -786,19 +808,19 @@ $all_employees = getAllEmployees($conn);
                         if (response.status === 'success' && response.data && response.data.length > 0) {
                             response.data.forEach(function(req) {
                                 let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>` : 'Aucun';
-                                tbody.append(`
+                                tbody.append(\`
                                     <tr>
-                                        <td>${escapeHtml(req.employee_name)}</td>
-                                        <td>${escapeHtml(req.date_debut)} - ${escapeHtml(req.date_fin)}</td>
-                                        <td>${escapeHtml(req.type_conge)}</td>
-                                        <td>${escapeHtml(req.duree)}j</td>
-                                        <td>${docLink}</td>
-                                        <td>${escapeHtml(req.date_demande)}</td>
+                                        <td>\${escapeHtml(req.employee_name)}</td>
+                                        <td>\${escapeHtml(req.date_debut)} - \${escapeHtml(req.date_fin)}</td>
+                                        <td>\${escapeHtml(req.type_conge)}</td>
+                                        <td>\${escapeHtml(req.duree)}j</td>
+                                        <td>\${docLink}</td>
+                                        <td>\${escapeHtml(req.date_demande)}</td>
                                         <td>
-                                            <button class="btn btn-success btn-sm py-0 px-1" onclick="approveLeaveFromModal(${req.id})">Approuver</button>
-                                            <button class="btn btn-danger btn-sm ml-1 py-0 px-1" onclick="rejectLeaveFromModal(${req.id})">Refuser</button>
+                                            <button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(\${req.id})">Approuver</button>
+                                            <button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(\${req.id})">Refuser</button>
                                         </td>
-                                    </tr>`);
+                                    </tr>\`);
                             });
                         } else if (response.status === 'success') {
                             tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune demande en attente.</td></tr>');
@@ -822,9 +844,6 @@ $all_employees = getAllEmployees($conn);
         function approveLeaveFromModal(leaveId) {
             try {
                 const commentaire = prompt("Commentaire pour l'approbation (optionnel):");
-                // If user presses cancel, commentaire will be null.
-                // Allow empty string if they press OK without typing.
-
                 $.ajax({
                     url: 'conges-handler.php',
                     type: 'POST',
@@ -850,7 +869,7 @@ $all_employees = getAllEmployees($conn);
         function rejectLeaveFromModal(leaveId) {
             try {
                 const commentaire = prompt("Motif du refus (obligatoire):");
-                if (!commentaire) { // Also handles if prompt is cancelled (returns null)
+                if (!commentaire) { 
                     displayModalAlert('congesAdminModal', 'Un motif de refus est requis.', 'warning');
                     return;
                 }
@@ -923,47 +942,49 @@ $all_employees = getAllEmployees($conn);
             try {
                 const employeeFilter = $('#timesheetEmployeeFilterModal');
                 const monthFilter = $('#timesheetMonthFilterModal');
+                const dayFilter = $('#timesheetDayFilterModal');
                 const tbody = $('#timesheetTableBodyModal');
 
-                if (!employeeFilter.length || !monthFilter.length || !tbody.length) {
+                if (!employeeFilter.length || !monthFilter.length || !dayFilter.length || !tbody.length) {
                     console.error("Modal filter or table body elements not found for Timesheet modal.");
                     if(tbody.length) tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>');
                     return;
                 }
                 const employeeId = employeeFilter.val();
                 const monthYear = monthFilter.val();
+                const specificDay = dayFilter.val();
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 $.ajax({
                     url: 'dashboard-handler.php',
                     type: 'GET', 
-                    data: { action: 'get_monthly_timesheet', employee_id: employeeId, month_year: monthYear },
+                    data: { action: 'get_monthly_timesheet', employee_id: employeeId, month_year: monthYear, specific_day: specificDay },
                     dataType: 'json',
                     success: function(response) {
                         tbody.empty();
                         if (response.status === 'success' && response.data && response.data.timesheet && response.data.timesheet.length > 0) {
                             response.data.timesheet.forEach(function(entry) {
                                 let mapButtonHTML = (entry.logon_latitude && entry.logon_longitude) || (entry.logoff_latitude && entry.logoff_longitude) ?
-                                    `<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapModal(
-                                        '${escapeHtml(entry.employee_name)}', 
-                                        '${escapeHtml(entry.entry_date)}',
-                                        '${entry.logon_latitude}', '${entry.logon_longitude}', '${escapeHtml(entry.logon_address)}', '${escapeHtml(entry.logon_time || '')}',
-                                        '${entry.logoff_latitude}', '${entry.logoff_longitude}', '${escapeHtml(entry.logoff_address)}', '${escapeHtml(entry.logoff_time || '')}'
-                                    )">Carte</button>` : '--';
-                                tbody.append(`
+                                    \`<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapModal(
+                                        '\${escapeHtml(entry.employee_name)}', 
+                                        '\${escapeHtml(entry.entry_date)}',
+                                        '\${entry.logon_latitude}', '\${entry.logon_longitude}', '\${escapeHtml(entry.logon_address)}', '\${escapeHtml(entry.logon_time || '')}',
+                                        '\${entry.logoff_latitude}', '\${entry.logoff_longitude}', '\${escapeHtml(entry.logoff_address)}', '\${escapeHtml(entry.logoff_time || '')}'
+                                    )">Carte</button>\` : '--';
+                                tbody.append(\`
                                     <tr>
-                                        <td>${mapButtonHTML}</td>
-                                        <td>${escapeHtml(entry.employee_name)}</td>
-                                        <td>${escapeHtml(entry.entry_date)}</td>
-                                        <td>${escapeHtml(entry.logon_time) || '--'}</td>
-                                        <td>${escapeHtml(entry.logoff_time) || '--'}</td>
-                                        <td>${escapeHtml(entry.duration) || '--'}</td>
-                                    </tr>`);
+                                        <td>\${mapButtonHTML}</td>
+                                        <td>\${escapeHtml(entry.employee_name)}</td>
+                                        <td>\${escapeHtml(entry.entry_date)}</td>
+                                        <td>\${escapeHtml(entry.logon_time) || '--'}</td>
+                                        <td>\${escapeHtml(entry.logoff_time) || '--'}</td>
+                                        <td>\${escapeHtml(entry.duration) || '--'}</td>
+                                    </tr>\`);
                             });
                         } else if (response.status === 'success') {
                             tbody.html('<tr><td colspan="6" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
                         } else {
-                            tbody.html(`<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ${escapeHtml(response.message || 'Impossible de charger les données.')}</td></tr>`);
+                            tbody.html(\`<tr><td colspan="6" style="text-align:center; color:red;">Erreur: \${escapeHtml(response.message || 'Impossible de charger les données.')}</td></tr>\`);
                         }
                     },
                     error: function(xhr) {
@@ -981,40 +1002,42 @@ $all_employees = getAllEmployees($conn);
             try {
                 const employeeFilter = $('#leaveEmployeeFilterModal');
                 const monthFilter = $('#leaveMonthFilterModal');
+                const dayFilter = $('#leaveDayFilterModal');
                 const tbody = $('#leaveTableBodyModal');
 
-                if (!employeeFilter.length || !monthFilter.length || !tbody.length) {
+                if (!employeeFilter.length || !monthFilter.length || !dayFilter.length || !tbody.length) {
                     console.error("Modal filter or table body elements not found for Leave modal.");
                     if(tbody.length) tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>');
                     return;
                 }
                 const employeeId = employeeFilter.val();
                 const monthYear = monthFilter.val();
+                const specificDay = dayFilter.val();
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 $.ajax({
                     url: 'dashboard-handler.php',
                     type: 'GET',
-                    data: { action: 'get_monthly_leaves', employee_id: employeeId, month_year: monthYear },
+                    data: { action: 'get_monthly_leaves', employee_id: employeeId, month_year: monthYear, specific_day: specificDay },
                     dataType: 'json',
                     success: function(response) {
                         tbody.empty();
                         if (response.status === 'success' && response.data && response.data.leaves && response.data.leaves.length > 0) {
                             response.data.leaves.forEach(function(leave) {
-                                 tbody.append(`
+                                 tbody.append(\`
                                     <tr>
-                                        <td>${escapeHtml(leave.employee_name)}</td>
-                                        <td>${escapeHtml(leave.type_conge_display)}</td>
-                                        <td>${escapeHtml(leave.date_debut)}</td>
-                                        <td>${escapeHtml(leave.date_fin)}</td>
-                                        <td>${escapeHtml(leave.duree)} jours</td>
-                                        <td><span class="status-tag status-${escapeHtml(leave.status)}">${escapeHtml(leave.status_display)}</span></td>
-                                    </tr>`);
+                                        <td>\${escapeHtml(leave.employee_name)}</td>
+                                        <td>\${escapeHtml(leave.type_conge_display)}</td>
+                                        <td>\${escapeHtml(leave.date_debut)}</td>
+                                        <td>\${escapeHtml(leave.date_fin)}</td>
+                                        <td>\${escapeHtml(leave.duree)} jours</td>
+                                        <td><span class="status-tag status-\${escapeHtml(leave.status)}">\${escapeHtml(leave.status_display)}</span></td>
+                                    </tr>\`);
                             });
                         } else if (response.status === 'success') {
                             tbody.html('<tr><td colspan="6" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
                         } else {
-                             tbody.html(`<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ${escapeHtml(response.message || 'Impossible de charger les données.')}</td></tr>`);
+                             tbody.html(\`<tr><td colspan="6" style="text-align:center; color:red;">Erreur: \${escapeHtml(response.message || 'Impossible de charger les données.')}</td></tr>\`);
                         }
                     },
                     error: function(xhr) {
@@ -1049,7 +1072,7 @@ $all_employees = getAllEmployees($conn);
 
                 if (typeof L === 'undefined') {
                     mapContainer.innerHTML = "Erreur: La bibliothèque de cartographie (Leaflet) n'a pas pu être chargée.";
-                    modal.style.display = "block";
+                    $('#mapModal').modal('show');
                     return;
                 }
                 
@@ -1095,10 +1118,9 @@ $all_employees = getAllEmployees($conn);
                 if (bounds.length > 0) { map.fitBounds(bounds, { padding: [50, 50] }); } 
                 else { map.setView([48.8566, 2.3522], 5); mapDetailsElem.innerHTML = "<p>Aucune localisation GPS enregistrée pour cette entrée.</p>"; }
                 
-                // Use jQuery to show the modal if Bootstrap is used that way
                 $('#mapModal').modal('show'); 
                 
-                setTimeout(() => { if (map) map.invalidateSize(); }, 200); // Increased delay slightly
+                setTimeout(() => { if (map) map.invalidateSize(); }, 200);
             } catch (e) {
                 console.error("Error in showTimesheetMapModal:", e);
                  if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
@@ -1108,7 +1130,7 @@ $all_employees = getAllEmployees($conn);
 
         function closeMapModal() {
             try {
-                $('#mapModal').modal('hide'); // Use jQuery to hide if shown with jQuery
+                $('#mapModal').modal('hide'); 
                 currentMapMarkers.forEach(marker => marker.remove());
                 currentMapMarkers = [];
                 if (map) { map.remove(); map = null; }
@@ -1147,7 +1169,7 @@ $all_employees = getAllEmployees($conn);
                     }
                     csv.push(rowData.join(","));
                 }
-                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && !rows[1])) { // Check if only header or empty
+                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && !rows[1])) { 
                     displayGlobalError("Aucune donnée à exporter de la table #" + tableId + ".");
                     return;
                 }
@@ -1176,12 +1198,14 @@ $all_employees = getAllEmployees($conn);
                 $('#feuilleDeTempsModal').on('show.bs.modal', function () {
                     $('#timesheetEmployeeFilterModal').val(''); 
                     $('#timesheetMonthFilterModal').val('<?php echo date('Y-m'); ?>'); 
+                    $('#timesheetDayFilterModal').val(''); // Reset day filter
                     loadTimesheetDataForModal();
                 });
 
                 $('#listeCongesModal').on('show.bs.modal', function () {
                     $('#leaveEmployeeFilterModal').val(''); 
                     $('#leaveMonthFilterModal').val('<?php echo date('Y-m'); ?>'); 
+                    $('#leaveDayFilterModal').val(''); // Reset day filter
                     loadLeaveDataForModal();
                 });
 
@@ -1189,7 +1213,7 @@ $all_employees = getAllEmployees($conn);
                     $('#eventCreationForm')[0].reset();
                     $('#eventCreationAlert').hide().removeClass('alert-success alert-danger alert-warning').text('');
                     const now = new Date();
-                    const startDateTime = new Date(now.getTime() + 60 * 60 * 1000); 
+                    const startDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
                     const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); 
                     
                     function formatDateTimeLocal(date) {
@@ -1206,8 +1230,20 @@ $all_employees = getAllEmployees($conn);
                     $('#eventColorModal').val('#007bff');
                 });
 
-                $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal').on('change', loadTimesheetDataForModal);
-                $('#leaveEmployeeFilterModal, #leaveMonthFilterModal').on('change', loadLeaveDataForModal);
+                // Event listeners for modal filters (including new day filters)
+                $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal, #timesheetDayFilterModal').on('change', loadTimesheetDataForModal);
+                $('#leaveEmployeeFilterModal, #leaveMonthFilterModal, #leaveDayFilterModal').on('change', loadLeaveDataForModal);
+
+                // Clear day filter when month changes
+                $('#timesheetMonthFilterModal').on('change', function() {
+                    $('#timesheetDayFilterModal').val(''); 
+                    // loadTimesheetDataForModal(); // Already handled by the general change listener above
+                });
+                $('#leaveMonthFilterModal').on('change', function() {
+                    $('#leaveDayFilterModal').val(''); 
+                    // loadLeaveDataForModal(); // Already handled by the general change listener above
+                });
+
 
             } catch (e) {
                 console.error("Error in DOMContentLoaded:", e);
@@ -1215,9 +1251,6 @@ $all_employees = getAllEmployees($conn);
             }
         });
 
-        // Ensure map modal closes correctly if user clicks outside of it
-        // (Bootstrap's default behavior if `data-backdrop="static"` is not set)
-        // Adding explicit close for the map modal on window click if it's the target.
         window.onclick = function(event) {
             const mapModalElement = document.getElementById('mapModal');
             if (event.target == mapModalElement) { 
