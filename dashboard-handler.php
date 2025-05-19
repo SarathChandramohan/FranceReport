@@ -5,7 +5,8 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // DO NOT display errors to browser
 ini_set('log_errors', 1);
-// ini_set('error_log', '/path/to/your/php-error.log'); // Optional: Specify a log file path
+// Ensure this path is writable by the web server if you uncomment it:
+// ini_set('error_log', __DIR__ . '/php-error.log'); // Log errors to a file in the same directory
 
 // Include database connection and session management
 require_once 'db-connection.php'; // This already has a try-catch for connection
@@ -58,9 +59,8 @@ try {
  * Gets all dashboard data: stats and recent activities
  */
 function getDashboardAllData() {
-    global $conn; // $conn is from db-connection.php
+    global $conn; 
     
-    // No need for an additional try-catch here if individual functions handle their DB errors
     $stats = getDashboardStats($conn);
     $activities = getRecentActivities($conn);
     
@@ -92,11 +92,14 @@ function getDashboardStats($conn) {
         $stats['employees_present'] = $stmt->fetch(PDO::FETCH_ASSOC)['present_count'] ?? 0;
         
         // Employees absent today
+        // This logic might need refinement based on how "absent" is truly defined
+        // (e.g., not on approved leave and no timesheet entry)
         $stmt = $conn->prepare("
             SELECT COUNT(DISTINCT u.user_id) AS absent_count
             FROM Users u
             LEFT JOIN Timesheet t ON u.user_id = t.user_id AND t.entry_date = :today
-            WHERE u.status = 'Active' AND t.timesheet_id IS NULL
+            LEFT JOIN Conges c ON u.user_id = c.user_id AND :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved'
+            WHERE u.status = 'Active' AND t.timesheet_id IS NULL AND c.conge_id IS NULL
         ");
         $stmt->execute([':today' => $today]);
         $stats['employees_absent'] = $stmt->fetch(PDO::FETCH_ASSOC)['absent_count'] ?? 0;
@@ -110,14 +113,10 @@ function getDashboardStats($conn) {
         $stmt->execute();
         $stats['pending_requests'] = $stmt->fetch(PDO::FETCH_ASSOC)['pending_requests_count'] ?? 0;
         
-        // Heures totales ce mois card is removed, so no need for this stat calculation anymore
-        // $stats['total_hours_month'] = 0; // Or remove entirely if not used anywhere else
-
         return $stats;
         
     } catch (PDOException $e) {
         error_log("PDO Error in getDashboardStats: " . $e->getMessage());
-        // Return default/empty stats on error to prevent breaking the caller
         return ['employees_present' => 0, 'employees_absent' => 0, 'pending_requests' => 0, 'error' => 'Database error in stats'];
     }
 }
@@ -129,7 +128,6 @@ function getDashboardStats($conn) {
  */
 function getRecentActivities($conn) {
     try {
-        // Using a CTE for a cleaner way to combine and then select TOP N
         $sql = "
             WITH CombinedActivities AS (
                 SELECT 
@@ -139,7 +137,8 @@ function getRecentActivities($conn) {
                         WHEN t.logon_time IS NOT NULL AND t.logoff_time IS NOT NULL THEN 'Sortie de pointage'
                         ELSE 'Activité de pointage' 
                     END AS action,
-                    COALESCE(t.logoff_time, t.logon_time) AS action_time
+                    COALESCE(t.logoff_time, t.logon_time) AS action_time,
+                    1 AS sort_priority -- Higher priority for timesheet
                 FROM Timesheet t
                 INNER JOIN Users u ON t.user_id = u.user_id
                 WHERE t.logon_time IS NOT NULL OR t.logoff_time IS NOT NULL
@@ -149,49 +148,56 @@ function getRecentActivities($conn) {
                 SELECT 
                     u.prenom + ' ' + u.nom AS employee_name,
                     'Demande de congé (' + c.type_conge + ')' AS action,
-                    c.date_demande AS action_time
+                    c.date_demande AS action_time,
+                    2 AS sort_priority -- Lower priority for conges
                 FROM Conges c
                 INNER JOIN Users u ON c.user_id = u.user_id
             )
             SELECT TOP 5 employee_name, action, action_time 
             FROM CombinedActivities
-            ORDER BY action_time DESC;
+            ORDER BY action_time DESC, sort_priority ASC;
         ";
         $stmt = $conn->prepare($sql);
         $stmt->execute();
         $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $formattedActivities = [];
-        foreach ($activities as $activity) {
-            $timestamp = strtotime($activity['action_time']);
-            $formattedActivities[] = [
-                'employee_name' => $activity['employee_name'], // Already fetched as combined
-                'action' => $activity['action'],
-                'date' => date('d/m/Y', $timestamp),
-                'hour' => date('H:i', $timestamp)
-            ];
+        if ($activities) {
+            foreach ($activities as $activity) {
+                $timestamp = strtotime($activity['action_time']);
+                $formattedActivities[] = [
+                    'employee_name' => $activity['employee_name'],
+                    'action' => $activity['action'],
+                    'date' => date('d/m/Y', $timestamp),
+                    'hour' => date('H:i', $timestamp)
+                ];
+            }
         }
         return $formattedActivities;
         
     } catch (PDOException $e) {
         error_log("PDO Error in getRecentActivities: " . $e->getMessage());
-        return [['error' => 'Database error in activities']]; // Return empty or error structure
+        return [['error' => 'Database error in activities']];
     }
 }
 
 /**
- * Gets monthly timesheet data, filterable by employee and month/year
+ * Gets monthly timesheet data, filterable by employee, month/year, and specific day
  */
 function getMonthlyTimesheetData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
     $monthYear = isset($_GET['month_year']) ? $_GET['month_year'] : date('Y-m'); 
+    $specificDay = isset($_GET['specific_day']) && !empty($_GET['specific_day']) ? $_GET['specific_day'] : null;
 
-    if (!preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
+    if ($specificDay && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $specificDay)) {
+        respondWithError("Format de jour invalide. Utilisez YYYY-MM-DD.");
+        return;
+    }
+    if (!$specificDay && !preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
         respondWithError("Format de mois invalide. Utilisez YYYY-MM.");
         return;
     }
-    list($year, $month) = explode('-', $monthYear);
 
     try {
         $sql = "SELECT 
@@ -204,14 +210,24 @@ function getMonthlyTimesheetData() {
                     CASE 
                         WHEN t.logon_time IS NOT NULL AND t.logoff_time IS NOT NULL AND DATEDIFF(MINUTE, t.logon_time, t.logoff_time) >= 0
                         THEN CAST(DATEDIFF(MINUTE, t.logon_time, t.logoff_time) / 60 AS VARCHAR) + 'h ' + 
-                             RIGHT('0' + CAST(DATEDIFF(MINUTE, t.logon_time, t.logoff_time) % 60 AS VARCHAR), 2) -- Removed 'm' to match previous format if that was intended. Add 'm' if needed.
+                             RIGHT('0' + CAST(DATEDIFF(MINUTE, t.logon_time, t.logoff_time) % 60 AS VARCHAR), 2)
                         ELSE NULL 
                     END AS duration
                 FROM Timesheet t
                 JOIN Users u ON t.user_id = u.user_id
-                WHERE MONTH(t.entry_date) = :month_val AND YEAR(t.entry_date) = :year_val";
+                WHERE 1=1";
         
-        $params = [':month_val' => $month, ':year_val' => $year];
+        $params = [];
+
+        if ($specificDay) {
+            $sql .= " AND t.entry_date = :specific_day";
+            $params[':specific_day'] = $specificDay;
+        } else { 
+            list($year, $month) = explode('-', $monthYear);
+            $sql .= " AND MONTH(t.entry_date) = :month_val AND YEAR(t.entry_date) = :year_val";
+            $params[':month_val'] = $month;
+            $params[':year_val'] = $year;
+        }
 
         if (!empty($employeeId)) {
             $sql .= " AND t.user_id = :employee_id";
@@ -224,20 +240,22 @@ function getMonthlyTimesheetData() {
         $timesheetData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $formattedData = [];
-        foreach($timesheetData as $entry) {
-            $formattedData[] = [
-                'employee_name' => $entry['employee_name'],
-                'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
-                'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
-                'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
-                'duration' => $entry['duration'],
-                'logon_latitude' => $entry['logon_latitude'],
-                'logon_longitude' => $entry['logon_longitude'],
-                'logon_address' => $entry['logon_address'],
-                'logoff_latitude' => $entry['logoff_latitude'],
-                'logoff_longitude' => $entry['logoff_longitude'],
-                'logoff_address' => $entry['logoff_address'],
-            ];
+        if ($timesheetData) {
+            foreach($timesheetData as $entry) {
+                $formattedData[] = [
+                    'employee_name' => $entry['employee_name'],
+                    'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
+                    'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
+                    'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
+                    'duration' => $entry['duration'],
+                    'logon_latitude' => $entry['logon_latitude'],
+                    'logon_longitude' => $entry['logon_longitude'],
+                    'logon_address' => $entry['logon_address'],
+                    'logoff_latitude' => $entry['logoff_latitude'],
+                    'logoff_longitude' => $entry['logoff_longitude'],
+                    'logoff_address' => $entry['logoff_address'],
+                ];
+            }
         }
         respondWithSuccess('Données de pointage récupérées.', ['timesheet' => $formattedData]);
 
@@ -248,21 +266,23 @@ function getMonthlyTimesheetData() {
 }
 
 /**
- * Gets monthly leave data, filterable by employee and month/year
+ * Gets monthly leave data, filterable by employee, month/year, and specific day
  */
 function getMonthlyLeaveData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
     $monthYear = isset($_GET['month_year']) ? $_GET['month_year'] : date('Y-m');
+    $specificDay = isset($_GET['specific_day']) && !empty($_GET['specific_day']) ? $_GET['specific_day'] : null;
 
-    if (!preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
+    if ($specificDay && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $specificDay)) {
+        respondWithError("Format de jour invalide. Utilisez YYYY-MM-DD.");
+        return;
+    }
+    if (!$specificDay && !preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
         respondWithError("Format de mois invalide. Utilisez YYYY-MM.");
         return;
     }
-    list($year, $month) = explode('-', $monthYear);
-    $firstDayOfMonth = "$year-$month-01";
-    $lastDayOfMonth = date("Y-m-t", strtotime($firstDayOfMonth));
-
+    
     try {
         $sql = "SELECT 
                     c.date_debut, 
@@ -274,17 +294,23 @@ function getMonthlyLeaveData() {
                     u.prenom + ' ' + u.nom AS employee_name
                 FROM Conges c
                 JOIN Users u ON c.user_id = u.user_id
-                WHERE 
-                    ((MONTH(c.date_debut) = :month_val AND YEAR(c.date_debut) = :year_val) OR 
-                     (MONTH(c.date_fin) = :month_alt AND YEAR(c.date_fin) = :year_alt) OR
-                     (c.date_debut <= :last_day AND c.date_fin >= :first_day))"; 
+                WHERE 1=1"; 
+        
+        $params = [];
 
-        $params = [
-            ':month_val' => $month, ':year_val' => $year,
-            ':month_alt' => $month, ':year_alt' => $year, 
-            ':last_day' => $lastDayOfMonth, ':first_day' => $firstDayOfMonth
-        ];
+        if ($specificDay) {
+            $sql .= " AND :specific_day BETWEEN c.date_debut AND c.date_fin";
+            $params[':specific_day'] = $specificDay;
+        } else { 
+            list($year, $month) = explode('-', $monthYear);
+            $firstDayOfMonth = "$year-$month-01";
+            $lastDayOfMonth = date("Y-m-t", strtotime($firstDayOfMonth));
 
+            $sql .= " AND ((c.date_debut <= :last_day_of_month AND c.date_fin >= :first_day_of_month))";
+            $params[':first_day_of_month'] = $firstDayOfMonth;
+            $params[':last_day_of_month'] = $lastDayOfMonth;
+        }
+        
         if (!empty($employeeId)) {
             $sql .= " AND c.user_id = :employee_id";
             $params[':employee_id'] = $employeeId;
@@ -296,17 +322,19 @@ function getMonthlyLeaveData() {
         $leaveData = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $formattedLeaves = [];
-        foreach ($leaveData as $leave) {
-            $formattedLeaves[] = [
-                'employee_name' => $leave['employee_name'],
-                'type_conge_display' => getTypeCongeDisplayName($leave['type_conge']),
-                'date_debut' => date('d/m/Y', strtotime($leave['date_debut'])),
-                'date_fin' => date('d/m/Y', strtotime($leave['date_fin'])),
-                'duree' => $leave['duree'],
-                'status' => $leave['status'],
-                'status_display' => getStatusDisplayName($leave['status']),
-                'commentaire' => $leave['commentaire']
-            ];
+        if($leaveData){
+            foreach ($leaveData as $leave) {
+                $formattedLeaves[] = [
+                    'employee_name' => $leave['employee_name'],
+                    'type_conge_display' => getTypeCongeDisplayName($leave['type_conge']),
+                    'date_debut' => date('d/m/Y', strtotime($leave['date_debut'])),
+                    'date_fin' => date('d/m/Y', strtotime($leave['date_fin'])),
+                    'duree' => $leave['duree'],
+                    'status' => $leave['status'],
+                    'status_display' => getStatusDisplayName($leave['status']),
+                    'commentaire' => $leave['commentaire']
+                ];
+            }
         }
         respondWithSuccess('Données de congé récupérées.', ['leaves' => $formattedLeaves]);
 
@@ -322,7 +350,7 @@ function getTypeCongeDisplayName($typeKey) {
         'cp' => 'Congés Payés', 'rtt' => 'RTT', 'sans-solde' => 'Congé Sans Solde',
         'special' => 'Congé Spécial', 'maladie' => 'Congé Maladie'
     ];
-    return $types[$typeKey] ?? ucfirst($typeKey);
+    return $types[$typeKey] ?? ucfirst(str_replace('_', ' ', $typeKey)); // More generic fallback
 }
 
 /** Helper function to get display name for status */
@@ -340,7 +368,6 @@ function getStatusDisplayName($statusKey) {
  * @param array $data Optional data to include in the response
  */
 function respondWithSuccess($message, $data = []) {
-    // header('Content-Type: application/json'); // Already set at the top
     echo json_encode([
         'status' => 'success',
         'message' => $message,
@@ -354,8 +381,7 @@ function respondWithSuccess($message, $data = []) {
  * @param string $message Error message
  */
 function respondWithError($message) {
-    // header('Content-Type: application/json'); // Already set at the top
-    error_log("Responding with error: " . $message);
+    error_log("Responding with error (dashboard-handler): " . $message);
     echo json_encode([
         'status' => 'error',
         'message' => $message
