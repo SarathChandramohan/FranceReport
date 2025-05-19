@@ -154,7 +154,6 @@ function getRecentActivities($conn) {
 function getMonthlyTimesheetData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
-    // Default to current month if month_year is empty but specific_day is also empty
     $monthYear = (isset($_GET['month_year']) && !empty($_GET['month_year'])) ? $_GET['month_year'] : date('Y-m');
     $specificDay = isset($_GET['specific_day']) && !empty($_GET['specific_day']) ? $_GET['specific_day'] : null;
 
@@ -162,7 +161,6 @@ function getMonthlyTimesheetData() {
         respondWithError("Format de jour invalide. Utilisez YYYY-MM-DD.");
         return;
     }
-    // monthYear is only strictly required if specificDay is not set.
     if (!$specificDay && ($monthYear && !preg_match('/^\d{4}-\d{2}$/', $monthYear))) {
         respondWithError("Format de mois invalide. Utilisez YYYY-MM ou laissez vide si un jour est sélectionné.");
         return;
@@ -172,12 +170,13 @@ function getMonthlyTimesheetData() {
         return;
     }
 
-
     try {
+        // Added t.total_break_time to the SELECT statement
         $sql = "SELECT 
                     t.entry_date, 
                     t.logon_time, 
                     t.logoff_time,
+                    t.total_break_time, -- Assuming this column stores total break in minutes
                     t.logon_latitude, t.logon_longitude, t.logon_address,
                     t.logoff_latitude, t.logoff_longitude, t.logoff_address,
                     u.prenom + ' ' + u.nom AS employee_name,
@@ -196,7 +195,7 @@ function getMonthlyTimesheetData() {
         if ($specificDay) {
             $sql .= " AND t.entry_date = :specific_day";
             $params[':specific_day'] = $specificDay;
-        } elseif ($monthYear) { // Only use monthYear if specificDay is not set
+        } elseif ($monthYear) { 
             list($year, $month) = explode('-', $monthYear);
             $sql .= " AND MONTH(t.entry_date) = :month_val AND YEAR(t.entry_date) = :year_val";
             $params[':month_val'] = $month;
@@ -216,12 +215,29 @@ function getMonthlyTimesheetData() {
         $formattedData = [];
         if ($timesheetData) {
             foreach($timesheetData as $entry) {
+                $break_duration_formatted = '--';
+                if (isset($entry['total_break_time']) && is_numeric($entry['total_break_time'])) {
+                    $total_break_minutes = intval($entry['total_break_time']);
+                    if ($total_break_minutes > 0) {
+                        $break_hours = floor($total_break_minutes / 60);
+                        $break_minutes = $total_break_minutes % 60;
+                        $break_duration_formatted = "";
+                        if ($break_hours > 0) {
+                            $break_duration_formatted .= $break_hours . "h ";
+                        }
+                        $break_duration_formatted .= str_pad($break_minutes, 2, '0', STR_PAD_LEFT) . "m";
+                    } else {
+                        $break_duration_formatted = "0m";
+                    }
+                }
+
                 $formattedData[] = [
                     'employee_name' => $entry['employee_name'],
                     'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
                     'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
                     'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
-                    'duration' => $entry['duration'],
+                    'total_break_time' => $break_duration_formatted, // Add formatted break time
+                    'duration' => $entry['duration'], // This is work duration, ensure it subtracts break time if needed by definition
                     'logon_latitude' => $entry['logon_latitude'],
                     'logon_longitude' => $entry['logon_longitude'],
                     'logon_address' => $entry['logon_address'],
@@ -238,7 +254,6 @@ function getMonthlyTimesheetData() {
         respondWithError('Erreur de base de données lors de la récupération des pointages: ' . $e->getMessage());
     }
 }
-
 function getMonthlyLeaveData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
