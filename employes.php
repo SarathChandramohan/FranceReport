@@ -2,13 +2,12 @@
 // employes.php
 
 require_once 'session-management.php';
-requireLogin(); // Ensures user is logged in
-$currentUser = getCurrentUser(); // Get current user info to check role
+requireLogin();
+$currentUser = getCurrentUser();
 $user_role = $currentUser['role'];
 
-require_once 'db-connection.php'; // For fetching the general list of employees
+require_once 'db-connection.php';
 
-// Function to get all employees (basic list for display on the page load)
 function getAllEmployeesForList($conn) {
     $employees = [];
     try {
@@ -35,23 +34,26 @@ $all_employees_list = getAllEmployeesForList($conn);
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
+        /* Ensure no default margin/padding interfering */
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
+            /* height: 100%; /* Usually not needed unless specific full-height layout */
         }
+
         body {
             background-color: #f5f5f7;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             color: #1d1d1f;
-            /* Adjusted padding-top if your navbar is fixed/sticky.
-               Measure your navbar height and set this value.
-               This value should be accurate. If navbar.php's style
-               makes it sticky-top, Bootstrap might handle spacing,
-               but explicit padding is safer. */
-            padding-top: 60px; /* Example: Adjust this based on your navbar's height */
+            /* This padding-top is crucial if your navbar is fixed or sticky and has a known height.
+               Adjust this value to the exact height of your rendered navbar. */
+            /* padding-top: 60px; /* Example value, will be set by JS */
         }
+
+        /* Navbar specific fix: If navbar.php makes it fixed/sticky */
+        /* This script will dynamically set padding-top after navbar.php loads */
+
         .card {
             background-color: #ffffff;
             border-radius: 12px;
@@ -81,7 +83,7 @@ $all_employees_list = getAllEmployeesForList($conn);
             text-align: center;
             border-left: 5px solid #007aff;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            cursor: pointer; /* Make cards look clickable */
+            cursor: pointer;
         }
         .stat-card:hover {
             transform: translateY(-5px);
@@ -156,7 +158,6 @@ $all_employees_list = getAllEmployeesForList($conn);
         .alert-danger-custom { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
         .alert-info-custom { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
 
-        /* Modal styles */
         .modal-header { background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; }
         .modal-title { font-weight: 600; }
         .modal-body { max-height: 70vh; overflow-y: auto; }
@@ -169,7 +170,7 @@ $all_employees_list = getAllEmployeesForList($conn);
 
 <?php include 'navbar.php'; ?>
 
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4" id="main-content-area">
     <h2>Tableau de Bord des Employés</h2>
 
     <div class="card">
@@ -194,7 +195,7 @@ $all_employees_list = getAllEmployeesForList($conn);
                         <th>Prénom</th>
                         <th>Email</th>
                         <th>Rôle</th>
-                        </tr>
+                    </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($all_employees_list)): ?>
@@ -218,8 +219,7 @@ $all_employees_list = getAllEmployeesForList($conn);
 </div>
 
 <div class="modal fade" id="employeeListModal" tabindex="-1" aria-labelledby="employeeListModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
+  <div class="modal-dialog modal-xl modal-dialog-centered"> <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="employeeListModalLabel">Liste des Employés</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -247,10 +247,22 @@ $all_employees_list = getAllEmployeesForList($conn);
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Attempt to fix navbar spacing dynamically
+    const navbar = document.querySelector('.navbar.sticky-top'); // Use a selector for your specific navbar
+    if (navbar) {
+        const navbarHeight = navbar.offsetHeight;
+        document.body.style.paddingTop = navbarHeight + 'px';
+    } else {
+        // Fallback if navbar isn't found or not sticky-top
+        // You might already have a default padding in CSS
+        console.warn("Navbar element for dynamic padding adjustment not found or not sticky.");
+    }
+
     fetchEmployeeStats();
 });
 
 function fetchEmployeeStats() {
+    // ... (fetchEmployeeStats function remains the same as previous version)
     const statsContainer = document.getElementById('employee-stats-container');
     statsContainer.innerHTML = `
         <div class="loading-placeholder">
@@ -287,6 +299,7 @@ function fetchEmployeeStats() {
 }
 
 function renderStats(stats, userRole) {
+    // ... (renderStats function remains the same as previous version, ensure click handlers are correct)
     const statsContainer = document.getElementById('employee-stats-container');
     statsContainer.innerHTML = '';
     const isAdmin = userRole === 'admin';
@@ -302,7 +315,6 @@ function renderStats(stats, userRole) {
 
     statTypes.forEach(type => {
         if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
-            // Only add click listener if the count is > 0 and it's not total_employees
             const isClickable = stats[type.key] > 0 && type.key !== 'total_employees';
             const clickHandler = isClickable ? `showEmployeeListModal('${type.key}', '${type.label}')` : '';
             const cursorStyle = isClickable ? 'cursor: pointer;' : 'cursor: default;';
@@ -347,13 +359,21 @@ function showEmployeeListModal(statType, modalTitleText) {
         .then(data => {
             if (data.status === 'success' && data.employees) {
                 if (data.employees.length > 0) {
-                    let tableHtml = '<table class="table table-sm table-hover" id="employeeListModalTable"><thead><tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Rôle</th></tr></thead><tbody>';
+                    let tableHtml = '<table class="table table-sm table-hover" id="employeeListModalTable"><thead><tr><th>Nom</th><th>Prénom</th>';
+                    if (statType === 'assigned_today') {
+                        tableHtml += '<th>Événement</th>'; // Add Event Name column
+                    }
+                    tableHtml += '<th>Email</th><th>Rôle</th></tr></thead><tbody>';
+
                     data.employees.forEach(emp => {
                         tableHtml += `<tr>
                                         <td>${emp.nom ? escapeHtml(emp.nom) : 'N/A'}</td>
-                                        <td>${emp.prenom ? escapeHtml(emp.prenom) : 'N/A'}</td>
-                                        <td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
-                                        <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>
+                                        <td>${emp.prenom ? escapeHtml(emp.prenom) : 'N/A'}</td>`;
+                        if (statType === 'assigned_today') {
+                            tableHtml += `<td>${emp.event_title ? escapeHtml(emp.event_title) : 'N/A'}</td>`;
+                        }
+                        tableHtml += `<td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
+                                      <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>
                                       </tr>`;
                     });
                     tableHtml += '</tbody></table>';
