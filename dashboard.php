@@ -272,33 +272,33 @@ $all_employees = getAllEmployees($conn);
             margin-right: 5px;
             white-space: nowrap;
         }
-        .filter-controls .form-control-sm {
-            padding: 0.3rem 0.6rem; /* Slightly more padding */
-            font-size: 14px; /* Ensure readability */
+        .filter-controls .form-control-sm { /* General styling for form-control-sm in filters */
+            padding: 0.3rem 0.6rem; 
+            font-size: 14px; 
             border-radius: 8px; 
             border: 1px solid #d2d2d7; 
             background-color: #f5f5f7; 
             height: auto; 
             line-height: 1.5;
         }
-        .filter-controls select.form-control-sm {
-            min-width: 220px; /* Increased min-width */
-            flex-basis: 220px; 
-            flex-grow: 1;   
+        .filter-controls select.form-control-sm { /* Specific for select elements */
+            min-width: 220px; 
+            flex-basis: 220px; /* Let it start at this width */
+            flex-grow: 1;   /* Allow it to grow if there's space */
         }
         .filter-controls input[type="month"].form-control-sm,
         .filter-controls input[type="date"].form-control-sm {
             min-width: 160px; 
-            flex-basis: auto; /* Let it size based on content or min-width */
-            flex-grow: 0; 
+            flex-basis: auto; /* auto basis for date/month inputs */
+            flex-grow: 0; /* Don't necessarily need these to grow much */
         }
-         .filter-controls > * {
+         .filter-controls > * { /* Spacing for all direct children */
             margin-bottom: 5px; 
-            margin-right: 10px; /* Space between filter elements */
+            margin-right: 10px; 
         }
-        .filter-controls .export-button {
-            margin-left: auto; /* Pushes button to the right if space allows */
-            margin-right: 0; /* Remove right margin for the last item */
+        .filter-controls .export-button { /* Ensure export button is last and aligned */
+            margin-left: auto; 
+            margin-right: 0; 
         }
 
 
@@ -404,11 +404,9 @@ $all_employees = getAllEmployees($conn);
             h2 { font-size: 20px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
             .filter-controls { flex-direction: column; align-items: stretch; }
-            .filter-controls select.form-control-sm, 
-            .filter-controls input[type="month"].form-control-sm,
-            .filter-controls input[type="date"].form-control-sm {
+            .filter-controls .form-control-sm { /* Ensure full width for stacked items */
                 width: 100%; margin-bottom: 10px; margin-right: 0;
-                min-width: 0; /* Override min-width for stacked layout */
+                min-width: 0; 
             }
              .filter-controls .export-button { margin-left: 0; width: 100%;}
 
@@ -709,45 +707,246 @@ $all_employees = getAllEmployees($conn);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // (JavaScript from the previous response, with modifications to how ajaxData is built)
-        // ... (all the JS functions: refreshDashboardData, displayGlobalError, displayModalAlert, updateActivitiesTable, etc.)
-
         let map; 
         let currentMapMarkers = []; 
 
         function refreshDashboardData() {
-            // ... (same as previous version)
+            try {
+                fetch('dashboard-handler.php?action=get_dashboard_all_data')
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.text().then(text => {
+                                try {
+                                    const errData = JSON.parse(text);
+                                    throw new Error(errData.message || `HTTP error! status: ${response.status}`);
+                                } catch (e) {
+                                    throw new Error(`HTTP error! status: ${response.status}. Response: ${text.substring(0,100)}...`);
+                                }
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.status === 'success') {
+                            document.getElementById('stats-employees-present').textContent = data.data.stats.employees_present;
+                            document.getElementById('stats-employees-absent').textContent = data.data.stats.employees_absent;
+                            document.getElementById('stats-pending-requests').textContent = data.data.stats.pending_requests;
+                            updateActivitiesTable(data.data.activities);
+                        } else {
+                            console.error('Error from handler (status not success):', data.message);
+                            displayGlobalError("Impossible de rafraîchir les données du tableau de bord: " + (data.message || "Erreur inconnue"));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error refreshing dashboard (fetch/parse):', error);
+                        displayGlobalError("Erreur de communication pour rafraîchir le tableau de bord: " + error.message);
+                    });
+            } catch (e) {
+                console.error("Error in refreshDashboardData:", e);
+                displayGlobalError("Une erreur s'est produite lors du rafraîchissement des données.");
+            }
         }
         
         function displayGlobalError(message) {
-            // ... (same as previous version)
+            console.error("Global Error:", message);
+            alert("Erreur: " + message); 
         }
 
         function displayModalAlert(modalId, message, type = 'danger') {
-            // ... (same as previous version)
+            try {
+                const alertSelector = `#${modalId} .modal-alert`;
+                const alertElement = $(alertSelector);
+                if (alertElement.length) {
+                    alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass(`alert-${type}`);
+                    alertElement.html(message); 
+                    alertElement.show();
+                     setTimeout(() => { alertElement.hide(); }, 5000); 
+                } else {
+                    console.warn(`Alert element not found for modal: ${modalId} with selector ${alertSelector}`);
+                    alert(`${type.toUpperCase()}: ${message}`);
+                }
+            } catch (e) {
+                console.error("Error in displayModalAlert:", e);
+                alert(`Notification: ${message}`);
+            }
         }
 
+
         function updateActivitiesTable(activities) {
-            // ... (same as previous version)
+            try {
+                const tbody = document.querySelector('#activities-table tbody');
+                if (!tbody) { console.error("Activities table body not found."); return; }
+                tbody.innerHTML = ''; 
+                
+                if (!activities || activities.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = '<td colspan="4" style="text-align: center;">Aucune activité récente</td>';
+                    tbody.appendChild(row);
+                    return;
+                }
+                
+                activities.forEach(activity => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${escapeHtml(activity.employee_name)}</td>
+                        <td>${escapeHtml(activity.action)}</td>
+                        <td>${escapeHtml(activity.date)}</td>
+                        <td>${escapeHtml(activity.hour)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (e) {
+                console.error("Error in updateActivitiesTable:", e);
+            }
         }
         
         function loadPendingLeaveRequestsForModal() {
-            // ... (same as previous version, ensure try...catch)
+            try {
+                const tbody = $('#congesAdminTableBody');
+                if (!tbody.length) { console.error("Conges Admin table body not found."); return; }
+                tbody.html('<tr><td colspan="7" style="text-align:center;">Chargement des demandes...</td></tr>');
+                $('#congesAdminAlert').hide();
+
+                $.ajax({
+                    url: 'conges-handler.php',
+                    type: 'POST', 
+                    data: { action: 'get_pending_requests' },
+                    dataType: 'json',
+                    success: function(response) {
+                        tbody.empty();
+                        if (response.status === 'success' && response.data && response.data.length > 0) {
+                            response.data.forEach(function(req) {
+                                let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>` : 'Aucun';
+                                tbody.append(\`
+                                    <tr>
+                                        <td>\${escapeHtml(req.employee_name)}</td>
+                                        <td>\${escapeHtml(req.date_debut)} - \${escapeHtml(req.date_fin)}</td>
+                                        <td>\${escapeHtml(req.type_conge)}</td>
+                                        <td>\${escapeHtml(req.duree)}j</td>
+                                        <td>\${docLink}</td>
+                                        <td>\${escapeHtml(req.date_demande)}</td>
+                                        <td>
+                                            <button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(\${req.id})">Approuver</button>
+                                            <button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(\${req.id})">Refuser</button>
+                                        </td>
+                                    </tr>\`);
+                            });
+                        } else if (response.status === 'success') {
+                            tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune demande en attente.</td></tr>');
+                        } else {
+                            displayModalAlert('congesAdminModal', response.message || 'Erreur lors du chargement des demandes.', 'danger');
+                            tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur de chargement.</td></tr>');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error("AJAX error loading pending leaves:", xhr.responseText);
+                        displayModalAlert('congesAdminModal', 'Erreur de communication avec le serveur.', 'danger');
+                        tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur de communication.</td></tr>');
+                    }
+                });
+            } catch (e) {
+                console.error("Error in loadPendingLeaveRequestsForModal:", e);
+                $('#congesAdminTableBody').html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
+            }
         }
 
         function approveLeaveFromModal(leaveId) {
-            // ... (same as previous version, ensure try...catch)
+            try {
+                const commentaire = prompt("Commentaire pour l'approbation (optionnel):");
+                $.ajax({
+                    url: 'conges-handler.php',
+                    type: 'POST',
+                    data: { action: 'approve_request', leave_id: leaveId, commentaire: commentaire || '' },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            displayModalAlert('congesAdminModal', response.message, 'success');
+                            loadPendingLeaveRequestsForModal();
+                            refreshDashboardData(); 
+                        } else {
+                            displayModalAlert('congesAdminModal', response.message || 'Erreur lors de l\'approbation.', 'danger');
+                        }
+                    },
+                    error: function() { displayModalAlert('congesAdminModal', 'Erreur de communication.', 'danger'); }
+                });
+            } catch (e) {
+                console.error("Error in approveLeaveFromModal:", e);
+                displayModalAlert('congesAdminModal', 'Erreur interne du script.', 'danger');
+            }
         }
 
         function rejectLeaveFromModal(leaveId) {
-            // ... (same as previous version, ensure try...catch)
+            try {
+                const commentaire = prompt("Motif du refus (obligatoire):");
+                if (!commentaire) { 
+                    displayModalAlert('congesAdminModal', 'Un motif de refus est requis.', 'warning');
+                    return;
+                }
+                $.ajax({
+                    url: 'conges-handler.php',
+                    type: 'POST',
+                    data: { action: 'reject_request', leave_id: leaveId, commentaire: commentaire },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            displayModalAlert('congesAdminModal', response.message, 'success');
+                            loadPendingLeaveRequestsForModal();
+                            refreshDashboardData(); 
+                        } else {
+                            displayModalAlert('congesAdminModal', response.message || 'Erreur lors du refus.', 'danger');
+                        }
+                    },
+                    error: function() { displayModalAlert('congesAdminModal', 'Erreur de communication.', 'danger'); }
+                });
+            } catch (e) {
+                console.error("Error in rejectLeaveFromModal:", e);
+                displayModalAlert('congesAdminModal', 'Erreur interne du script.', 'danger');
+            }
         }
         
         $('#eventCreationForm').on('submit', function(e) {
-            // ... (same as previous version, ensure try...catch)
+            e.preventDefault();
+            try {
+                $('#eventCreationAlert').hide().removeClass('alert-success alert-danger alert-warning').text('');
+                const formData = new FormData(this);
+                formData.append('action', 'create_event');
+
+                if (!formData.get('title') || !formData.get('start_datetime') || !formData.get('end_datetime') || formData.getAll('assigned_users[]').length === 0) {
+                    displayModalAlert('eventCreationModal', 'Veuillez remplir tous les champs obligatoires (*).', 'warning');
+                    return;
+                }
+                if (new Date(formData.get('end_datetime')) <= new Date(formData.get('start_datetime'))) {
+                    displayModalAlert('eventCreationModal', 'La date de fin doit être postérieure à la date de début.', 'warning');
+                    return;
+                }
+
+                $.ajax({
+                    url: 'events_handler.php',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            displayModalAlert('eventCreationModal', response.message + (response.event_id ? ` (ID: ${response.event_id})` : ''), 'success');
+                            $('#eventCreationForm')[0].reset();
+                            setTimeout(() => { $('#eventCreationModal').modal('hide'); }, 2000);
+                        } else {
+                            displayModalAlert('eventCreationModal', response.message || 'Erreur lors de la création de l\'événement.', 'danger');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error("AJAX error creating event:", xhr.responseText);
+                        displayModalAlert('eventCreationModal', 'Erreur de communication avec le serveur.', 'danger');
+                    }
+                });
+            } catch (e) {
+                console.error("Error in eventCreationForm submit handler:", e);
+                displayModalAlert('eventCreationModal', 'Erreur interne du script.', 'danger');
+            }
         });
 
-        // MODIFIED loadTimesheetDataForModal
         function loadTimesheetDataForModal() {
             try {
                 const employeeFilter = $('#timesheetEmployeeFilterModal');
@@ -762,7 +961,7 @@ $all_employees = getAllEmployees($conn);
                 }
                 const employeeId = employeeFilter.val();
                 const monthYearInput = monthFilter.val();
-                const specificDay = dayFilter.val();
+                const specificDay = dayFilter.val(); // YYYY-MM-DD or empty string
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
@@ -772,22 +971,18 @@ $all_employees = getAllEmployees($conn);
 
                 if (specificDay && specificDay !== '') {
                     ajaxData.specific_day = specificDay;
-                    // If a specific day is chosen, we don't need monthYear for filtering,
-                    // but the handler might still expect it for context or if day is invalid.
-                    // For now, let's keep sending monthYear for simplicity in handler.
-                    ajaxData.month_year = monthYearInput; // Or derive from specificDay
-                } else if (monthYearInput && monthYearInput !== '') {
+                } else if (monthYearInput && monthYearInput !== '') { // Only use month if specificDay is not set
                     ajaxData.month_year = monthYearInput;
                 } else {
-                     tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Veuillez sélectionner un mois.</td></tr>');
+                     // If neither day nor month is selected (e.g. month cleared and day empty)
+                     tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>');
                      return;
                 }
-
 
                 $.ajax({
                     url: 'dashboard-handler.php',
                     type: 'GET', 
-                    data: ajaxData, // Use the constructed ajaxData
+                    data: ajaxData, 
                     dataType: 'json',
                     success: function(response) {
                         tbody.empty();
@@ -827,7 +1022,6 @@ $all_employees = getAllEmployees($conn);
             }
         }
         
-        // MODIFIED loadLeaveDataForModal
         function loadLeaveDataForModal() {
             try {
                 const employeeFilter = $('#leaveEmployeeFilterModal');
@@ -842,28 +1036,28 @@ $all_employees = getAllEmployees($conn);
                 }
                 const employeeId = employeeFilter.val();
                 const monthYearInput = monthFilter.val();
-                const specificDay = dayFilter.val();
+                const specificDay = dayFilter.val(); // YYYY-MM-DD or empty string
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
                     action: 'get_monthly_leaves',
                     employee_id: employeeId
                 };
-
+                
                 if (specificDay && specificDay !== '') {
                     ajaxData.specific_day = specificDay;
-                    ajaxData.month_year = monthYearInput; // Keep sending month for context if day is chosen
                 } else if (monthYearInput && monthYearInput !== '') {
                     ajaxData.month_year = monthYearInput;
                 } else {
-                     tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Veuillez sélectionner un mois.</td></tr>');
+                     tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>');
                      return;
                 }
+
 
                 $.ajax({
                     url: 'dashboard-handler.php',
                     type: 'GET',
-                    data: ajaxData, // Use the constructed ajaxData
+                    data: ajaxData, 
                     dataType: 'json',
                     success: function(response) {
                         tbody.empty();
@@ -896,21 +1090,151 @@ $all_employees = getAllEmployees($conn);
             }
         }
 
-        // ... (showTimesheetMapModal, closeMapModal, escapeHtml, exportTableToCSV functions remain the same as previous response)
         function showTimesheetMapModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
-            // ... (Implementation from previous response)
+            try {
+                const modal = document.getElementById('mapModal');
+                const mapContainer = document.getElementById('map-modal-content-container');
+                const mapTitleElem = document.getElementById('map-modal-title');
+                const mapDetailsElem = document.getElementById('map-modal-details');
+
+                if(!modal || !mapContainer || !mapTitleElem || !mapDetailsElem) {
+                    console.error("Map modal elements not found."); return;
+                }
+
+                mapTitleElem.textContent = `Localisation pour ${escapeHtml(employeeName)} - ${escapeHtml(entryDate)}`;
+                
+                currentMapMarkers.forEach(marker => marker.remove());
+                currentMapMarkers = [];
+                if (map) { map.remove(); map = null; }
+                
+                mapContainer.innerHTML = ''; 
+
+                if (typeof L === 'undefined') {
+                    mapContainer.innerHTML = "Erreur: La bibliothèque de cartographie (Leaflet) n'a pas pu être chargée.";
+                    $('#mapModal').modal('show');
+                    return;
+                }
+                
+                map = L.map(mapContainer);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+
+                let latEntree = parseFloat(latEntreeStr);
+                let lonEntree = parseFloat(lonEntreeStr);
+                let latSortie = parseFloat(latSortieStr);
+                let lonSortie = parseFloat(lonSortieStr);
+
+                const validEntryCoords = !isNaN(latEntree) && !isNaN(lonEntree) && (latEntree !== 0 || lonEntree !== 0);
+                const validExitCoords = !isNaN(latSortie) && !isNaN(lonSortie) && (latSortie !== 0 || lonSortie !== 0);
+                let bounds = [];
+                let detailsHTML = "";
+
+                if (validEntryCoords) {
+                    const entryMarker = L.marker([latEntree, lonEntree]).addTo(map)
+                        .bindPopup(`<b>Entrée:</b> ${escapeHtml(timeEntree) || 'N/A'}<br>${escapeHtml(addrEntree) || 'Adresse non enregistrée'}`);
+                    currentMapMarkers.push(entryMarker);
+                    bounds.push([latEntree, lonEntree]);
+                    detailsHTML += `<p><strong>Entrée (${escapeHtml(timeEntree) || 'N/A'}):</strong> ${escapeHtml(addrEntree) || `Lat: ${latEntree.toFixed(5)}, Lon: ${lonEntree.toFixed(5)}`}</p>`;
+                } else {
+                     detailsHTML += `<p><strong>Entrée (${escapeHtml(timeEntree) || 'N/A'}):</strong> Localisation non enregistrée.</p>`;
+                }
+
+                if (validExitCoords) {
+                    const exitMarker = L.marker([latSortie, lonSortie]).addTo(map)
+                        .bindPopup(`<b>Sortie:</b> ${escapeHtml(timeSortie) || 'N/A'}<br>${escapeHtml(addrSortie) || 'Adresse non enregistrée'}`);
+                    currentMapMarkers.push(exitMarker);
+                    bounds.push([latSortie, lonSortie]);
+                    detailsHTML += `<p><strong>Sortie (${escapeHtml(timeSortie) || 'N/A'}):</strong> ${escapeHtml(addrSortie) || `Lat: ${latSortie.toFixed(5)}, Lon: ${lonSortie.toFixed(5)}`}</p>`;
+                } else {
+                    detailsHTML += `<p><strong>Sortie (${escapeHtml(timeSortie) || 'N/A'}):</strong> Localisation non enregistrée.</p>`;
+                }
+                
+                mapDetailsElem.innerHTML = detailsHTML;
+
+                if (validEntryCoords && validExitCoords && !(latEntree === latSortie && lonEntree === lonSortie)) { 
+                    L.polyline(bounds, {color: 'blue'}).addTo(map); 
+                }
+
+
+                if (bounds.length > 0) { 
+                    if (bounds.length === 1) { // Only one point, set view to it
+                        map.setView(bounds[0], 13); // Zoom level 13 for a single point
+                    } else {
+                        map.fitBounds(bounds, { padding: [50, 50] }); 
+                    }
+                } else { 
+                    map.setView([48.8566, 2.3522], 5); 
+                    mapDetailsElem.innerHTML = "<p>Aucune localisation GPS enregistrée pour cette entrée.</p>"; 
+                }
+                
+                $('#mapModal').modal('show'); 
+                
+                setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+            } catch (e) {
+                console.error("Error in showTimesheetMapModal:", e);
+                 if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
+                 $('#mapModal').modal('show');
+            }
         }
 
         function closeMapModal() {
-            // ... (Implementation from previous response)
+            try {
+                $('#mapModal').modal('hide'); 
+                currentMapMarkers.forEach(marker => marker.remove());
+                currentMapMarkers = [];
+                if (map) { map.remove(); map = null; }
+            } catch (e) {
+                console.error("Error in closeMapModal:", e);
+            }
         }
 
         function escapeHtml(text) {
-            // ... (Implementation from previous response)
+            if (text === null || typeof text === 'undefined') return '';
+            const div = document.createElement('div');
+            div.textContent = String(text); 
+            return div.innerHTML;
         }
 
         function exportTableToCSV(tableId, filename) {
-            // ... (Implementation from previous response)
+            try {
+                const table = document.getElementById(tableId);
+                if (!table) { displayGlobalError(`Erreur d'exportation: Table #${tableId} non trouvée.`); return; }
+                let csv = [];
+                const rows = table.querySelectorAll("tr");
+                
+                for (const row of rows) {
+                    const rowData = [];
+                    const cols = row.querySelectorAll("td, th");
+                    for (const col of cols) {
+                        let cellContent = col.cloneNode(true);
+                        cellContent.querySelectorAll('button.action-button, button.btn, a.btn').forEach(el => el.remove());
+                        cellContent.querySelectorAll('.status-tag').forEach(el => {
+                            const statusText = el.textContent || el.innerText;
+                            el.parentNode.insertBefore(document.createTextNode(statusText), el);
+                            el.remove();
+                        });
+                        let text = cellContent.innerText.trim().replace(/"/g, '""'); 
+                        rowData.push(`"${text}"`); 
+                    }
+                    csv.push(rowData.join(","));
+                }
+                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && !rows[1])) { 
+                    displayGlobalError("Aucune donnée à exporter de la table #" + tableId + ".");
+                    return;
+                }
+                const csvFile = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+                const downloadLink = document.createElement("a");
+                downloadLink.download = filename;
+                downloadLink.href = window.URL.createObjectURL(csvFile);
+                downloadLink.style.display = "none";
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            } catch (e) {
+                console.error("Error in exportTableToCSV:", e);
+                displayGlobalError("Erreur lors de la préparation de l'exportation CSV.");
+            }
         }
         
         document.addEventListener('DOMContentLoaded', function() {
