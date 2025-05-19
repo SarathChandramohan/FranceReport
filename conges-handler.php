@@ -29,37 +29,109 @@ switch($action) {
     case 'get_stats':
         getLeaveStats($user_id);
         break;
-    case 'get_details':
+    case 'get_details': // This is for the user's own leave details
         getLeaveDetails($user_id);
         break;
+    case 'get_details_for_admin': // MODIFIED: New action for admin details view
+        getLeaveDetailsForAdmin($user_id);
+        break;
     case 'get_pending_requests':
-    getPendingRequests($user_id);
-    break;
-case 'approve_request':
-    approveLeaveRequest($user_id);
-    break;
-case 'reject_request':
-    rejectLeaveRequest($user_id);
-    break;
+        getPendingRequests($user_id);
+        break;
+    case 'approve_request':
+        approveLeaveRequest($user_id);
+        break;
+    case 'reject_request':
+        rejectLeaveRequest($user_id);
+        break;
     default:
-        respondWithError('Invalid action specified');
+        respondWithError('Invalid action specified: ' . htmlspecialchars($action)); // Added action to error message
 }
+
+/**
+ * Gets detailed information for a specific leave request (Admin version)
+ * * @param int $admin_user_id The admin user ID (for permission check)
+ */
+function getLeaveDetailsForAdmin($admin_user_id) {
+    global $conn;
+
+    // Ensure the current user is an admin
+    $currentUser = getCurrentUser();
+    if ($currentUser['role'] !== 'admin') {
+        respondWithError('Accès refusé. Cette action est réservée aux administrateurs.');
+        return;
+    }
+    
+    // Get leave ID
+    $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
+    
+    if ($leave_id <= 0) {
+        respondWithError('ID de congé invalide.');
+        return;
+    }
+    
+    try {
+        // Get the leave request details and include employee name
+        $stmt = $conn->prepare("SELECT 
+                                c.conge_id as id, 
+                                c.user_id as employee_user_id,
+                                u.prenom as employee_firstname,
+                                u.nom as employee_lastname,
+                                c.date_debut, 
+                                c.date_fin, 
+                                c.type_conge, 
+                                c.duree, 
+                                c.commentaire, 
+                                c.document, 
+                                c.status, 
+                                c.date_demande, 
+                                c.date_reponse, 
+                                c.reponse_commentaire 
+                               FROM Conges c
+                               JOIN Users u ON c.user_id = u.user_id
+                               WHERE c.conge_id = ?");
+        
+        $stmt->execute([$leave_id]);
+        $leave = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$leave) {
+            respondWithError('Demande de congé non trouvée.');
+            return;
+        }
+        
+        // Format dates for display and add employee name
+        $leave['employee_name'] = $leave['employee_firstname'] . ' ' . $leave['employee_lastname'];
+        $leave['date_debut'] = date('d/m/Y', strtotime($leave['date_debut']));
+        $leave['date_fin'] = date('d/m/Y', strtotime($leave['date_fin']));
+        $leave['date_demande'] = date('d/m/Y H:i', strtotime($leave['date_demande']));
+        $leave['status_display'] = getStatusDisplayName($leave['status']); // Helper for display
+        
+        if ($leave['date_reponse']) {
+            $leave['date_reponse'] = date('d/m/Y H:i', strtotime($leave['date_reponse']));
+        }
+        
+        respondWithSuccess('Details retrieved successfully for admin', $leave);
+        
+    } catch(PDOException $e) {
+        respondWithError('Erreur de base de données: ' . $e->getMessage());
+    }
+}
+
+
 /**
  * Gets all pending leave requests (for admin only)
- * 
- * @param int $user_id The user ID
+ * * @param int $user_id The user ID
  */
 function getPendingRequests($user_id) {
     global $conn;
     
-    // Check if the user is an admin
     $user = getCurrentUser();
     if ($user['role'] !== 'admin') {
         respondWithError('Accès refusé. Vous devez être administrateur.');
+        return; // Added return
     }
     
     try {
-        // Get all pending leave requests from all users
         $stmt = $conn->prepare("SELECT 
                                 c.conge_id as id,
                                 c.user_id, 
@@ -79,7 +151,6 @@ function getPendingRequests($user_id) {
         $stmt->execute();
         $pending = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Format dates and add employee name
         foreach ($pending as &$entry) {
             $entry['date_debut'] = date('d/m/Y', strtotime($entry['date_debut']));
             $entry['date_fin'] = date('d/m/Y', strtotime($entry['date_fin']));
@@ -96,44 +167,42 @@ function getPendingRequests($user_id) {
 
 /**
  * Approves a leave request
- * 
- * @param int $user_id The user ID of the admin
+ * * @param int $user_id The user ID of the admin
  */
 function approveLeaveRequest($user_id) {
     global $conn;
     
-    // Check if the user is an admin
     $user = getCurrentUser();
     if ($user['role'] !== 'admin') {
         respondWithError('Accès refusé. Vous devez être administrateur.');
+        return; // Added return
     }
     
-    // Get leave ID and comment
     $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
     $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
     
     if ($leave_id <= 0) {
         respondWithError('ID de congé invalide.');
+        return; // Added return
     }
     
     try {
-        // Check if the leave request exists and is pending
         $stmt = $conn->prepare("SELECT status FROM Conges WHERE conge_id = ?");
         $stmt->execute([$leave_id]);
         $leave = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$leave) {
             respondWithError('Demande de congé non trouvée.');
+            return; // Added return
         }
         
         if ($leave['status'] !== 'pending') {
             respondWithError('Seules les demandes en attente peuvent être approuvées.');
+            return; // Added return
         }
         
-        // Begin transaction
         $conn->beginTransaction();
         
-        // Update leave status to approved
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'approved', 
                                    date_reponse = GetDate(),
@@ -141,14 +210,11 @@ function approveLeaveRequest($user_id) {
                                WHERE conge_id = ?");
         $stmt->execute([$commentaire, $leave_id]);
         
-        // Commit transaction
         $conn->commit();
         
-        // Return success response
         respondWithSuccess('Demande de congé approuvée avec succès.');
         
     } catch(PDOException $e) {
-        // Rollback transaction on error
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
@@ -158,48 +224,47 @@ function approveLeaveRequest($user_id) {
 
 /**
  * Rejects a leave request
- * 
- * @param int $user_id The user ID of the admin
+ * * @param int $user_id The user ID of the admin
  */
 function rejectLeaveRequest($user_id) {
     global $conn;
     
-    // Check if the user is an admin
     $user = getCurrentUser();
     if ($user['role'] !== 'admin') {
         respondWithError('Accès refusé. Vous devez être administrateur.');
+        return; // Added return
     }
     
-    // Get leave ID and comment
     $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
     $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
     
     if ($leave_id <= 0) {
         respondWithError('ID de congé invalide.');
+        return; // Added return
     }
     
     if (empty($commentaire)) {
         respondWithError('Un motif de refus est requis.');
+        return; // Added return
     }
     
     try {
-        // Check if the leave request exists and is pending
         $stmt = $conn->prepare("SELECT status FROM Conges WHERE conge_id = ?");
         $stmt->execute([$leave_id]);
         $leave = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$leave) {
             respondWithError('Demande de congé non trouvée.');
+            return; // Added return
         }
         
         if ($leave['status'] !== 'pending') {
             respondWithError('Seules les demandes en attente peuvent être refusées.');
+            return; // Added return
         }
         
-        // Begin transaction
         $conn->beginTransaction();
         
-        // Update leave status to rejected
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'rejected', 
                                    date_reponse = GetDate(),
@@ -207,14 +272,11 @@ function rejectLeaveRequest($user_id) {
                                    WHERE conge_id = ?");
         $stmt->execute([$commentaire, $leave_id]);
         
-        // Commit transaction
         $conn->commit();
         
-        // Return success response
         respondWithSuccess('Demande de congé refusée avec succès.');
         
     } catch(PDOException $e) {
-        // Rollback transaction on error
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
@@ -223,100 +285,81 @@ function rejectLeaveRequest($user_id) {
 }
 /**
  * Submits a new leave request
- * 
- * @param int $user_id The user ID
+ * * @param int $user_id The user ID
  */
 function submitLeaveRequest($user_id) {
     global $conn;
     
-    // Get form data
     $date_debut = isset($_POST['date_debut']) ? $_POST['date_debut'] : null;
     $date_fin = isset($_POST['date_fin']) ? $_POST['date_fin'] : null;
     $type_conge = isset($_POST['type_conge']) ? $_POST['type_conge'] : null;
     $commentaire = isset($_POST['commentaire']) ? $_POST['commentaire'] : '';
     
-    // Validate required fields
     if (!$date_debut || !$date_fin || !$type_conge) {
         respondWithError('Tous les champs obligatoires doivent être remplis.');
+        return; // Added return
     }
     
-    // Validate date range
     if (strtotime($date_fin) < strtotime($date_debut)) {
         respondWithError('La date de fin ne peut pas être antérieure à la date de début.');
+        return; // Added return
     }
     
-    // Calculate duration in days (including weekends for now)
     $duration = calculateDateDiff($date_debut, $date_fin);
-    
-    // Set default status
     $status = 'pending';
-    
-    // Handle file upload
     $document_path = null;
+
     if (!empty($_FILES['document']) && $_FILES['document']['error'] == 0) {
         $upload_dir = 'uploads/conges/';
-        
-        // Create directory if it doesn't exist
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
+            if (!mkdir($upload_dir, 0777, true)) {
+                respondWithError('Échec de la création du répertoire de téléchargement.');
+                return;
+            }
         }
         
-        // Generate unique filename
         $filename = uniqid() . '_' . basename($_FILES['document']['name']);
         $target_file = $upload_dir . $filename;
         
-        // Check file type
         $file_type = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-        if ($file_type != "pdf" && $file_type != "jpg" && $file_type != "jpeg" && $file_type != "png") {
+        $allowed_types = ["pdf", "jpg", "jpeg", "png"];
+        if (!in_array($file_type, $allowed_types)) {
             respondWithError('Seuls les fichiers PDF, JPG, JPEG et PNG sont autorisés.');
+            return; 
         }
         
-        // Check file size (max 5MB)
-        if ($_FILES['document']['size'] > 5000000) {
+        if ($_FILES['document']['size'] > 5000000) { // 5MB
             respondWithError('Le fichier est trop volumineux. Taille maximum: 5MB.');
+            return; 
         }
         
-        // Upload the file
         if (move_uploaded_file($_FILES['document']['tmp_name'], $target_file)) {
             $document_path = $target_file;
         } else {
             respondWithError('Erreur lors du téléchargement du fichier.');
+            return; 
         }
     }
     
     try {
-        // Begin transaction
         $conn->beginTransaction();
         
-        // Insert new leave request
         $stmt = $conn->prepare("INSERT INTO Conges 
                                (user_id, date_debut, date_fin, type_conge, 
                                 duree, commentaire, document, status, date_demande) 
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, GetDate())");
         
         $stmt->execute([
-            $user_id,
-            $date_debut,
-            $date_fin,
-            $type_conge,
-            $duration,
-            $commentaire,
-            $document_path,
-            $status
+            $user_id, $date_debut, $date_fin, $type_conge,
+            $duration, $commentaire, $document_path, $status
         ]);
         
         $conge_id = $conn->lastInsertId();
-        
-        // Commit transaction
         $conn->commit();
         
-        // Return success response
-        respondWithSuccess('Demande de congé soumise avec succès.', [
-            'conge_id' => $conge_id
-        ]);
+        respondWithSuccess('Demande de congé soumise avec succès.', ['conge_id' => $conge_id]);
         
     } catch(PDOException $e) {
-        // Rollback transaction on error
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
@@ -326,21 +369,19 @@ function submitLeaveRequest($user_id) {
 
 /**
  * Cancels a leave request
- * 
- * @param int $user_id The user ID
+ * * @param int $user_id The user ID
  */
 function cancelLeaveRequest($user_id) {
     global $conn;
     
-    // Get leave ID
     $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
     
     if ($leave_id <= 0) {
         respondWithError('ID de congé invalide.');
+        return; // Added return
     }
     
     try {
-        // Check if the leave request belongs to the user and is pending
         $stmt = $conn->prepare("SELECT status FROM Conges 
                                WHERE conge_id = ? AND user_id = ?");
         $stmt->execute([$leave_id, $user_id]);
@@ -348,30 +389,27 @@ function cancelLeaveRequest($user_id) {
         
         if (!$leave) {
             respondWithError('Demande de congé non trouvée ou non autorisée.');
+            return; // Added return
         }
         
         if ($leave['status'] !== 'pending') {
             respondWithError('Seules les demandes en attente peuvent être annulées.');
+            return; // Added return
         }
         
-        // Begin transaction
         $conn->beginTransaction();
         
-        // Update leave status to cancelled
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'cancelled', 
                                    date_reponse = GetDate() 
                                WHERE conge_id = ?");
         $stmt->execute([$leave_id]);
         
-        // Commit transaction
         $conn->commit();
         
-        // Return success response
         respondWithSuccess('Demande de congé annulée avec succès.');
         
     } catch(PDOException $e) {
-        // Rollback transaction on error
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
@@ -381,14 +419,12 @@ function cancelLeaveRequest($user_id) {
 
 /**
  * Gets the leave history for a user
- * 
- * @param int $user_id The user ID
+ * * @param int $user_id The user ID
  */
 function getLeaveHistory($user_id) {
     global $conn;
     
     try {
-        // Get all leave requests for the user, ordered by most recent first
         $stmt = $conn->prepare("SELECT 
                                 conge_id as id, 
                                 date_debut, 
@@ -405,7 +441,6 @@ function getLeaveHistory($user_id) {
         $stmt->execute([$user_id]);
         $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Format dates for display
         foreach ($history as &$entry) {
             $entry['date_debut'] = date('d/m/Y', strtotime($entry['date_debut']));
             $entry['date_fin'] = date('d/m/Y', strtotime($entry['date_fin']));
@@ -421,17 +456,13 @@ function getLeaveHistory($user_id) {
 
 /**
  * Gets the leave statistics for a user
- * 
- * @param int $user_id The user ID
+ * * @param int $user_id The user ID
  */
 function getLeaveStats($user_id) {
     global $conn;
     
     try {
-        // Get the current year
         $current_year = date('Y');
-        
-        // Get default leave allowances (this would normally come from a configuration table)
         $leave_types = [
             'cp' => ['acquis' => 25, 'name' => 'Congés Payés'],
             'rtt' => ['acquis' => 12, 'name' => 'RTT'],
@@ -439,41 +470,28 @@ function getLeaveStats($user_id) {
             'special' => ['acquis' => 5, 'name' => 'Congé Spécial'],
             'maladie' => ['acquis' => 0, 'name' => 'Congé Maladie']
         ];
-        
-        // Initialize results array
         $results = [];
         
-        // For each leave type, calculate taken and pending days
         foreach ($leave_types as $type => $info) {
-            // Calculate days taken (approved leaves)
-            $stmt = $conn->prepare("SELECT COALESCE(SUM(duree), 0) as total_taken 
+            $stmt_taken = $conn->prepare("SELECT COALESCE(SUM(duree), 0) as total_taken 
                                    FROM Conges 
-                                   WHERE user_id = ? 
-                                   AND type_conge = ? 
-                                   AND status = 'approved'
-                                   AND YEAR(date_debut) = ?");
-            $stmt->execute([$user_id, $type, $current_year]);
-            $taken = $stmt->fetch(PDO::FETCH_ASSOC);
+                                   WHERE user_id = ? AND type_conge = ? AND status = 'approved' AND YEAR(date_debut) = ?");
+            $stmt_taken->execute([$user_id, $type, $current_year]);
+            $taken = $stmt_taken->fetch(PDO::FETCH_ASSOC);
             
-            // Calculate pending days
-            $stmt = $conn->prepare("SELECT COALESCE(SUM(duree), 0) as total_pending 
+            $stmt_pending = $conn->prepare("SELECT COALESCE(SUM(duree), 0) as total_pending 
                                    FROM Conges 
-                                   WHERE user_id = ? 
-                                   AND type_conge = ? 
-                                   AND status = 'pending'
-                                   AND YEAR(date_debut) = ?");
-            $stmt->execute([$user_id, $type, $current_year]);
-            $pending = $stmt->fetch(PDO::FETCH_ASSOC);
+                                   WHERE user_id = ? AND type_conge = ? AND status = 'pending' AND YEAR(date_debut) = ?");
+            $stmt_pending->execute([$user_id, $type, $current_year]);
+            $pending = $stmt_pending->fetch(PDO::FETCH_ASSOC);
             
-            // Calculate balance
-            $balance = $info['acquis'] - $taken['total_taken'];
+            $balance = $info['acquis'] - ($taken['total_taken'] ?? 0);
             
-            // Add to results
             $results[] = [
                 'type' => $type,
                 'acquis' => $info['acquis'],
-                'pris' => $taken['total_taken'],
-                'pending' => $pending['total_pending'],
+                'pris' => ($taken['total_taken'] ?? 0),
+                'pending' => ($pending['total_pending'] ?? 0),
                 'solde' => $balance
             ];
         }
@@ -486,22 +504,20 @@ function getLeaveStats($user_id) {
 }
 
 /**
- * Gets detailed information for a specific leave request
- * 
- * @param int $user_id The user ID
+ * Gets detailed information for a specific leave request (User's own)
+ * * @param int $user_id The user ID
  */
 function getLeaveDetails($user_id) {
     global $conn;
     
-    // Get leave ID
     $leave_id = isset($_POST['leave_id']) ? intval($_POST['leave_id']) : 0;
     
     if ($leave_id <= 0) {
         respondWithError('ID de congé invalide.');
+        return; // Added return
     }
     
     try {
-        // Get the leave request details
         $stmt = $conn->prepare("SELECT 
                                 conge_id as id, 
                                 date_debut, 
@@ -522,9 +538,9 @@ function getLeaveDetails($user_id) {
         
         if (!$leave) {
             respondWithError('Demande de congé non trouvée ou non autorisée.');
+            return; // Added return
         }
         
-        // Format dates for display
         $leave['date_debut'] = date('d/m/Y', strtotime($leave['date_debut']));
         $leave['date_fin'] = date('d/m/Y', strtotime($leave['date_fin']));
         $leave['date_demande'] = date('d/m/Y H:i', strtotime($leave['date_demande']));
@@ -540,28 +556,28 @@ function getLeaveDetails($user_id) {
     }
 }
 
-/**
- * Calculate the number of days between two dates, including both start and end dates
- * 
- * @param string $start_date Start date (YYYY-MM-DD)
- * @param string $end_date End date (YYYY-MM-DD)
- * @return int Number of days
- */
 function calculateDateDiff($start_date, $end_date) {
-    $start = new DateTime($start_date);
-    $end = new DateTime($end_date);
-    $end->modify('+1 day'); // Include the end date
-    
-    $interval = $start->diff($end);
-    return $interval->days;
+    try {
+        $start = new DateTime($start_date);
+        $end = new DateTime($end_date);
+        // It's important to add 1 day to the end date to include it in the count
+        $end->modify('+1 day'); 
+        $interval = $start->diff($end);
+        return $interval->days > 0 ? $interval->days : 1; // Ensure at least 1 day if start and end are same
+    } catch (Exception $e) {
+        error_log("Error in calculateDateDiff: " . $e->getMessage());
+        return 1; // Default to 1 day on error
+    }
 }
 
-/**
- * Sends a success response
- * 
- * @param string $message Success message
- * @param array $data Optional data to include in the response
- */
+function getStatusDisplayName($statusKey) {
+    $statuses = [
+        'pending' => 'En attente', 'approved' => 'Approuvé',
+        'rejected' => 'Refusé', 'cancelled' => 'Annulé'
+    ];
+    return $statuses[$statusKey] ?? ucfirst($statusKey);
+}
+
 function respondWithSuccess($message, $data = []) {
     header('Content-Type: application/json');
     echo json_encode([
@@ -572,11 +588,6 @@ function respondWithSuccess($message, $data = []) {
     exit;
 }
 
-/**
- * Sends an error response
- * 
- * @param string $message Error message
- */
 function respondWithError($message) {
     header('Content-Type: application/json');
     echo json_encode([
