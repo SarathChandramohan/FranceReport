@@ -258,19 +258,18 @@ $all_employees = getAllEmployees($conn);
             font-size: 22px; 
             font-weight: 600;
         }
-
-        /* Updated Filter Controls CSS */
+       
         .filter-controls {
             margin-bottom: 20px;
             display: flex;
             align-items: center; 
             flex-wrap: wrap; 
-            gap: 20px; /* Increased gap between filter groups */
+            gap: 20px; 
         }
         .filter-item {
             display: flex;
             align-items: center;
-            gap: 8px; /* Space between label and its input/select */
+            gap: 8px; 
         }
         .filter-controls label {
             font-weight: 500;
@@ -278,7 +277,7 @@ $all_employees = getAllEmployees($conn);
             font-size: 14px;
             white-space: nowrap;
         }
-        .filter-controls .form-control-sm { /* Base style for inputs/selects in filters */
+        .filter-controls .form-control-sm {
             padding: 0.3rem 0.6rem;
             font-size: 14px;
             border-radius: 8px;
@@ -287,18 +286,14 @@ $all_employees = getAllEmployees($conn);
             height: auto;
             line-height: 1.5;
         }
-        .filter-item select.form-control-sm { /* Specific for select */
+        .filter-item select.form-control-sm {
             min-width: 200px;
-            flex-grow: 1; /* Allows the select to take more space if available within its filter-item */
+            flex-grow: 1; 
         }
         .filter-item input[type="month"].form-control-sm,
         .filter-item input[type="date"].form-control-sm {
             min-width: 150px; 
         }
-        .filter-item .export-button { /* Styling for export button if it's inside a filter-item */
-             margin-left: auto; /* Pushes button to the right within its group if needed */
-        }
-        /* To push the export button group to the far right of the filter-controls line */
         .filter-controls .filter-item.export-button-group {
             margin-left: auto;
         }
@@ -373,9 +368,12 @@ $all_employees = getAllEmployees($conn);
         .status-tag.status-cancelled { background-color: #8e8e93; } 
 
         .modal {
-            display: none; position: fixed; z-index: 1050;
+            display: none; position: fixed; z-index: 1050; 
             left: 0; top: 0; width: 100%; height: 100%; overflow: auto; 
             background-color: rgba(0,0,0,0.5); 
+        }
+        #mapModal.modal { /* Ensure map modal is on top of other modals */
+            z-index: 1070; 
         }
         .modal-content {
             background-color: #ffffff; margin: 5% auto; 
@@ -412,16 +410,16 @@ $all_employees = getAllEmployees($conn);
                 gap: 10px;
             }
             .filter-item {
-                width: 100%; /* Make filter items take full width when stacked */
+                width: 100%; 
                 gap: 5px;
-                justify-content: space-between; /* Distribute space if label is short */
+                justify-content: space-between; 
             }
             .filter-item label {
-                 flex-shrink: 0; /* Prevent label from shrinking too much */
+                 flex-shrink: 0; 
             }
             .filter-controls .form-control-sm {
-                flex-grow: 1; /* Allow input/select to take available space in the filter-item */
-                min-width: 100px; /* Ensure they don't get too small */
+                flex-grow: 1; 
+                min-width: 100px; 
             }
             .filter-controls .export-button, 
             .filter-item.export-button-group { 
@@ -523,7 +521,7 @@ $all_employees = getAllEmployees($conn);
         </div>
     </div>
 
-    <div id="mapModal" class="modal">
+    <div id="mapModal" class="modal fade"> 
         <div class="modal-content">
             <span class="close-button" onclick="closeMapModal()">&times;</span>
             <h3 id="map-modal-title">Localisation Pointage</h3>
@@ -746,6 +744,14 @@ $all_employees = getAllEmployees($conn);
         let map; 
         let currentMapMarkers = []; 
 
+        function escapeHtml(text) {
+            if (text === null || typeof text === 'undefined') return '';
+            const strText = String(text);
+            const div = document.createElement('div');
+            div.textContent = strText; 
+            return div.innerHTML;
+        }
+
         function refreshDashboardData() {
             try {
                 fetch('dashboard-handler.php?action=get_dashboard_all_data')
@@ -785,32 +791,27 @@ $all_employees = getAllEmployees($conn);
         
         function displayGlobalError(message) {
             console.error("Global Error:", message);
-            // A more user-friendly error display could be implemented here
-            // For now, using alert for simplicity and to ensure visibility.
             alert("ERREUR: " + message); 
         }
 
         function displayModalAlert(modalId, message, type = 'danger') {
             try {
                 const alertSelector = '#' + modalId + ' .modal-alert';
-                const alertElement = $(alertSelector); // Use jQuery to select the alert element
-                if (alertElement.length) { // Check if the element exists
+                const alertElement = $(alertSelector); 
+                if (alertElement.length) { 
                     alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass('alert-' + type);
-                    alertElement.html(message); // Use .html() if message might contain HTML, otherwise .text()
+                    alertElement.html(message); 
                     alertElement.show();
-                     // Optional: Auto-hide after a few seconds
                      setTimeout(() => { alertElement.hide(); }, 5000); 
                 } else {
-                    // Fallback if the specific modal alert div is not found
                     console.warn("Alert element not found for modal: " + modalId + " with selector " + alertSelector + ". Falling back to global alert.");
                     alert(type.toUpperCase() + ": " + message);
                 }
             } catch (e) {
                 console.error("Error in displayModalAlert:", e);
-                alert("Notification: " + message); // Fallback
+                alert("Notification: " + message); 
             }
         }
-
 
         function updateActivitiesTable(activities) {
             try {
@@ -916,7 +917,8 @@ $all_employees = getAllEmployees($conn);
         function rejectLeaveFromModal(leaveId) {
             try {
                 const commentaire = prompt("Motif du refus (obligatoire):");
-                if (!commentaire) { 
+                if (commentaire === null) return; // User cancelled
+                if (!commentaire.trim()) { 
                     displayModalAlert('congesAdminModal', 'Un motif de refus est requis.', 'warning');
                     return;
                 }
@@ -1044,9 +1046,9 @@ $all_employees = getAllEmployees($conn);
                                     '<td>' + mapButtonHTML + '</td>' +
                                     '<td>' + escapeHtml(String(entry.employee_name)) + '</td>' +
                                     '<td>' + escapeHtml(String(entry.entry_date)) + '</td>' +
-                                    '<td>' + (escapeHtml(String(entry.logon_time)) || '--') + '</td>' +
-                                    '<td>' + (escapeHtml(String(entry.logoff_time)) || '--') + '</td>' +
-                                    '<td>' + (escapeHtml(String(entry.duration)) || '--') + '</td>' +
+                                    '<td>' + (escapeHtml(String(entry.logon_time || '--'))) + '</td>' +
+                                    '<td>' + (escapeHtml(String(entry.logoff_time || '--'))) + '</td>' +
+                                    '<td>' + (escapeHtml(String(entry.duration || '--'))) + '</td>' +
                                 '</tr>';
                                 tbody.append(rowHTML);
                             });
@@ -1136,7 +1138,7 @@ $all_employees = getAllEmployees($conn);
         
         function showTimesheetMapModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
             try {
-                const modal = document.getElementById('mapModal');
+                const modal = document.getElementById('mapModal'); 
                 const mapContainer = document.getElementById('map-modal-content-container');
                 const mapTitleElem = document.getElementById('map-modal-title');
                 const mapDetailsElem = document.getElementById('map-modal-details');
@@ -1176,22 +1178,22 @@ $all_employees = getAllEmployees($conn);
 
                 if (validEntryCoords) {
                     const entryMarker = L.marker([latEntree, lonEntree]).addTo(map)
-                        .bindPopup('<b>Entrée:</b> ' + (escapeHtml(timeEntree) || 'N/A') + '<br>' + (escapeHtml(addrEntree) || 'Adresse non enregistrée'));
+                        .bindPopup('<b>Entrée:</b> ' + (escapeHtml(String(timeEntree)) || 'N/A') + '<br>' + (escapeHtml(String(addrEntree)) || 'Adresse non enregistrée'));
                     currentMapMarkers.push(entryMarker);
                     bounds.push([latEntree, lonEntree]);
-                    detailsHTML += '<p><strong>Entrée ('+(escapeHtml(timeEntree) || 'N/A')+'):</strong> ' + (escapeHtml(addrEntree) || 'Lat: ' + latEntree.toFixed(5) + ', Lon: ' + lonEntree.toFixed(5)) + '</p>';
+                    detailsHTML += '<p><strong>Entrée ('+(escapeHtml(String(timeEntree)) || 'N/A')+'):</strong> ' + (escapeHtml(String(addrEntree)) || 'Lat: ' + latEntree.toFixed(5) + ', Lon: ' + lonEntree.toFixed(5)) + '</p>';
                 } else {
-                     detailsHTML += '<p><strong>Entrée ('+(escapeHtml(timeEntree) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
+                     detailsHTML += '<p><strong>Entrée ('+(escapeHtml(String(timeEntree)) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
                 }
 
                 if (validExitCoords) {
                     const exitMarker = L.marker([latSortie, lonSortie]).addTo(map)
-                        .bindPopup('<b>Sortie:</b> ' + (escapeHtml(timeSortie) || 'N/A') + '<br>' + (escapeHtml(addrSortie) || 'Adresse non enregistrée'));
+                        .bindPopup('<b>Sortie:</b> ' + (escapeHtml(String(timeSortie)) || 'N/A') + '<br>' + (escapeHtml(String(addrSortie)) || 'Adresse non enregistrée'));
                     currentMapMarkers.push(exitMarker);
                     bounds.push([latSortie, lonSortie]);
-                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(timeSortie) || 'N/A')+'):</strong> ' + (escapeHtml(addrSortie) || 'Lat: ' + latSortie.toFixed(5) + ', Lon: ' + lonSortie.toFixed(5)) + '</p>';
+                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(String(timeSortie)) || 'N/A')+'):</strong> ' + (escapeHtml(String(addrSortie)) || 'Lat: ' + latSortie.toFixed(5) + ', Lon: ' + lonSortie.toFixed(5)) + '</p>';
                 } else {
-                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(timeSortie) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
+                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(String(timeSortie)) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
                 }
                 
                 mapDetailsElem.innerHTML = detailsHTML;
@@ -1199,7 +1201,6 @@ $all_employees = getAllEmployees($conn);
                 if (validEntryCoords && validExitCoords && !(latEntree === latSortie && lonEntree === lonSortie)) { 
                     L.polyline(bounds, {color: 'blue'}).addTo(map); 
                 }
-
 
                 if (bounds.length > 0) { 
                     if (bounds.length === 1) { 
@@ -1214,14 +1215,18 @@ $all_employees = getAllEmployees($conn);
                 
                 $('#mapModal').modal('show'); 
                 
-                setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+                $('#mapModal').on('shown.bs.modal', function() {
+                    if (map) {
+                        map.invalidateSize();
+                    }
+                });
             } catch (e) {
                 console.error("Error in showTimesheetMapModal:", e);
                  if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
                  $('#mapModal').modal('show');
             }
         }
-
+        
         function closeMapModal() {
             try {
                 $('#mapModal').modal('hide'); 
@@ -1232,15 +1237,7 @@ $all_employees = getAllEmployees($conn);
                 console.error("Error in closeMapModal:", e);
             }
         }
-
-        function escapeHtml(text) {
-            if (text === null || typeof text === 'undefined') return '';
-            const strText = String(text);
-            const div = document.createElement('div');
-            div.textContent = strText; 
-            return div.innerHTML;
-        }
-
+        
         function exportTableToCSV(tableId, filename) {
             try {
                 const table = document.getElementById(tableId);
@@ -1309,7 +1306,7 @@ $all_employees = getAllEmployees($conn);
                     $('#eventCreationAlert').hide().removeClass('alert-success alert-danger alert-warning').text('');
                     const now = new Date();
                     const startDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
-                    const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); 
+                    const endDateTime = new Date(startDateTime.getTime() + (60 * 60 * 1000)); 
                     
                     function formatDateTimeLocal(date) {
                         const year = date.getFullYear();
@@ -1335,6 +1332,13 @@ $all_employees = getAllEmployees($conn);
                     $('#leaveDayFilterModal').val(''); 
                 });
 
+                 $('#mapModal').on('shown.bs.modal', function() { // Ensure map resizes after it's fully shown
+                    if (map) {
+                        map.invalidateSize();
+                    }
+                });
+
+
             } catch (e) {
                 console.error("Error in DOMContentLoaded:", e);
                 displayGlobalError("Erreur lors de l'initialisation de la page.");
@@ -1347,6 +1351,7 @@ $all_employees = getAllEmployees($conn);
                 closeMapModal(); 
             }
         }
+        // --- End of Custom JavaScript ---
     </script>
 </body>
 </html>
