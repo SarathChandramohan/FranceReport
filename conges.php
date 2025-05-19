@@ -429,7 +429,7 @@ $user = getCurrentUser();
                                     <option value="rtt">RTT</option>
                                     <option value="sans-solde">Congé Sans Solde</option>
                                     <option value="special">Congé Spécial</option>
-                                    <option value="maladie">Congé Maladie</option>
+                                    <option value="maladie">Arrêt maladie</option>
                                 </select>
                             </div>
 
@@ -701,7 +701,7 @@ $user = getCurrentUser();
                                 typeConge = 'Congé Spécial';
                                 break;
                             case 'maladie':
-                                typeConge = 'Congé Maladie';
+                                typeConge = 'Arrêt maladie';
                                 break;
                             default:
                                 typeConge = entry.type_conge;
