@@ -258,47 +258,49 @@ $all_employees = getAllEmployees($conn);
             font-size: 22px; 
             font-weight: 600;
         }
-        .filter-controls { 
+
+        /* Updated Filter Controls CSS */
+        .filter-controls {
             margin-bottom: 20px;
             display: flex;
-            gap: 10px; 
-            align-items: center;
+            align-items: center; 
             flex-wrap: wrap; 
+            gap: 20px; /* Increased gap between filter groups */
+        }
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px; /* Space between label and its input/select */
         }
         .filter-controls label {
             font-weight: 500;
             color: #1d1d1f;
             font-size: 14px;
-            margin-right: 5px;
             white-space: nowrap;
         }
-        .filter-controls .form-control-sm {
-            padding: 0.3rem 0.6rem; 
-            font-size: 14px; 
-            border-radius: 8px; 
-            border: 1px solid #d2d2d7; 
-            background-color: #f5f5f7; 
-            height: auto; 
+        .filter-controls .form-control-sm { /* Base style for inputs/selects in filters */
+            padding: 0.3rem 0.6rem;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 1px solid #d2d2d7;
+            background-color: #f5f5f7;
+            height: auto;
             line-height: 1.5;
         }
-        .filter-controls select.form-control-sm {
-            min-width: 220px; 
-            flex-basis: 220px; 
-            flex-grow: 1;   
+        .filter-item select.form-control-sm { /* Specific for select */
+            min-width: 200px;
+            flex-grow: 1; /* Allows the select to take more space if available within its filter-item */
         }
-        .filter-controls input[type="month"].form-control-sm,
-        .filter-controls input[type="date"].form-control-sm {
-            min-width: 160px; 
-            flex-basis: auto; 
-            flex-grow: 0; 
+        .filter-item input[type="month"].form-control-sm,
+        .filter-item input[type="date"].form-control-sm {
+            min-width: 150px; 
         }
-         .filter-controls > * {
-            margin-bottom: 5px; 
-            margin-right: 10px; 
+        .filter-item .export-button { /* Styling for export button if it's inside a filter-item */
+             margin-left: auto; /* Pushes button to the right within its group if needed */
         }
-        .filter-controls .export-button {
-            margin-left: auto; 
-            margin-right: 0; 
+        /* To push the export button group to the far right of the filter-controls line */
+        .filter-controls .filter-item.export-button-group {
+            margin-left: auto;
         }
 
 
@@ -403,12 +405,29 @@ $all_employees = getAllEmployees($conn);
             .content-card { padding: 20px; }
             h2 { font-size: 20px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
-            .filter-controls { flex-direction: column; align-items: stretch; }
-            .filter-controls .form-control-sm {
-                width: 100%; margin-bottom: 10px; margin-right: 0;
-                min-width: 0; 
+            
+            .filter-controls { 
+                flex-direction: column; 
+                align-items: stretch; 
+                gap: 10px;
             }
-             .filter-controls .export-button { margin-left: 0; width: 100%;}
+            .filter-item {
+                width: 100%; /* Make filter items take full width when stacked */
+                gap: 5px;
+                justify-content: space-between; /* Distribute space if label is short */
+            }
+            .filter-item label {
+                 flex-shrink: 0; /* Prevent label from shrinking too much */
+            }
+            .filter-controls .form-control-sm {
+                flex-grow: 1; /* Allow input/select to take available space in the filter-item */
+                min-width: 100px; /* Ensure they don't get too small */
+            }
+            .filter-controls .export-button, 
+            .filter-item.export-button-group { 
+                margin-left: 0; 
+                width: 100%;
+            }
 
             .shortcut-buttons-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;}
             .shortcut-btn { padding: 15px; font-size: 0.8rem;}
@@ -608,20 +627,28 @@ $all_employees = getAllEmployees($conn);
                 </div>
                 <div class="modal-body">
                     <div class="filter-controls">
-                        <label for="timesheetEmployeeFilterModal">Employé:</label>
-                        <select id="timesheetEmployeeFilterModal" class="form-control form-control-sm">
-                            <option value="">Tous</option>
-                            <?php foreach ($all_employees as $emp): ?>
-                                <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
-                                    <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label for="timesheetMonthFilterModal">Mois:</label>
-                        <input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
-                        <label for="timesheetDayFilterModal">Jour:</label>
-                        <input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm">
-                        <button class="export-button btn-sm" onclick="exportTableToCSV('timesheetTableModal', 'feuille_de_temps_modal.csv')">Exporter CSV</button>
+                        <div class="filter-item">
+                            <label for="timesheetEmployeeFilterModal">Employé:</label>
+                            <select id="timesheetEmployeeFilterModal" class="form-control form-control-sm">
+                                <option value="">Tous</option>
+                                <?php foreach ($all_employees as $emp): ?>
+                                    <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
+                                        <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label for="timesheetMonthFilterModal">Mois:</label>
+                            <input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
+                        </div>
+                        <div class="filter-item">
+                            <label for="timesheetDayFilterModal">Jour:</label>
+                            <input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm">
+                        </div>
+                        <div class="filter-item export-button-group">
+                            <button class="export-button btn-sm" onclick="exportTableToCSV('timesheetTableModal', 'feuille_de_temps_modal.csv')">Exporter CSV</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table id="timesheetTableModal" class="table table-striped table-sm">
@@ -655,20 +682,28 @@ $all_employees = getAllEmployees($conn);
                 </div>
                 <div class="modal-body">
                      <div class="filter-controls">
-                        <label for="leaveEmployeeFilterModal">Employé:</label>
-                        <select id="leaveEmployeeFilterModal" class="form-control form-control-sm">
-                            <option value="">Tous</option>
-                             <?php foreach ($all_employees as $emp): ?>
-                                <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
-                                    <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label for="leaveMonthFilterModal">Mois:</label>
-                        <input type="month" id="leaveMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
-                        <label for="leaveDayFilterModal">Jour:</label>
-                        <input type="date" id="leaveDayFilterModal" class="form-control form-control-sm">
-                        <button class="export-button btn-sm" onclick="exportTableToCSV('leaveTableModal', 'liste_conges_modal.csv')">Exporter CSV</button>
+                        <div class="filter-item">
+                            <label for="leaveEmployeeFilterModal">Employé:</label>
+                            <select id="leaveEmployeeFilterModal" class="form-control form-control-sm">
+                                <option value="">Tous</option>
+                                 <?php foreach ($all_employees as $emp): ?>
+                                    <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
+                                        <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label for="leaveMonthFilterModal">Mois:</label>
+                            <input type="month" id="leaveMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
+                        </div>
+                        <div class="filter-item">
+                            <label for="leaveDayFilterModal">Jour:</label>
+                            <input type="date" id="leaveDayFilterModal" class="form-control form-control-sm">
+                        </div>
+                        <div class="filter-item export-button-group">
+                            <button class="export-button btn-sm" onclick="exportTableToCSV('leaveTableModal', 'liste_conges_modal.csv')">Exporter CSV</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table id="leaveTableModal" class="table table-striped table-sm">
@@ -750,27 +785,32 @@ $all_employees = getAllEmployees($conn);
         
         function displayGlobalError(message) {
             console.error("Global Error:", message);
-            alert("Erreur: " + message); 
+            // A more user-friendly error display could be implemented here
+            // For now, using alert for simplicity and to ensure visibility.
+            alert("ERREUR: " + message); 
         }
 
         function displayModalAlert(modalId, message, type = 'danger') {
             try {
                 const alertSelector = '#' + modalId + ' .modal-alert';
-                const alertElement = $(alertSelector);
-                if (alertElement.length) {
+                const alertElement = $(alertSelector); // Use jQuery to select the alert element
+                if (alertElement.length) { // Check if the element exists
                     alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass('alert-' + type);
-                    alertElement.html(message); 
+                    alertElement.html(message); // Use .html() if message might contain HTML, otherwise .text()
                     alertElement.show();
+                     // Optional: Auto-hide after a few seconds
                      setTimeout(() => { alertElement.hide(); }, 5000); 
                 } else {
-                    console.warn("Alert element not found for modal: " + modalId + " with selector " + alertSelector);
+                    // Fallback if the specific modal alert div is not found
+                    console.warn("Alert element not found for modal: " + modalId + " with selector " + alertSelector + ". Falling back to global alert.");
                     alert(type.toUpperCase() + ": " + message);
                 }
             } catch (e) {
                 console.error("Error in displayModalAlert:", e);
-                alert("Notification: " + message);
+                alert("Notification: " + message); // Fallback
             }
         }
+
 
         function updateActivitiesTable(activities) {
             try {
@@ -1159,6 +1199,7 @@ $all_employees = getAllEmployees($conn);
                 if (validEntryCoords && validExitCoords && !(latEntree === latSortie && lonEntree === lonSortie)) { 
                     L.polyline(bounds, {color: 'blue'}).addTo(map); 
                 }
+
 
                 if (bounds.length > 0) { 
                     if (bounds.length === 1) { 
