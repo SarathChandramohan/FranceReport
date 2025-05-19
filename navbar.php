@@ -171,7 +171,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <span class="close-menu d-lg-none">&times;</span>
         <ul class="navbar-nav ml-auto nav-links">
             <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
-                <li class="nav-item"><a href="dashboard.php" class="nav-link <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Tableau de bord</a></li>
+                <li class="nav-item"><a href="dashboard.php" class="nav-link <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Administrateur</a></li>
             <?php endif; ?>
             <li class="nav-item"><a href="timesheet.php" class="nav-link <?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a></li>
             <li class="nav-item"><a href="conges.php" class="nav-link <?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a></li>
