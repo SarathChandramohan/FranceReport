@@ -55,7 +55,6 @@ function getDashboardAllData() {
 }
 
 function getDashboardStats($conn) {
-    // ... (same as previous version) ...
     $stats = [];
     $today = date('Y-m-d');
     
@@ -96,7 +95,6 @@ function getDashboardStats($conn) {
 }
 
 function getRecentActivities($conn) {
-    // ... (same as previous version) ...
     try {
         $sql = "
             WITH CombinedActivities AS (
@@ -154,7 +152,6 @@ function getRecentActivities($conn) {
 function getMonthlyTimesheetData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
-    // Default to current month if month_year is empty but specific_day is also empty
     $monthYear = (isset($_GET['month_year']) && !empty($_GET['month_year'])) ? $_GET['month_year'] : date('Y-m');
     $specificDay = isset($_GET['specific_day']) && !empty($_GET['specific_day']) ? $_GET['specific_day'] : null;
 
@@ -162,7 +159,6 @@ function getMonthlyTimesheetData() {
         respondWithError("Format de jour invalide. Utilisez YYYY-MM-DD.");
         return;
     }
-    // monthYear is only strictly required if specificDay is not set.
     if (!$specificDay && ($monthYear && !preg_match('/^\d{4}-\d{2}$/', $monthYear))) {
         respondWithError("Format de mois invalide. Utilisez YYYY-MM ou laissez vide si un jour est sélectionné.");
         return;
@@ -172,19 +168,22 @@ function getMonthlyTimesheetData() {
         return;
     }
 
-
     try {
+        // MODIFIED: Added break_minutes to SELECT
         $sql = "SELECT 
                     t.entry_date, 
                     t.logon_time, 
                     t.logoff_time,
                     t.logon_latitude, t.logon_longitude, t.logon_address,
                     t.logoff_latitude, t.logoff_longitude, t.logoff_address,
+                    t.break_minutes, -- Added this line
                     u.prenom + ' ' + u.nom AS employee_name,
                     CASE 
                         WHEN t.logon_time IS NOT NULL AND t.logoff_time IS NOT NULL AND DATEDIFF(MINUTE, t.logon_time, t.logoff_time) >= 0
-                        THEN CAST(DATEDIFF(MINUTE, t.logon_time, t.logoff_time) / 60 AS VARCHAR) + 'h ' + 
-                             RIGHT('0' + CAST(DATEDIFF(MINUTE, t.logon_time, t.logoff_time) % 60 AS VARCHAR), 2)
+                        THEN 
+                            -- Calculate duration subtracting break_minutes
+                            CAST( (DATEDIFF(MINUTE, t.logon_time, t.logoff_time) - ISNULL(t.break_minutes, 0) ) / 60 AS VARCHAR) + 'h ' + 
+                            RIGHT('0' + CAST( (DATEDIFF(MINUTE, t.logon_time, t.logoff_time) - ISNULL(t.break_minutes, 0) ) % 60 AS VARCHAR), 2)
                         ELSE NULL 
                     END AS duration
                 FROM Timesheet t
@@ -196,7 +195,7 @@ function getMonthlyTimesheetData() {
         if ($specificDay) {
             $sql .= " AND t.entry_date = :specific_day";
             $params[':specific_day'] = $specificDay;
-        } elseif ($monthYear) { // Only use monthYear if specificDay is not set
+        } elseif ($monthYear) { 
             list($year, $month) = explode('-', $monthYear);
             $sql .= " AND MONTH(t.entry_date) = :month_val AND YEAR(t.entry_date) = :year_val";
             $params[':month_val'] = $month;
@@ -216,18 +215,36 @@ function getMonthlyTimesheetData() {
         $formattedData = [];
         if ($timesheetData) {
             foreach($timesheetData as $entry) {
+                $durationDisplay = $entry['duration'];
+                // Ensure duration is not negative if break is longer than work
+                if ($entry['logon_time'] && $entry['logoff_time']) {
+                    $logon = new DateTime($entry['logon_time']);
+                    $logoff = new DateTime($entry['logoff_time']);
+                    $diffMinutes = ($logoff->getTimestamp() - $logon->getTimestamp()) / 60;
+                    $breakMinutes = (int)($entry['break_minutes'] ?? 0);
+                    $effectiveMinutes = $diffMinutes - $breakMinutes;
+                    if ($effectiveMinutes < 0) {
+                        $effectiveMinutes = 0;
+                    }
+                    $hours = floor($effectiveMinutes / 60);
+                    $minutes = $effectiveMinutes % 60;
+                    $durationDisplay = $hours . 'h ' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
+                }
+
+
                 $formattedData[] = [
                     'employee_name' => $entry['employee_name'],
                     'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
                     'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
                     'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
-                    'duration' => $entry['duration'],
+                    'duration' => $durationDisplay,
                     'logon_latitude' => $entry['logon_latitude'],
                     'logon_longitude' => $entry['logon_longitude'],
                     'logon_address' => $entry['logon_address'],
                     'logoff_latitude' => $entry['logoff_latitude'],
                     'logoff_longitude' => $entry['logoff_longitude'],
                     'logoff_address' => $entry['logoff_address'],
+                    'break_minutes' => $entry['break_minutes'] // Added this line
                 ];
             }
         }
@@ -320,7 +337,6 @@ function getMonthlyLeaveData() {
 }
 
 function getTypeCongeDisplayName($typeKey) {
-    // ... (same as previous version) ...
     $types = [
         'cp' => 'Congés Payés', 'rtt' => 'RTT', 'sans-solde' => 'Congé Sans Solde',
         'special' => 'Congé Spécial', 'maladie' => 'Congé Maladie'
@@ -329,7 +345,6 @@ function getTypeCongeDisplayName($typeKey) {
 }
 
 function getStatusDisplayName($statusKey) {
-    // ... (same as previous version) ...
     $statuses = [
         'pending' => 'En attente', 'approved' => 'Approuvé',
         'rejected' => 'Refusé', 'cancelled' => 'Annulé'
@@ -338,7 +353,6 @@ function getStatusDisplayName($statusKey) {
 }
 
 function respondWithSuccess($message, $data = []) {
-    // ... (same as previous version) ...
     echo json_encode([
         'status' => 'success',
         'message' => $message,
@@ -348,7 +362,6 @@ function respondWithSuccess($message, $data = []) {
 }
 
 function respondWithError($message) {
-    // ... (same as previous version) ...
     error_log("Responding with error (dashboard-handler): " . $message);
     echo json_encode([
         'status' => 'error',
