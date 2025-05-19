@@ -21,7 +21,7 @@ switch ($action) {
     case 'get_employee_overview_stats':
         getEmployeeOverviewStats($conn, $userRole);
         break;
-    case 'get_employee_list_for_stat': // New action for fetching lists for modals
+    case 'get_employee_list_for_stat':
         getEmployeeListForStat($conn, $userRole, isset($_GET['type']) ? $_GET['type'] : '');
         break;
     default:
@@ -30,11 +30,11 @@ switch ($action) {
 }
 
 function getEmployeeOverviewStats($conn, $role) {
+    // ... (getEmployeeOverviewStats function remains the same as previous version)
     $today_sql_server_format = date('Y-m-d');
     $stats = [];
 
     try {
-        // Stat 3: En Activité (Pointage Aujourd'hui) - Visible to admin & others
         $stmt_active = $conn->prepare("
             SELECT COUNT(DISTINCT user_id) AS count_active
             FROM Timesheet
@@ -45,12 +45,10 @@ function getEmployeeOverviewStats($conn, $role) {
         $stats['active_today'] = (int)($stmt_active->fetchColumn() ?: 0);
 
         if ($role === 'admin') {
-            // Stat 1: Total employés (Actifs)
             $stmt_total = $conn->prepare("SELECT COUNT(user_id) AS count_total FROM Users WHERE status = 'Active'");
             $stmt_total->execute();
             $stats['total_employees'] = (int)($stmt_total->fetchColumn() ?: 0);
 
-            // Stat 2: Assignés Aujourd'hui (Événements)
             $stmt_assigned = $conn->prepare("
                 SELECT COUNT(DISTINCT eau.user_id) AS count_assigned
                 FROM Event_AssignedUsers eau
@@ -61,7 +59,6 @@ function getEmployeeOverviewStats($conn, $role) {
             $stmt_assigned->execute();
             $stats['assigned_today'] = (int)($stmt_assigned->fetchColumn() ?: 0);
 
-            // Stat 4: En Congés (Autres que maladie)
             $stmt_leave = $conn->prepare("
                 SELECT COUNT(DISTINCT user_id) AS count_leave
                 FROM Conges
@@ -73,7 +70,6 @@ function getEmployeeOverviewStats($conn, $role) {
             $stmt_leave->execute();
             $stats['on_generic_leave_today'] = (int)($stmt_leave->fetchColumn() ?: 0);
 
-            // Stat 5: En Arrêt Maladie
             $stmt_sick = $conn->prepare("
                 SELECT COUNT(DISTINCT user_id) AS count_sick
                 FROM Conges
@@ -109,46 +105,59 @@ function getEmployeeListForStat($conn, $role, $statType) {
     $sql = "";
     $params = [':today' => $today_sql_server_format];
 
-    // Basic security check for statType
     $allowedStatTypes = ['assigned_today', 'active_today', 'on_generic_leave_today', 'on_sick_leave_today'];
     if (!in_array($statType, $allowedStatTypes)) {
         echo json_encode(['status' => 'error', 'message' => 'Type de statistique non valide.']);
         exit;
     }
 
-    // Permission check: some lists are admin-only
     if ($role !== 'admin' && in_array($statType, ['assigned_today', 'on_generic_leave_today', 'on_sick_leave_today'])) {
         echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé à cette liste.']);
         exit;
     }
 
-    $baseSelect = "SELECT DISTINCT u.user_id, u.nom, u.prenom, u.email, u.role FROM Users u ";
+    // Base SELECT to include common user details
+    // Added e.title for 'assigned_today'
+    $baseSelect = "SELECT DISTINCT u.user_id, u.nom, u.prenom, u.email, u.role";
+    if ($statType === 'assigned_today') {
+        $baseSelect .= ", e.title AS event_title ";
+    }
+    $baseSelect .= " FROM Users u ";
+
 
     switch ($statType) {
         case 'assigned_today':
-            $sql = $baseSelect . "JOIN Event_AssignedUsers eau ON u.user_id = eau.user_id " .
-                                 "JOIN Events e ON eau.event_id = e.event_id " .
-                                 "WHERE CONVERT(date, e.start_datetime) = :today AND u.status = 'Active'";
+            $sql = $baseSelect .
+                   "JOIN Event_AssignedUsers eau ON u.user_id = eau.user_id " .
+                   "JOIN Events e ON eau.event_id = e.event_id " .
+                   "WHERE CONVERT(date, e.start_datetime) = :today AND u.status = 'Active'";
             break;
         case 'active_today':
-            $sql = $baseSelect . "JOIN Timesheet t ON u.user_id = t.user_id " .
-                                 "WHERE t.entry_date = :today AND t.logon_time IS NOT NULL AND u.status = 'Active'";
+            $sql = $baseSelect .
+                   "JOIN Timesheet t ON u.user_id = t.user_id " .
+                   "WHERE t.entry_date = :today AND t.logon_time IS NOT NULL AND u.status = 'Active'";
             break;
         case 'on_generic_leave_today':
-            $sql = $baseSelect . "JOIN Conges c ON u.user_id = c.user_id " .
-                                 "WHERE :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved' " .
-                                 "AND c.type_conge <> 'maladie' AND c.type_conge <> 'Arrêt maladie' AND u.status = 'Active'";
+            $sql = $baseSelect .
+                   "JOIN Conges c ON u.user_id = c.user_id " .
+                   "WHERE :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved' " .
+                   "AND c.type_conge <> 'maladie' AND c.type_conge <> 'Arrêt maladie' AND u.status = 'Active'";
             break;
         case 'on_sick_leave_today':
-            $sql = $baseSelect . "JOIN Conges c ON u.user_id = c.user_id " .
-                                 "WHERE :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved' " .
-                                 "AND (c.type_conge = 'maladie' OR c.type_conge = 'Arrêt maladie') AND u.status = 'Active'";
+            $sql = $baseSelect .
+                   "JOIN Conges c ON u.user_id = c.user_id " .
+                   "WHERE :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved' " .
+                   "AND (c.type_conge = 'maladie' OR c.type_conge = 'Arrêt maladie') AND u.status = 'Active'";
             break;
         default:
             echo json_encode(['status' => 'error', 'message' => 'Type de statistique non géré pour la liste.']);
             exit;
     }
     $sql .= " ORDER BY u.nom, u.prenom";
+    if ($statType === 'assigned_today') {
+        $sql .= ", event_title"; // Also order by event title if relevant
+    }
+
 
     try {
         $stmt = $conn->prepare($sql);
