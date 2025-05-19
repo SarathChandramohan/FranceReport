@@ -175,7 +175,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <?php endif; ?>
             <li class="nav-item"><a href="timesheet.php" class="nav-link <?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a></li>
             <li class="nav-item"><a href="conges.php" class="nav-link <?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a></li>
-            <li class="nav-item"><a href="employes.php" class="nav-link <?php echo $current_page == 'employes.php' ? 'active' : ''; ?>">Employés</a></li>
+            
             <li class="nav-item"><a href="planning.php" class="nav-link <?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a></li>
             <li class="nav-item"><a href="events.php" class="nav-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>">Événements</a></li>
             <li class="nav-item"><a href="messages.php" class="nav-link <?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages RH/Direction</a></li>
