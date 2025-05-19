@@ -272,7 +272,7 @@ $all_employees = getAllEmployees($conn);
             margin-right: 5px;
             white-space: nowrap;
         }
-        .filter-controls .form-control-sm { /* General styling for form-control-sm in filters */
+        .filter-controls .form-control-sm {
             padding: 0.3rem 0.6rem; 
             font-size: 14px; 
             border-radius: 8px; 
@@ -281,22 +281,22 @@ $all_employees = getAllEmployees($conn);
             height: auto; 
             line-height: 1.5;
         }
-        .filter-controls select.form-control-sm { /* Specific for select elements */
+        .filter-controls select.form-control-sm {
             min-width: 220px; 
-            flex-basis: 220px; /* Let it start at this width */
-            flex-grow: 1;   /* Allow it to grow if there's space */
+            flex-basis: 220px; 
+            flex-grow: 1;   
         }
         .filter-controls input[type="month"].form-control-sm,
         .filter-controls input[type="date"].form-control-sm {
             min-width: 160px; 
-            flex-basis: auto; /* auto basis for date/month inputs */
-            flex-grow: 0; /* Don't necessarily need these to grow much */
+            flex-basis: auto; 
+            flex-grow: 0; 
         }
-         .filter-controls > * { /* Spacing for all direct children */
+         .filter-controls > * {
             margin-bottom: 5px; 
             margin-right: 10px; 
         }
-        .filter-controls .export-button { /* Ensure export button is last and aligned */
+        .filter-controls .export-button {
             margin-left: auto; 
             margin-right: 0; 
         }
@@ -404,7 +404,7 @@ $all_employees = getAllEmployees($conn);
             h2 { font-size: 20px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
             .filter-controls { flex-direction: column; align-items: stretch; }
-            .filter-controls .form-control-sm { /* Ensure full width for stacked items */
+            .filter-controls .form-control-sm {
                 width: 100%; margin-bottom: 10px; margin-right: 0;
                 min-width: 0; 
             }
@@ -707,6 +707,7 @@ $all_employees = getAllEmployees($conn);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // --- Start of Custom JavaScript ---
         let map; 
         let currentMapMarkers = []; 
 
@@ -718,9 +719,9 @@ $all_employees = getAllEmployees($conn);
                             return response.text().then(text => {
                                 try {
                                     const errData = JSON.parse(text);
-                                    throw new Error(errData.message || `HTTP error! status: ${response.status}`);
+                                    throw new Error(errData.message || "HTTP error! status: " + response.status);
                                 } catch (e) {
-                                    throw new Error(`HTTP error! status: ${response.status}. Response: ${text.substring(0,100)}...`);
+                                    throw new Error("HTTP error! status: " + response.status + ". Response: " + text.substring(0,100) + "...");
                                 }
                             });
                         }
@@ -754,23 +755,22 @@ $all_employees = getAllEmployees($conn);
 
         function displayModalAlert(modalId, message, type = 'danger') {
             try {
-                const alertSelector = `#${modalId} .modal-alert`;
+                const alertSelector = '#' + modalId + ' .modal-alert';
                 const alertElement = $(alertSelector);
                 if (alertElement.length) {
-                    alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass(`alert-${type}`);
+                    alertElement.removeClass('alert-success alert-danger alert-warning alert-info').addClass('alert-' + type);
                     alertElement.html(message); 
                     alertElement.show();
                      setTimeout(() => { alertElement.hide(); }, 5000); 
                 } else {
-                    console.warn(`Alert element not found for modal: ${modalId} with selector ${alertSelector}`);
-                    alert(`${type.toUpperCase()}: ${message}`);
+                    console.warn("Alert element not found for modal: " + modalId + " with selector " + alertSelector);
+                    alert(type.toUpperCase() + ": " + message);
                 }
             } catch (e) {
                 console.error("Error in displayModalAlert:", e);
-                alert(`Notification: ${message}`);
+                alert("Notification: " + message);
             }
         }
-
 
         function updateActivitiesTable(activities) {
             try {
@@ -787,12 +787,10 @@ $all_employees = getAllEmployees($conn);
                 
                 activities.forEach(activity => {
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${escapeHtml(activity.employee_name)}</td>
-                        <td>${escapeHtml(activity.action)}</td>
-                        <td>${escapeHtml(activity.date)}</td>
-                        <td>${escapeHtml(activity.hour)}</td>
-                    `;
+                    row.innerHTML = "<td>" + escapeHtml(activity.employee_name) + "</td>" +
+                                    "<td>" + escapeHtml(activity.action) + "</td>" +
+                                    "<td>" + escapeHtml(activity.date) + "</td>" +
+                                    "<td>" + escapeHtml(activity.hour) + "</td>";
                     tbody.appendChild(row);
                 });
             } catch (e) {
@@ -816,20 +814,20 @@ $all_employees = getAllEmployees($conn);
                         tbody.empty();
                         if (response.status === 'success' && response.data && response.data.length > 0) {
                             response.data.forEach(function(req) {
-                                let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>` : 'Aucun';
-                                tbody.append(\`
-                                    <tr>
-                                        <td>\${escapeHtml(req.employee_name)}</td>
-                                        <td>\${escapeHtml(req.date_debut)} - \${escapeHtml(req.date_fin)}</td>
-                                        <td>\${escapeHtml(req.type_conge)}</td>
-                                        <td>\${escapeHtml(req.duree)}j</td>
-                                        <td>\${docLink}</td>
-                                        <td>\${escapeHtml(req.date_demande)}</td>
-                                        <td>
-                                            <button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(\${req.id})">Approuver</button>
-                                            <button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(\${req.id})">Refuser</button>
-                                        </td>
-                                    </tr>\`);
+                                let docLink = req.document ? '<a href="' + escapeHtml(String(req.document)) + '" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>' : 'Aucun';
+                                let rowHtml = '<tr>' +
+                                    '<td>' + escapeHtml(String(req.employee_name)) + '</td>' +
+                                    '<td>' + escapeHtml(String(req.date_debut)) + ' - ' + escapeHtml(String(req.date_fin)) + '</td>' +
+                                    '<td>' + escapeHtml(String(req.type_conge)) + '</td>' +
+                                    '<td>' + escapeHtml(String(req.duree)) + 'j</td>' +
+                                    '<td>' + docLink + '</td>' +
+                                    '<td>' + escapeHtml(String(req.date_demande)) + '</td>' +
+                                    '<td>' +
+                                        '<button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(' + req.id + ')">Approuver</button>' +
+                                        '<button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(' + req.id + ')">Refuser</button>' +
+                                    '</td>' +
+                                '</tr>';
+                                tbody.append(rowHtml);
                             });
                         } else if (response.status === 'success') {
                             tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune demande en attente.</td></tr>');
@@ -851,7 +849,7 @@ $all_employees = getAllEmployees($conn);
         }
 
         function approveLeaveFromModal(leaveId) {
-            try {
+             try {
                 const commentaire = prompt("Commentaire pour l'approbation (optionnel):");
                 $.ajax({
                     url: 'conges-handler.php',
@@ -929,7 +927,7 @@ $all_employees = getAllEmployees($conn);
                     dataType: 'json',
                     success: function(response) {
                         if (response.status === 'success') {
-                            displayModalAlert('eventCreationModal', response.message + (response.event_id ? ` (ID: ${response.event_id})` : ''), 'success');
+                            displayModalAlert('eventCreationModal', response.message + (response.event_id ? ' (ID: ' + response.event_id + ')' : ''), 'success');
                             $('#eventCreationForm')[0].reset();
                             setTimeout(() => { $('#eventCreationModal').modal('hide'); }, 2000);
                         } else {
@@ -961,7 +959,7 @@ $all_employees = getAllEmployees($conn);
                 }
                 const employeeId = employeeFilter.val();
                 const monthYearInput = monthFilter.val();
-                const specificDay = dayFilter.val(); // YYYY-MM-DD or empty string
+                const specificDay = dayFilter.val(); 
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
@@ -971,10 +969,9 @@ $all_employees = getAllEmployees($conn);
 
                 if (specificDay && specificDay !== '') {
                     ajaxData.specific_day = specificDay;
-                } else if (monthYearInput && monthYearInput !== '') { // Only use month if specificDay is not set
+                } else if (monthYearInput && monthYearInput !== '') { 
                     ajaxData.month_year = monthYearInput;
                 } else {
-                     // If neither day nor month is selected (e.g. month cleared and day empty)
                      tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>');
                      return;
                 }
@@ -988,27 +985,35 @@ $all_employees = getAllEmployees($conn);
                         tbody.empty();
                         if (response.status === 'success' && response.data && response.data.timesheet && response.data.timesheet.length > 0) {
                             response.data.timesheet.forEach(function(entry) {
-                                let mapButtonHTML = (entry.logon_latitude && entry.logon_longitude) || (entry.logoff_latitude && entry.logoff_longitude) ?
-                                    \`<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapModal(
-                                        '\${escapeHtml(entry.employee_name)}', 
-                                        '\${escapeHtml(entry.entry_date)}',
-                                        '\${entry.logon_latitude}', '\${entry.logon_longitude}', '\${escapeHtml(entry.logon_address)}', '\${escapeHtml(entry.logon_time || '')}',
-                                        '\${entry.logoff_latitude}', '\${entry.logoff_longitude}', '\${escapeHtml(entry.logoff_address)}', '\${escapeHtml(entry.logoff_time || '')}'
-                                    )">Carte</button>\` : '--';
-                                tbody.append(\`
-                                    <tr>
-                                        <td>\${mapButtonHTML}</td>
-                                        <td>\${escapeHtml(entry.employee_name)}</td>
-                                        <td>\${escapeHtml(entry.entry_date)}</td>
-                                        <td>\${escapeHtml(entry.logon_time) || '--'}</td>
-                                        <td>\${escapeHtml(entry.logoff_time) || '--'}</td>
-                                        <td>\${escapeHtml(entry.duration) || '--'}</td>
-                                    </tr>\`);
+                                let mapButtonHTML = '--';
+                                if ((entry.logon_latitude && entry.logon_longitude) || (entry.logoff_latitude && entry.logoff_longitude)) {
+                                    mapButtonHTML = '<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapModal(' +
+                                        '\'' + escapeHtml(String(entry.employee_name !== undefined && entry.employee_name !== null ? entry.employee_name : '')) + '\',' +
+                                        '\'' + escapeHtml(String(entry.entry_date !== undefined && entry.entry_date !== null ? entry.entry_date : '')) + '\',' +
+                                        '\'' + String(entry.logon_latitude !== undefined && entry.logon_latitude !== null ? entry.logon_latitude : '') + '\',' +
+                                        '\'' + String(entry.logon_longitude !== undefined && entry.logon_longitude !== null ? entry.logon_longitude : '') + '\',' +
+                                        '\'' + escapeHtml(String(entry.logon_address || '')) + '\',' +
+                                        '\'' + escapeHtml(String(entry.logon_time || '')) + '\',' +
+                                        '\'' + String(entry.logoff_latitude !== undefined && entry.logoff_latitude !== null ? entry.logoff_latitude : '') + '\',' +
+                                        '\'' + String(entry.logoff_longitude !== undefined && entry.logoff_longitude !== null ? entry.logoff_longitude : '') + '\',' +
+                                        '\'' + escapeHtml(String(entry.logoff_address || '')) + '\',' +
+                                        '\'' + escapeHtml(String(entry.logoff_time || '')) + '\'' +
+                                    ')">Carte</button>';
+                                }
+                                let rowHTML = '<tr>' +
+                                    '<td>' + mapButtonHTML + '</td>' +
+                                    '<td>' + escapeHtml(String(entry.employee_name)) + '</td>' +
+                                    '<td>' + escapeHtml(String(entry.entry_date)) + '</td>' +
+                                    '<td>' + (escapeHtml(String(entry.logon_time)) || '--') + '</td>' +
+                                    '<td>' + (escapeHtml(String(entry.logoff_time)) || '--') + '</td>' +
+                                    '<td>' + (escapeHtml(String(entry.duration)) || '--') + '</td>' +
+                                '</tr>';
+                                tbody.append(rowHTML);
                             });
                         } else if (response.status === 'success') {
                             tbody.html('<tr><td colspan="6" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
                         } else {
-                            tbody.html(\`<tr><td colspan="6" style="text-align:center; color:red;">Erreur: \${escapeHtml(response.message || 'Impossible de charger les données.')}</td></tr>\`);
+                            tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>');
                         }
                     },
                     error: function(xhr) {
@@ -1036,7 +1041,7 @@ $all_employees = getAllEmployees($conn);
                 }
                 const employeeId = employeeFilter.val();
                 const monthYearInput = monthFilter.val();
-                const specificDay = dayFilter.val(); // YYYY-MM-DD or empty string
+                const specificDay = dayFilter.val(); 
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
@@ -1053,7 +1058,6 @@ $all_employees = getAllEmployees($conn);
                      return;
                 }
 
-
                 $.ajax({
                     url: 'dashboard-handler.php',
                     type: 'GET',
@@ -1063,20 +1067,20 @@ $all_employees = getAllEmployees($conn);
                         tbody.empty();
                         if (response.status === 'success' && response.data && response.data.leaves && response.data.leaves.length > 0) {
                             response.data.leaves.forEach(function(leave) {
-                                 tbody.append(\`
-                                    <tr>
-                                        <td>\${escapeHtml(leave.employee_name)}</td>
-                                        <td>\${escapeHtml(leave.type_conge_display)}</td>
-                                        <td>\${escapeHtml(leave.date_debut)}</td>
-                                        <td>\${escapeHtml(leave.date_fin)}</td>
-                                        <td>\${escapeHtml(leave.duree)} jours</td>
-                                        <td><span class="status-tag status-\${escapeHtml(leave.status)}">\${escapeHtml(leave.status_display)}</span></td>
-                                    </tr>\`);
+                                 let rowHTML = '<tr>' +
+                                    '<td>' + escapeHtml(String(leave.employee_name)) + '</td>' +
+                                    '<td>' + escapeHtml(String(leave.type_conge_display)) + '</td>' +
+                                    '<td>' + escapeHtml(String(leave.date_debut)) + '</td>' +
+                                    '<td>' + escapeHtml(String(leave.date_fin)) + '</td>' +
+                                    '<td>' + escapeHtml(String(leave.duree)) + ' jours</td>' +
+                                    '<td><span class="status-tag status-' + escapeHtml(String(leave.status)) + '">' + escapeHtml(String(leave.status_display)) + '</span></td>' +
+                                 '</tr>';
+                                 tbody.append(rowHTML);
                             });
                         } else if (response.status === 'success') {
                             tbody.html('<tr><td colspan="6" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
                         } else {
-                             tbody.html(\`<tr><td colspan="6" style="text-align:center; color:red;">Erreur: \${escapeHtml(response.message || 'Impossible de charger les données.')}</td></tr>\`);
+                             tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>');
                         }
                     },
                     error: function(xhr) {
@@ -1089,7 +1093,7 @@ $all_employees = getAllEmployees($conn);
                  $('#leaveTableBodyModal').html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
             }
         }
-
+        
         function showTimesheetMapModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
             try {
                 const modal = document.getElementById('mapModal');
@@ -1101,7 +1105,7 @@ $all_employees = getAllEmployees($conn);
                     console.error("Map modal elements not found."); return;
                 }
 
-                mapTitleElem.textContent = `Localisation pour ${escapeHtml(employeeName)} - ${escapeHtml(entryDate)}`;
+                mapTitleElem.textContent = 'Localisation pour ' + escapeHtml(employeeName) + ' - ' + escapeHtml(entryDate);
                 
                 currentMapMarkers.forEach(marker => marker.remove());
                 currentMapMarkers = [];
@@ -1132,22 +1136,22 @@ $all_employees = getAllEmployees($conn);
 
                 if (validEntryCoords) {
                     const entryMarker = L.marker([latEntree, lonEntree]).addTo(map)
-                        .bindPopup(`<b>Entrée:</b> ${escapeHtml(timeEntree) || 'N/A'}<br>${escapeHtml(addrEntree) || 'Adresse non enregistrée'}`);
+                        .bindPopup('<b>Entrée:</b> ' + (escapeHtml(timeEntree) || 'N/A') + '<br>' + (escapeHtml(addrEntree) || 'Adresse non enregistrée'));
                     currentMapMarkers.push(entryMarker);
                     bounds.push([latEntree, lonEntree]);
-                    detailsHTML += `<p><strong>Entrée (${escapeHtml(timeEntree) || 'N/A'}):</strong> ${escapeHtml(addrEntree) || `Lat: ${latEntree.toFixed(5)}, Lon: ${lonEntree.toFixed(5)}`}</p>`;
+                    detailsHTML += '<p><strong>Entrée ('+(escapeHtml(timeEntree) || 'N/A')+'):</strong> ' + (escapeHtml(addrEntree) || 'Lat: ' + latEntree.toFixed(5) + ', Lon: ' + lonEntree.toFixed(5)) + '</p>';
                 } else {
-                     detailsHTML += `<p><strong>Entrée (${escapeHtml(timeEntree) || 'N/A'}):</strong> Localisation non enregistrée.</p>`;
+                     detailsHTML += '<p><strong>Entrée ('+(escapeHtml(timeEntree) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
                 }
 
                 if (validExitCoords) {
                     const exitMarker = L.marker([latSortie, lonSortie]).addTo(map)
-                        .bindPopup(`<b>Sortie:</b> ${escapeHtml(timeSortie) || 'N/A'}<br>${escapeHtml(addrSortie) || 'Adresse non enregistrée'}`);
+                        .bindPopup('<b>Sortie:</b> ' + (escapeHtml(timeSortie) || 'N/A') + '<br>' + (escapeHtml(addrSortie) || 'Adresse non enregistrée'));
                     currentMapMarkers.push(exitMarker);
                     bounds.push([latSortie, lonSortie]);
-                    detailsHTML += `<p><strong>Sortie (${escapeHtml(timeSortie) || 'N/A'}):</strong> ${escapeHtml(addrSortie) || `Lat: ${latSortie.toFixed(5)}, Lon: ${lonSortie.toFixed(5)}`}</p>`;
+                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(timeSortie) || 'N/A')+'):</strong> ' + (escapeHtml(addrSortie) || 'Lat: ' + latSortie.toFixed(5) + ', Lon: ' + lonSortie.toFixed(5)) + '</p>';
                 } else {
-                    detailsHTML += `<p><strong>Sortie (${escapeHtml(timeSortie) || 'N/A'}):</strong> Localisation non enregistrée.</p>`;
+                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(timeSortie) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
                 }
                 
                 mapDetailsElem.innerHTML = detailsHTML;
@@ -1156,10 +1160,9 @@ $all_employees = getAllEmployees($conn);
                     L.polyline(bounds, {color: 'blue'}).addTo(map); 
                 }
 
-
                 if (bounds.length > 0) { 
-                    if (bounds.length === 1) { // Only one point, set view to it
-                        map.setView(bounds[0], 13); // Zoom level 13 for a single point
+                    if (bounds.length === 1) { 
+                        map.setView(bounds[0], 13); 
                     } else {
                         map.fitBounds(bounds, { padding: [50, 50] }); 
                     }
@@ -1191,15 +1194,16 @@ $all_employees = getAllEmployees($conn);
 
         function escapeHtml(text) {
             if (text === null || typeof text === 'undefined') return '';
+            const strText = String(text);
             const div = document.createElement('div');
-            div.textContent = String(text); 
+            div.textContent = strText; 
             return div.innerHTML;
         }
 
         function exportTableToCSV(tableId, filename) {
             try {
                 const table = document.getElementById(tableId);
-                if (!table) { displayGlobalError(`Erreur d'exportation: Table #${tableId} non trouvée.`); return; }
+                if (!table) { displayGlobalError("Erreur d'exportation: Table #" + tableId + " non trouvée."); return; }
                 let csv = [];
                 const rows = table.querySelectorAll("tr");
                 
@@ -1215,11 +1219,11 @@ $all_employees = getAllEmployees($conn);
                             el.remove();
                         });
                         let text = cellContent.innerText.trim().replace(/"/g, '""'); 
-                        rowData.push(`"${text}"`); 
+                        rowData.push('"' + text + '"'); 
                     }
                     csv.push(rowData.join(","));
                 }
-                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && !rows[1])) { 
+                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && rows.length === 1) ) { 
                     displayGlobalError("Aucune donnée à exporter de la table #" + tableId + ".");
                     return;
                 }
