@@ -722,7 +722,7 @@ $all_employees = getAllEmployees($conn);
                                     <th>Date</th>
                                     <th>Entrée</th>
                                     <th>Sortie</th>
-                                    <th>Pause prise</th> {/* MODIFIED: Added Pause Prise */}
+                                    <th>Pause prise</th>
                                     <th>Durée</th>
                                 </tr>
                             </thead>
