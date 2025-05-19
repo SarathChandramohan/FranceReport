@@ -26,6 +26,7 @@ CREATE TABLE Timesheet (
     logoff_latitude DECIMAL(9, 6) NULL,
     logoff_longitude DECIMAL(9, 6) NULL,
     logoff_address NVARCHAR(500) NULL,
+    break_minutes INT NULL;
 
     -- Define the foreign key constraint
     CONSTRAINT FK_Timesheet_Users FOREIGN KEY (user_id)
@@ -78,7 +79,113 @@ CREATE TABLE Conges (
 );
 
 ------------------------------------------------------------------------------------------
-ALTER TABLE Timesheet
-ADD break_minutes INT NULL;
------------------------------------------------------------------------------------------
-C:\Users\Sarath C\AppData\Local\Android\Sdk
+CREATE TABLE Events (
+    event_id INT IDENTITY(1,1) PRIMARY KEY,       -- Auto-incrementing primary key
+    title NVARCHAR(255) NOT NULL,                -- Title of the event
+    description NVARCHAR(MAX) NULL,              -- Optional longer description
+    start_datetime DATETIME NOT NULL,            -- Start date and time of the event
+    end_datetime DATETIME NOT NULL,              -- End date and time of the event
+    color VARCHAR(7) NULL DEFAULT '#007bff',     -- Optional color (hex code, e.g., #RRGGBB), default blue
+    creator_user_id INT NOT NULL,                -- User who created the event
+    assigned_user_id INT NOT NULL,               -- User the event is scheduled for
+    date_creation DATETIME DEFAULT GETDATE(),    -- Timestamp when the event was created
+
+    -- Foreign key constraint for the creator
+    CONSTRAINT FK_Events_CreatorUser FOREIGN KEY (creator_user_id)
+    REFERENCES Users (user_id)
+    ON DELETE NO ACTION, -- Decide what happens if the creator user is deleted (NO ACTION prevents deletion if events exist)
+
+    -- Foreign key constraint for the assigned user
+    CONSTRAINT FK_Events_AssignedUser FOREIGN KEY (assigned_user_id)
+    REFERENCES Users (user_id)
+    ON DELETE CASCADE -- Decide what happens if the assigned user is deleted (CASCADE deletes their events)
+);
+
+-- Optional: Create indexes for performance, especially on dates and user IDs
+CREATE INDEX IDX_Events_DateTime ON Events (start_datetime, end_datetime);
+CREATE INDEX IDX_Events_AssignedUser ON Events (assigned_user_id);
+
+----------------------------------------------------------------------------------------------
+IF OBJECT_ID('FK_Events_AssignedUser', 'F') IS NOT NULL
+BEGIN
+    ALTER TABLE Events DROP CONSTRAINT FK_Events_AssignedUser;
+END
+GO
+
+-- Add the foreign key back with ON DELETE NO ACTION
+ALTER TABLE Events
+ADD CONSTRAINT FK_Events_AssignedUser FOREIGN KEY (assigned_user_id)
+REFERENCES Users (user_id)
+ON DELETE NO ACTION; -- Changed from CASCADE to NO ACTION
+GO
+-------------------------------------------------------------------------------------------------
+CREATE TABLE Event_AssignedUsers (
+    event_id INT NOT NULL,
+    user_id INT NOT NULL,
+    PRIMARY KEY (event_id, user_id),
+    CONSTRAINT FK_EventAssignedUsers_Event FOREIGN KEY (event_id)
+        REFERENCES Events (event_id)
+        ON DELETE CASCADE, -- If an event is deleted, remove its user assignments
+    CONSTRAINT FK_EventAssignedUsers_User FOREIGN KEY (user_id)
+        REFERENCES Users (user_id)
+        ON DELETE CASCADE -- If a user is deleted, remove their assignments from events
+);
+GO
+----------------------------------------------------------------------------------------------
+ALTER TABLE Events
+ALTER COLUMN assigned_user_id INT NULL;
+GO
+-----------------------------------------------------------------------------------------------
+
+UPDATE Users
+SET role = 'admin'
+WHERE user_id = 12;
+
+-------------------------------------------------------------------------------------------------
+-- Table to store Teams
+CREATE TABLE Planning_Teams (
+    team_id INT IDENTITY(1,1) PRIMARY KEY,
+    team_name NVARCHAR(255) NOT NULL,
+    creator_user_id INT NOT NULL,              -- User who created the team
+    date_creation DATETIME DEFAULT GETDATE(),  -- Timestamp when the team was created
+    CONSTRAINT FK_Planning_Teams_CreatorUser FOREIGN KEY (creator_user_id) REFERENCES Users(user_id) ON DELETE NO ACTION
+);
+GO
+
+-- Junction table for Many-to-Many relationship between Teams and Users (Staff)
+CREATE TABLE Planning_Team_Members (
+    team_id INT NOT NULL,
+    user_id INT NOT NULL,
+    PRIMARY KEY (team_id, user_id),
+    CONSTRAINT FK_Planning_TeamMembers_Team FOREIGN KEY (team_id) REFERENCES Planning_Teams(team_id) ON DELETE CASCADE,
+    CONSTRAINT FK_Planning_TeamMembers_User FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+GO
+
+-- Table to store individual planning assignments
+CREATE TABLE Planning_Assignments (
+    assignment_id INT IDENTITY(1,1) PRIMARY KEY,
+    assigned_user_id INT NOT NULL,             -- The staff member this specific assignment part is for
+    creator_user_id INT NOT NULL,              -- User who created/assigned this
+    assignment_date DATE NOT NULL,             -- The specific date of this assignment
+    start_time TIME NULL,
+    end_time TIME NULL,
+    shift_type VARCHAR(50) NULL,               -- e.g., 'matin', 'apres-midi', 'nuit', 'repos', 'custom'
+    mission_text NVARCHAR(MAX) NULL,           -- Description of the task or mission
+    color VARCHAR(7) NULL DEFAULT '#007bff',   -- Color for calendar display (hex code)
+    date_creation DATETIME DEFAULT GETDATE(),  -- Timestamp when the assignment was created
+    CONSTRAINT FK_Planning_Assignments_AssignedUser FOREIGN KEY (assigned_user_id) REFERENCES Users(user_id) ON DELETE CASCADE, -- Or NO ACTION depending on requirements
+    CONSTRAINT FK_Planning_Assignments_CreatorUser FOREIGN KEY (creator_user_id) REFERENCES Users(user_id) ON DELETE NO ACTION -- Or SET NULL if creator is deleted
+);
+GO
+
+-- Optional: Indexes for performance
+CREATE INDEX IDX_Planning_Assignments_DateUser ON Planning_Assignments (assignment_date, assigned_user_id);
+CREATE INDEX IDX_Planning_Assignments_AssignedUser ON Planning_Assignments (assigned_user_id);
+CREATE INDEX IDX_Planning_Assignments_CreatorUser ON Planning_Assignments (creator_user_id);
+CREATE INDEX IDX_Planning_Teams_Name ON Planning_Teams (team_name);
+GO
+
+ALTER TABLE Planning_Assignments ADD location NVARCHAR(255) NULL;
+GO
+------------------------------------------------------------------------------------------------------------------

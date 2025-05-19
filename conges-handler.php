@@ -54,13 +54,14 @@ function getPendingRequests($user_id) {
     
     // Check if the user is an admin
     $user = getCurrentUser();
-    if ($user['role'] !== 'Admin') {
+    if ($user['role'] !== 'admin') {
         respondWithError('Accès refusé. Vous devez être administrateur.');
     }
     
     try {
         // Get all pending leave requests from all users
         $stmt = $conn->prepare("SELECT 
+                                c.conge_id as id,
                                 c.user_id, 
                                 c.date_debut, 
                                 c.date_fin, 
@@ -103,7 +104,7 @@ function approveLeaveRequest($user_id) {
     
     // Check if the user is an admin
     $user = getCurrentUser();
-    if ($user['role'] !== 'Admin') {
+    if ($user['role'] !== 'admin') {
         respondWithError('Accès refusé. Vous devez être administrateur.');
     }
     
@@ -136,10 +137,9 @@ function approveLeaveRequest($user_id) {
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'approved', 
                                    date_reponse = GetDate(),
-                                   reponse_commentaire = ?,
-                                   admin_id = ?
+                                   reponse_commentaire = ?
                                WHERE conge_id = ?");
-        $stmt->execute([$commentaire, $user_id, $leave_id]);
+        $stmt->execute([$commentaire, $leave_id]);
         
         // Commit transaction
         $conn->commit();
@@ -166,7 +166,7 @@ function rejectLeaveRequest($user_id) {
     
     // Check if the user is an admin
     $user = getCurrentUser();
-    if ($user['role'] !== 'Admin') {
+    if ($user['role'] !== 'admin') {
         respondWithError('Accès refusé. Vous devez être administrateur.');
     }
     
@@ -203,10 +203,9 @@ function rejectLeaveRequest($user_id) {
         $stmt = $conn->prepare("UPDATE Conges 
                                SET status = 'rejected', 
                                    date_reponse = GetDate(),
-                                   reponse_commentaire = ?,
-                                   admin_id = ?
-                               WHERE conge_id = ?");
-        $stmt->execute([$commentaire, $user_id, $leave_id]);
+                                   reponse_commentaire = ?
+                                   WHERE conge_id = ?");
+        $stmt->execute([$commentaire, $leave_id]);
         
         // Commit transaction
         $conn->commit();

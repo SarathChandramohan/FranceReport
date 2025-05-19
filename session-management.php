@@ -25,7 +25,7 @@ function getCurrentUser() {
             'nom' => $_SESSION['nom'],
             'prenom' => $_SESSION['prenom'],
             'email' => $_SESSION['email'],
-            'role' => 'Admin'
+            'role' => $_SESSION['role']  // Default to 'User' if not set
         ];
     }
     return null;
@@ -52,4 +52,15 @@ function logoutUser() {
     header("Location: index.php");
     exit;
 }
+
+// Implement session timeout
+function checkSessionTimeout($maxIdleTime = 900) { // 900 seconds = 30 minutes
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $maxIdleTime) {
+        logoutUser();
+    }
+    $_SESSION['last_activity'] = time(); // Update last activity time
+}
+
+// Call this function on each page to check session timeout
+checkSessionTimeout();
 ?>

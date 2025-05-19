@@ -20,6 +20,7 @@ $user = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Congés - Gestion des Ouvriers</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
     <!-- Original CSS styles from timesheet.html -->
     <style>
         /* Basic Reset and Font */
@@ -37,96 +38,6 @@ $user = getCurrentUser();
             color: #1d1d1f; /* Default dark text */
             -webkit-font-smoothing: antialiased; /* Smoother fonts on WebKit */
             -moz-osx-font-smoothing: grayscale; /* Smoother fonts on Firefox */
-        }
-
-        /* Container */
-        .container {
-            max-width: 1100px; /* Slightly adjusted max-width */
-            margin: 0 auto;
-            padding: 25px; /* Slightly increased padding */
-        }
-
-        /* Header */
-        header {
-            /* White header background */
-            background-color: #ffffff;
-            color: #1d1d1f; /* Dark text */
-            padding: 15px 0; /* Adjusted padding */
-            margin-bottom: 0; /* Remove bottom margin, nav handles separation */
-            border-bottom: 1px solid #d2d2d7; /* Subtle border */
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-content h1 {
-            font-size: 24px; /* Slightly larger title */
-            font-weight: 600;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px; /* Increased gap */
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .user-avatar {
-            width: 36px; /* Slightly smaller avatar */
-            height: 36px;
-            border-radius: 50%;
-            background-color: #007aff; /* Apple blue */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        /* Navigation */
-        nav {
-            /* Darker nav background */
-            background-color: #333; /* Dark gray */
-            padding: 12px 0;
-            margin-bottom: 30px; /* Add margin back here */
-        }
-
-        nav ul {
-            display: flex;
-            flex-wrap: wrap;
-            list-style: none;
-            gap: 10px 20px; /* Row and column gap */
-            padding-left: 0;
-            justify-content: flex-start; /* Align items to start */
-        }
-
-        nav li {
-            margin-bottom: 5px;
-        }
-
-        nav a {
-            color: #f5f5f7; /* Lighter text for dark background */
-            text-decoration: none;
-            padding: 6px 12px; /* Adjusted padding */
-            border-radius: 6px; /* Slightly more rounded */
-            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-            display: inline-block;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        nav a:hover {
-            background-color: #555; /* Slightly lighter gray on hover */
-            color: #ffffff;
-        }
-        nav a.active {
-            background-color: #007aff; /* Apple blue for active */
-            color: #ffffff;
         }
 
         /* Card Styling */
@@ -475,36 +386,8 @@ $user = getCurrentUser();
     </style>
 </head>
 <body>
-    <header>
-        <div class="container header-content">
-            <h1>Gestion des Ouvriers</h1>
-            <div class="user-info">
-                <span><?php echo htmlspecialchars($user['prenom'] . ' ' . $user['nom']); ?></span>
-                <div class="user-avatar">
-                    <?php 
-                    // Generate initials from first and last name
-                    echo htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1))); 
-                    ?>
-                </div>
-            </div>
-        </div>
-    </header>
-    <nav>
-        <div class="container">
-            <ul>
-                <li><a href="dashboard.php">Tableau de bord</a></li>
-                <li><a href="timesheet.php">Pointage</a></li>
-                <li><a href="conges.php" class="active">Congés </a></li>
-                <li><a href="employes.php" >Employés</a></li>
-                <li><a href="planning.php">Planning </a></li>
-                <li><a href="chat.php">Chat </a></li>
-                <li><a href="messages.php">Messages RH/Direction </a></li>
-                <li><a href="logout.php">Déconnexion</a></li>
-            </ul>
-        </div>
-    </nav>
-
-    <div class="container">
+<?php include 'navbar.php'; ?>
+    <div class="container-fluid">
         <div id="conges">
             <h2>Congés</h2>
             
@@ -514,7 +397,7 @@ $user = getCurrentUser();
             <!-- Tabs for Leave Management -->
             <div class="tabs-container">
                 <div class="tabs-nav">
-                   <?php if ($user['role'] == 'Admin'): ?>
+                   <?php if ($user['role'] == 'admin'): ?>
         <button class="tab-button" onclick="openTab('admin-approvals')">Administration</button>
         <?php endif; ?> 
         <button class="tab-button active" onclick="openTab('new-leave')">Nouvelle Demande</button>
@@ -595,7 +478,7 @@ $user = getCurrentUser();
                         </div>
                     </div>
                 </div>
-                <?php if ($user['role'] == 'Admin'): ?>
+                <?php if ($user['role'] == 'admin'): ?>
     <!-- Admin Approvals Tab (Only visible to admins) -->
     <div id="admin-approvals" class="tab-content">
         <div class="card">
@@ -663,7 +546,7 @@ $user = getCurrentUser();
             </div>
         </div>
     </div>
-
+<?php include('footer.php'); ?>
     <script>
         // Tab navigation functionality
         function openTab(tabId) {
@@ -1070,7 +953,6 @@ function loadPendingRequests() {
                         <button class="btn-primary" onclick="showAdminDetails(${entry.id})">Détails</button>
                     </td>
                 `;
-                
                 tableBody.appendChild(row);
             });
         } else {
@@ -1081,6 +963,7 @@ function loadPendingRequests() {
 
 // Function to approve a leave request
 function approveRequest(leaveId) {
+    console.log(leaveId);
     const commentaire = prompt("Commentaire pour l'approbation (optionnel):");
     
     // Make AJAX request to approve

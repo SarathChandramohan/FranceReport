@@ -1,11 +1,7 @@
 <?php
-// logout.php - Script to handle user logout
+// Include session management functions
+require_once 'session-management.php';
 
-// Include session management
-require_once 'session_check.php';
-
-// Call the logout function
+// Log out the user by calling the logout function
 logoutUser();
-
-// Note: logoutUser() already handles redirecting to login page and exit
 ?>

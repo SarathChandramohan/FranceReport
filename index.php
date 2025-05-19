@@ -10,16 +10,16 @@ function connectDB() {
                 "TrustServerCertificate" => 0
             );
             $serverName = "tcp:francerecord.database.windows.net,1433";
-        
+
             $conn = sqlsrv_connect($serverName, $connectionInfo);
-        
+
             if($conn === false) {
                 // Throw an exception just like PDO would
                 $errors = sqlsrv_errors();
                 $message = isset($errors[0]['message']) ? $errors[0]['message'] : 'Unknown error during SQL Server connection.';
                 throw new Exception("Erreur de connexion SQL Server: " . $message);
             }
-        
+
             return $conn;
         }
 
@@ -39,55 +39,57 @@ function connectDB() {
             $sql = "SELECT COUNT(*) AS count FROM Users WHERE email = ?";
             $params = array($email);
             $stmt = sqlsrv_query($conn, $sql, $params);
-            
+
             if($stmt === false) {
                 return false;
             }
-            
+
             $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
             sqlsrv_free_stmt($stmt);
-            
+
             return ($row['count'] > 0);
         }
 
         function registerUser($conn, $nom, $prenom, $email, $password) {
             $hashedPassword = hashPassword($password);
-            
+
             // 🛠️ Fixed your typo here
-            $sql = "INSERT INTO Users (nom, prenom, email, role, status, password_hash, date_creation) 
+            $sql = "INSERT INTO Users (nom, prenom, email, role, status, password_hash, date_creation)
                     VALUES (?, ?, ?, ?, ?, ?, GETDATE())";
             $params = array($nom, $prenom, $email, "User", "Active", $hashedPassword);
-        
+
             $stmt = sqlsrv_query($conn, $sql, $params);
             if($stmt === false) {
                 error_log("Register error: " . print_r(sqlsrv_errors(), true));
                 return false;
             }
-        
+
             sqlsrv_free_stmt($stmt);
             return true;
         }
 
         function authenticateUser($conn, $email, $password) {
-            $sql = "SELECT user_id, nom, prenom, password_hash FROM Users WHERE email = ?";
+            // Modified to select role
+            $sql = "SELECT user_id, nom, prenom, role, password_hash FROM Users WHERE email = ?";
             $params = array($email);
-            
+
             $stmt = sqlsrv_query($conn, $sql, $params);
             if($stmt === false) {
                 return false;
             }
-            
+
             $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
             sqlsrv_free_stmt($stmt);
-            
+
             if($row && verifyPassword($password, $row['password_hash'])) {
                 return array(
                     'user_id' => $row['user_id'],
                     'nom' => $row['nom'],
-                    'prenom' => $row['prenom']
+                    'prenom' => $row['prenom'],
+                    'role' => $row['role'] // Added role to the returned array
                 );
             }
-            
+
             return false;
         }
 
@@ -105,7 +107,7 @@ function connectDB() {
             $email = trim($_POST['email']);
             $password = $_POST['password'];
             $confirm_password = $_POST['confirm_password'];
-            
+
             if(empty($nom) || empty($prenom) || empty($email) || empty($password)) {
                 $errorMsg = "Tous les champs sont obligatoires.";
             } elseif(!validateEmail($email)) {
@@ -137,7 +139,7 @@ function connectDB() {
         if(isset($_POST['login'])) {
             $email = trim($_POST['email']);
             $password = $_POST['password'];
-            
+
             if(empty($email) || empty($password)) {
                 $errorMsg = "L'email et le mot de passe sont obligatoires.";
             } else {
@@ -152,8 +154,14 @@ function connectDB() {
                         $_SESSION['prenom'] = $user['prenom'];
                         $_SESSION['email'] = $email;
                         $_SESSION['logged_in'] = true;
+                        $_SESSION['role'] = $user['role']; // Store the user's role in the session
 
-                        header("Location:timesheet.php");
+                        // Redirect based on role
+                        if ($_SESSION['role'] === 'admin') {
+                            header("Location: dashboard.php");
+                        } else {
+                            header("Location: timesheet.php");
+                        }
                         exit;
                     } else {
                         $errorMsg = "Email ou mot de passe incorrect.";
@@ -330,7 +338,6 @@ function connectDB() {
 
 
 
-        
       
 
         <div class="card">

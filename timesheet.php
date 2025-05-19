@@ -20,9 +20,14 @@ $user = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pointage - Gestion des Ouvriers</title>
-    <!-- Original CSS styles from timesheet.html -->
     <style>
-        /* Basic Reset and Font */
+        @media (max-width: 991px) {
+    .navbar-toggler {
+        margin-right: 0;
+        z-index: 1035;
+    }
+}
+/* Basic Reset and Font */
         * {
             margin: 0;
             padding: 0;
@@ -37,191 +42,26 @@ $user = getCurrentUser();
             color: #1d1d1f; /* Default dark text */
             -webkit-font-smoothing: antialiased; /* Smoother fonts on WebKit */
             -moz-osx-font-smoothing: grayscale; /* Smoother fonts on Firefox */
+            /* Ensure no top margin/padding on body and hide horizontal overflow */
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+            overflow-x: hidden; /* Hide the part of the menu that is off-screen */
         }
 
         /* Container */
-        .container {
+        .container-fluid {
+             /* Ensure no top margin/padding is pushing down content after navbar */
+            margin-top: 0 !important;
+            /* Adjust padding below the navbar as needed */
+            padding-top: 20px;
+        }
+
+        .container { /* Assuming you might also use a standard .container */
             max-width: 1100px; /* Slightly adjusted max-width */
             margin: 0 auto;
             padding: 25px; /* Slightly increased padding */
         }
 
-        /* Header */
-       
-
-        /* Navigation */
-       /* --- New Navigation Styles --- */
-nav {
-    background-color: #333; /* Dark gray */
-    padding: 12px 0;
-    margin-bottom: 30px;
-    position: relative; /* Needed for absolute positioning of the mobile menu */
-}
-
-.nav-content {
-    display: flex;
-    justify-content: space-between; /* Distribute space between items */
-    align-items: center; /* Vertically align items */
-    flex-wrap: wrap; /* Allow items to wrap on smaller screens */
-}
-
-.nav-left, .nav-center, .nav-right {
-    display: flex; /* Use flex for internal alignment */
-    align-items: center;
-    padding: 0 10px; /* Add some padding around the sections */
-}
-
-.nav-left {
-     /* Adjust width or flex-basis if needed for your logo */
-     flex-grow: 0; /* Don't grow */
-}
-
-.nav-center {
-    flex-grow: 1; /* Allow nav links to take up available space */
-    justify-content: center; /* Center the links within the center div */
-    order: 2; /* Set order for desktop layout */
-}
-
-.nav-right {
-    flex-grow: 0; /* Don't grow */
-    order: 3; /* Set order for desktop layout */
-}
-
-.nav-links {
-    display: flex; /* Display list items in a row */
-    list-style: none;
-    gap: 10px 20px; /* Row and column gap */
-    padding: 0; /* Remove default padding */
-    margin: 0; /* Remove default margin */
-}
-
-/* Adjust existing nav a styles for consistency */
-nav a {
-    color: #f5f5f7; /* Lighter text for dark background */
-    text-decoration: none;
-    padding: 6px 12px; /* Adjusted padding */
-    border-radius: 6px; /* Slightly more rounded */
-    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-    display: inline-block;
-    font-size: 14px;
-    font-weight: 500;
-}
-
-nav a:hover {
-    background-color: #555; /* Slightly lighter gray on hover */
-    color: #ffffff;
-}
-nav a.active {
-    background-color: #007aff; /* Apple blue for active */
-    color: #ffffff;
-}
-
-/* Style for the user info on the right */
-.user-info-nav {
-     display: flex;
-     align-items: center;
-     gap: 8px; /* Smaller gap than the old header */
-     font-size: 14px;
-     font-weight: 500;
-     color: #f5f5f7; /* Match nav link color */
-}
-
-.user-info-nav .user-avatar {
-     width: 28px; /* Smaller avatar in nav */
-     height: 28px;
-     border-radius: 50%;
-     background-color: #007aff; /* Apple blue */
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     color: white;
-     font-weight: 600;
-     font-size: 12px; /* Smaller font for initials */
-}
-
-/* Hamburger Menu Button (Hidden by default on desktop) */
-.hamburger-menu {
-    display: none; /* Hide on desktop */
-    background: none;
-    border: none;
-    color: #f5f5f7; /* White icon */
-    font-size: 24px;
-    cursor: pointer;
-    padding: 0 10px;
-    order: 1; /* Set order for mobile layout */
-}
-
- /* --- Responsive Adjustments for Mobile Navigation --- */
- @media (max-width: 768px) {
-     .nav-content {
-         flex-direction: row; /* Keep row layout for logo/hamburger/user */
-         justify-content: space-between;
-         align-items: center;
-     }
-
-     .nav-left {
-         order: 1; /* Logo on the left */
-         flex-grow: 0;
-     }
-
-     .nav-right {
-         order: 3; /* User info on the right */
-         flex-grow: 0;
-     }
-
-     .nav-center {
-         order: 4; /* Nav links below others */
-         flex-basis: 100%; /* Take full width */
-         justify-content: flex-start; /* Align links to the left */
-         margin-top: 10px; /* Space above links */
-         display: none; /* Hide links by default on mobile */
-         flex-direction: column; /* Stack links vertically */
-         align-items: flex-start; /* Align links to the left */
-     }
-
-     .nav-links {
-         flex-direction: column; /* Stack links vertically */
-         gap: 5px 0; /* Adjust gap for vertical list */
-         width: 100%; /* Links take full width */
-     }
-
-     nav li {
-         width: 100%; /* Make list items take full width */
-     }
-
-     nav a {
-         display: block; /* Make links block elements for better clicking */
-         padding: 8px 15px; /* Adjust padding for block links */
-     }
-
-     .hamburger-menu {
-         display: block; /* Show hamburger menu on mobile */
-         order: 2; /* Hamburger between logo and user */
-     }
-
-     /* Class to show the mobile menu when hamburger is clicked */
-     .nav-center.show {
-         display: flex; /* Show the navigation links */
-     }
- }
-
- /* Adjust padding for small screens to ensure nav content is not against edges */
- @media (max-width: 480px) {
-      .nav-left, .nav-right, .hamburger-menu {
-           padding: 0 8px; /* Reduce padding on smaller screens */
-      }
-      .user-info-nav {
-           font-size: 13px;
-      }
-       .user-info-nav .user-avatar {
-          width: 24px;
-          height: 24px;
-           font-size: 11px;
-      }
-      .hamburger-menu {
-           font-size: 22px;
-      }
- }
 
         /* Card Styling */
         .card {
@@ -284,8 +124,11 @@ nav a.active {
             font-weight: 600; /* Bolder font */
             font-size: 15px;
             transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-            margin-bottom: 10px;
             line-height: 1.2; /* Ensure text vertical alignment */
+            flex-grow: 1; /* Allow buttons to grow */
+            flex-basis: 0; /* Allow buttons to shrink */
+            text-align: center; /* Center text in buttons */
+            min-width: 120px; /* Minimum width to prevent squishing */
         }
 
         .btn-primary { background-color: #007aff; color: white; }
@@ -297,8 +140,71 @@ nav a.active {
         .btn-danger { background-color: #ff3b30; color: white; } /* Apple red */
         .btn-danger:hover { background-color: #d63027; } /* Darker red */
 
-        .btn-warning { background-color: #ff9500; color: white; } /* Apple orange */
-        .btn-warning:hover { background-color: #d97e00; } /* Darker orange */
+        /* Changed from orange to #333333 */
+        .btn-warning { background-color: #333333; color: white; } /* Dark gray */
+        .btn-warning:hover { background-color: #555555; } /* Slightly lighter gray on hover */
+
+         /* Disabled Button Styling */
+        button:disabled, button[disabled] {
+            opacity: 0.6; /* Greyed out */
+            cursor: not-allowed; /* Indicate not clickable */
+        }
+
+        /* Added CSS for disabled warning button */
+        .btn-warning:disabled, .btn-warning[disabled] {
+            background-color: #333333 !important; /* Set background to dark gray */
+            color: white !important; /* Ensure text color remains white */
+            opacity: 0.6; /* Keep the greyed out effect */
+        }
+
+
+        /* Adjust button margins within the flex container */
+        .clock-buttons button {
+             margin-bottom: 10px; /* Add bottom margin back to buttons */
+        }
+
+
+        /* Dropdown for Break */
+        .dropdown {
+            position: relative;
+            display: inline-block; /* Keep inline-block for dropdown container */
+            width: 100%; /* Make dropdown take full width of its button */
+        }
+
+        /* Style the button inside the dropdown */
+        .dropdown .btn-warning {
+             width: 100%; /* Make the button inside the dropdown take full width */
+             margin-bottom: 0; /* Remove margin from the button inside the dropdown */
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 100%; /* Dropdown content takes width of button */
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            top: 100%; /* Position below the button */
+            left: 0;
+        }
+
+        .dropdown-content a {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+        }
+
+        .dropdown-content a:hover { background-color: #f1f1f1; }
+
+        /* Use a class to show dropdown instead of :hover */
+        .dropdown.show .dropdown-content {
+            display: block;
+        }
+
 
         /* Table Styling */
         .table-container {
@@ -444,7 +350,21 @@ nav a.active {
             h2 { font-size: 24px; }
             .card { padding: 20px; border-radius: 10px; }
             .clock-display { font-size: 48px; }
-            .clock-buttons button { width: calc(50% - 10px); font-size: 14px; padding: 10px 18px; }
+            /* Adjust button width for medium screens */
+             .clock-buttons button {
+                 width: calc(50% - 10px); /* Two buttons per row with gap */
+                 min-width: unset; /* Allow shrinking */
+             }
+              /* Ensure consistent bottom margin for buttons on the same row */
+            .clock-buttons button:nth-child(1),
+            .clock-buttons button:nth-child(2) {
+                margin-bottom: 10px;
+            }
+             /* Style for the third button (Sortie) when it wraps */
+             .clock-buttons button:nth-child(3) {
+                margin-top: 0; /* Remove extra top margin if it wraps */
+             }
+
             .modal-content { width: 95%; margin: 5% auto; padding: 20px; }
             #map-container { height: 300px; }
             table th, table td { padding: 12px 14px; font-size: 13px; }
@@ -454,7 +374,14 @@ nav a.active {
              .container { padding: 15px; }
              h2 { font-size: 22px; }
              .clock-display { font-size: 40px; }
-             .clock-buttons button { width: 100%; }
+              /* Make all buttons take full width on small screens */
+             .clock-buttons button {
+                 width: 100%;
+                 margin-bottom: 10px;
+             }
+             .clock-buttons button:last-child {
+                margin-bottom: 0; /* No bottom margin on the last button */
+             }
              table th, table td { padding: 10px 12px; font-size: 12px; }
              .modal-content { padding: 15px; }
              #map-container { height: 250px; }
@@ -462,44 +389,18 @@ nav a.active {
              nav ul { gap: 5px 10px; }
              nav a { font-size: 12px; padding: 4px 8px; }
         }
+
+        /* REMOVED THE "More Assertive CSS for navbar mobile positioning" BLOCK */
+
     </style>
 </head>
-<body>
-    <nav>
-    <div class="container nav-content"> <div class="nav-left">
-    <img src="Logo.png" alt="Company Logo" class="company-logo">
-</div>
-        <div class="nav-center">
-             <ul class="nav-links"> <li><a href="dashboard.php">Tableau de bord</a></li>
-                <li><a href="timesheet.php" class="active">Pointage</a></li>
-                <li><a href="conges.php">Congés </a></li>
-                <li><a href="employes.php">Employés</a></li>
-                <li><a href="planning.php">Planning </a></li>
-                <li><a href="chat.php">Chat </a></li>
-                <li><a href="messages.php">Messages RH/Direction</a></li>
-                <li><a href="logout.php">Déconnexion</a></li>
-             </ul>
-        </div>
-         <div class="nav-right">
-             <div class="user-info-nav"> <span><?php echo htmlspecialchars($user['prenom'] . ' ' . $user['nom'] . ' SC'); ?></span> <div class="user-avatar">
-                    <?php
-                    // Generate initials from first and last name (assuming you want SC after the name)
-                    // If you need initials like 'ACS', you'd modify this logic
-                    echo htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1)));
-                    ?>
-                </div>
-             </div>
-         </div>
-         <button class="hamburger-menu" aria-label="Toggle navigation">
-            &#9776; </button>
-    </div>
-</nav>
+<body class="timesheet-page">
+    <?php include 'navbar.php'; ?>
 
-    <div class="container">
+    <div class="container-fluid">
         <div id="pointage">
             <h2>Pointage</h2>
-            
-            <!-- Status messages area -->
+
             <div id="status-message" style="display: none;"></div>
 
             <div class="clock-section">
@@ -522,7 +423,16 @@ nav a.active {
 
                     <div class="clock-buttons">
                         <button class="btn-success" id="btn-entree" onclick="enregistrerPointage('record_entry')">Enregistrer Entrée</button>
-                        <button class="btn-danger" id="btn-sortie" onclick="enregistrerPointage('record_exit')">Enregistrer Sortie</button>
+
+                         <div class="dropdown" id="break-dropdown">
+                            <button class="btn-warning" id="btn-break">Ajouter Pause</button>
+                            <div class="dropdown-content">
+                                <a href="#" onclick="addBreak(30)">30 min</a>
+                                <a href="#" onclick="addBreak(60)">1 heure</a>
+                            </div>
+                        </div>
+
+                        <button class="btn-danger" id="btn-sortie" onclick="enregistrerPointage('record_exit')" disabled>Enregistrer Sortie</button>
                     </div>
                 </div>
             </div>
@@ -531,18 +441,17 @@ nav a.active {
                 <div class="table-container">
                     <table>
                         <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Entrée</th>
-                                <th>Lieu Entrée</th>
-                                <th>Sortie</th>
-                                <th>Lieu Sortie</th>
-                                <th>Total</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
+                        <tr>
+                            <th>Actions</th>
+                            <th>Date</th>
+                            <th>Entrée</th>
+                            <th>Lieu Entrée</th>
+                            <th>Sortie</th>
+                            <th>Pause prise</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
                         <tbody id="timesheet-history">
-                            <!-- History data will be loaded here via JavaScript -->
                             <tr>
                                 <td colspan="7" style="text-align: center;">Chargement des données...</td>
                             </tr>
@@ -566,16 +475,17 @@ nav a.active {
             </div>
         </div>
     </div>
-<!-- Leaflet.js OpenStreetMap library -->
+<?php include('footer.php'); ?>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Global variables for location data
         let currentLatitude = null;
         let currentLongitude = null;
         let currentLocationAddress = null;
-        
-        
+
+
         // Clock Update function
         function updateClock() {
             const now = new Date();
@@ -589,40 +499,40 @@ nav a.active {
         }
         const clockInterval = setInterval(updateClock, 1000);
         updateClock(); // Initial call
-        
+
         // Show status message function
         function showStatusMessage(message, type = 'info') {
             const statusDiv = document.getElementById('status-message');
             if (!statusDiv) return;
-            
+
             // Set message and class
             statusDiv.innerHTML = message;
             statusDiv.className = `alert alert-${type}`;
             statusDiv.style.display = 'block';
-            
+
             // Auto-hide after 5 seconds
             setTimeout(() => {
                 statusDiv.style.display = 'none';
             }, 5000);
         }
-        
+
         // Enhanced Mobile-Friendly Geolocation
         function getLocation() {
             const locationStatus = document.getElementById('location-status');
             const locationAddress = document.getElementById('location-address');
-            
+
             if (!locationStatus || !locationAddress) return; // Exit if elements not found
-            
+
             // Update status to pending
             locationStatus.textContent = "Obtention...";
             locationStatus.className = "pending";
             locationAddress.textContent = ""; // Clear previous address
-            
+
             // Reset global location variables
             currentLatitude = null;
             currentLongitude = null;
             currentLocationAddress = null;
-            
+
             // Check if geolocation is available
             if (!navigator.geolocation) {
                 locationStatus.textContent = "Non supportée";
@@ -630,18 +540,18 @@ nav a.active {
                 locationAddress.textContent = "La géolocalisation n'est pas supportée par ce navigateur.";
                 return;
             }
-            
+
             // Set options with longer timeout for mobile
             const geoOptions = {
                 enableHighAccuracy: true,
                 timeout: 15000, // Longer timeout (15 seconds) for mobile devices
                 maximumAge: 0 // Don't use cached position
             };
-            
+
             // Get current position with retry mechanism
             let retryCount = 0;
             const maxRetries = 2;
-            
+
             function tryGetPosition() {
                 navigator.geolocation.getCurrentPosition(
                     // Success callback
@@ -649,25 +559,25 @@ nav a.active {
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
                         const accuracy = position.coords.accuracy;
-                        
+
                         // Set global variables
                         currentLatitude = lat;
                         currentLongitude = lon;
-                        
+
                         locationStatus.textContent = "Position trouvée";
                         locationStatus.className = "success";
-                        
+
                         // Display coordinates with accuracy information
                         const locationText = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
                         locationAddress.textContent = locationText;
                         currentLocationAddress = locationText;
-                        
+
                         // Check if location is accurate enough for business use
                         if (accuracy > 100) { // If accuracy is worse than 100 meters
                             locationAddress.textContent += ` (Précision: ~${Math.round(accuracy)}m)`;
                             currentLocationAddress += ` (Précision: ~${Math.round(accuracy)}m)`;
                         }
-                        
+
                         // Store successful coordinates in session storage
                         storeLastLocation(lat, lon, locationText);
                     },
@@ -680,26 +590,26 @@ nav a.active {
                             setTimeout(tryGetPosition, 1000); // Wait 1 second before retry
                             return;
                         }
-                        
+
                         // Handle error after all retries
                         locationStatus.textContent = "Erreur Géo.";
                         locationStatus.className = "error";
-                        
+
                         // Get specific error message
                         let errorMsg = getGeolocationErrorMessage(error);
                         locationAddress.textContent = errorMsg;
-                        
+
                         // Fallback to last known position if available
                         tryFallbackLocation();
                     },
                     geoOptions
                 );
             }
-            
+
             // Start first attempt
             tryGetPosition();
         }
-        
+
         // Store successful location for fallback
         function storeLastLocation(lat, lon, address) {
             try {
@@ -711,7 +621,7 @@ nav a.active {
                 console.log('Could not store location in session storage');
             }
         }
-        
+
         // Try to use last known location as fallback
         function tryFallbackLocation() {
             try {
@@ -719,23 +629,23 @@ nav a.active {
                 const lastLon = sessionStorage.getItem('lastLon');
                 const lastAddress = sessionStorage.getItem('lastAddress');
                 const lastTime = sessionStorage.getItem('lastLocationTime');
-                
+
                 if (lastLat && lastLon && lastTime) {
                     const timeDiff = (new Date() - new Date(lastTime)) / (1000 * 60); // minutes
                     if (timeDiff < 30) { // Use cached location if less than 30 minutes old
                         const locationAddress = document.getElementById('location-address');
                         const locationStatus = document.getElementById('location-status');
-                        
+
                         // Set global variables
                         currentLatitude = parseFloat(lastLat);
                         currentLongitude = parseFloat(lastLon);
                         currentLocationAddress = lastAddress + ` (Position d'il y a ${Math.round(timeDiff)} minutes)`;
-                        
+
                         locationStatus.textContent = "Position antérieure";
                         locationStatus.className = "warning";
-                        
+
                         locationAddress.textContent = currentLocationAddress;
-                        
+
                         return true;
                     }
                 }
@@ -744,43 +654,43 @@ nav a.active {
             }
             return false;
         }
-        
+
         // Mobile check
         function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            return /Android|webOS|iPhone|iPad|Ipod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
-        
+
         function getGeolocationErrorMessage(error) {
             // For permission denied errors on mobile, give more specific guidance
             if (error.code === error.PERMISSION_DENIED && isMobileDevice()) {
                 return "Accès refusé. Vérifiez les paramètres de localisation de votre téléphone et autorisez ce site à accéder à votre position.";
             }
-            
+
             switch(error.code) {
-                case error.PERMISSION_DENIED: 
+                case error.PERMISSION_DENIED:
                     return "Accès localisation refusé. Vérifiez les autorisations dans votre navigateur.";
-                case error.POSITION_UNAVAILABLE: 
+                case error.POSITION_UNAVAILABLE:
                     return "Position indisponible. Vérifiez que le GPS est activé ou essayez dehors pour un meilleur signal.";
-                case error.TIMEOUT: 
+                case error.TIMEOUT:
                     return "Délai d'attente dépassé. Le GPS peut prendre plus de temps à l'intérieur des bâtiments.";
-                default: 
+                default:
                     return `Erreur localisation inconnue (${error.code}).`;
             }
         }
-        
+
         // Function to make AJAX requests
         function makeAjaxRequest(action, data, callback) {
             // Create FormData object
             const formData = new FormData();
             formData.append('action', action);
-            
+
             // Add other data to FormData
             for (const key in data) {
                 if (data.hasOwnProperty(key)) {
                     formData.append(key, data[key]);
                 }
             }
-            
+
             // Create and send the request
             const xhr = new XMLHttpRequest();
             xhr.open('POST', 'timesheet-handler.php', true);
@@ -800,50 +710,64 @@ nav a.active {
             };
             xhr.send(formData);
         }
-        
+
         // Record Time Entry
         function enregistrerPointage(action) {
             const toggleLocation = document.getElementById('toggle-location');
             const locationStatus = document.getElementById('location-status');
-            
+            const btnEntree = document.getElementById('btn-entree');
+            const btnSortie = document.getElementById('btn-sortie');
+
+
             let latitude = null;
             let longitude = null;
             let address = null;
-            
+
             // Check if location is enabled and available
             if (toggleLocation && toggleLocation.checked && locationStatus) {
                 // Location is enabled, use the global variables
                 latitude = currentLatitude;
                 longitude = currentLongitude;
                 address = currentLocationAddress;
-                
+
                 // Check if we have valid coordinates
                 if (!latitude || !longitude) {
                     showStatusMessage("Position non disponible. Veuillez activer et autoriser la localisation.", "error");
                     return;
                 }
             }
-            
+
             // Prepare data object
             const data = {
                 latitude: latitude,
                 longitude: longitude,
                 address: address
             };
-            
+
             // Show pending status
             showStatusMessage("Envoi en cours...", "info");
-            
+
             // Make AJAX request
             makeAjaxRequest(action, data, function(error, response) {
                 if (error) {
                     showStatusMessage("Erreur: " + error, "error");
                     return;
                 }
-                
+
                 if (response.status === "success") {
                     showStatusMessage(response.message, "success");
-                    
+
+                    // Update button states after successful action
+                    if (action === 'record_entry') {
+                        btnEntree.disabled = true;
+                        btnSortie.disabled = false;
+                         document.getElementById('btn-break').disabled = false; // Enable break button on entry
+                    } else if (action === 'record_exit') {
+                        btnEntree.disabled = true;
+                        btnSortie.disabled = true;
+                         document.getElementById('btn-break').disabled = true; // Disable break button on exit
+                    }
+
                     // Refresh the history table
                     loadTimesheetHistory();
                 } else {
@@ -851,71 +775,132 @@ nav a.active {
                 }
             });
         }
-        
+
+         // Function to add break
+        function addBreak(minutes) {
+             // Check if an entry has been recorded today
+            makeAjaxRequest('get_latest_entry_status', {}, function(error, response) {
+                if (error) {
+                    showStatusMessage("Erreur lors de la vérification du statut: " + error, "error");
+                    return;
+                }
+
+                if (response.status === "success" && response.data && response.data.has_entry && !response.data.has_exit) {
+                     // Entry recorded, no exit yet - safe to add break
+                    const data = { break_minutes: minutes };
+                    makeAjaxRequest('add_break', data, function(error, response) {
+                        if (error) {
+                            showStatusMessage("Erreur lors de l'ajout de la pause: " + error, "error");
+                            return;
+                        }
+
+                        if (response.status === "success") {
+                            showStatusMessage(response.message, "success");
+                            // Refresh the history table
+                            loadTimesheetHistory();
+                        } else {
+                            showStatusMessage("Erreur: " + response.message, "error");
+                        }
+                    });
+
+                } else {
+                    // No entry or exit already recorded
+                    showStatusMessage("Impossible d'ajouter une pause sans une entrée préalable pour aujourd'hui ou si la sortie est déjà enregistrée.", "error");
+                }
+            });
+        }
+
+
         // Load timesheet history
         function loadTimesheetHistory() {
             const tableBody = document.getElementById('timesheet-history');
             if (!tableBody) return;
-            
+
             // Show loading state
             tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Chargement des données...</td></tr>';
-            
+
             // Make AJAX request to get history
             makeAjaxRequest('get_history', {}, function(error, response) {
                 if (error) {
                     tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Erreur: ' + error + '</td></tr>';
                     return;
                 }
-                
+
                 if (response.status === "success" && Array.isArray(response.data)) {
                     if (response.data.length === 0) {
                         tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Aucun pointage trouvé</td></tr>';
+                        updateButtonStates(false, false); // No entries, disable both
+                         document.getElementById('btn-break').disabled = true; // Disable break button
                         return;
                     }
-                    
+
                     // Clear the table
                     tableBody.innerHTML = '';
-                    
+
                     // Add rows for each entry
                     response.data.forEach(function(entry) {
                         const row = document.createElement('tr');
-                        
+
+                         // Calculate duration and subtract break
+                         let totalDuration = '--';
+                         if (entry.logon_time && entry.logoff_time) {
+                             const logonTime = new Date(`1970-01-01T${entry.logon_time}:00Z`);
+                             const logoffTime = new Date(`1970-01-01T${entry.logoff_time}:00Z`);
+                             let diffMs = logoffTime - logonTime;
+
+                             // Subtract break time if recorded
+                             if (entry.break_minutes > 0) {
+                                 diffMs -= entry.break_minutes * 60 * 1000; // Subtract break in milliseconds
+                             }
+
+                              if (diffMs < 0) diffMs = 0; // Ensure total time is not negative
+const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+                             const totalMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                             totalDuration = `${totalHours}h${String(totalMinutes).padStart(2, '0')}`;
+                         }
+
                         // Format the HTML content for the row
-                        row.innerHTML = `
-                            <td>${entry.date}</td>
-                            <td>${entry.logon_time}</td>
-                            <td>${formatLocation(entry.logon_location)}</td>
-                            <td>${entry.logoff_time}</td>
-                            <td>${formatLocation(entry.logoff_location)}</td>
-                            <td>${entry.duration || '--'}</td>
-                            <td>
-                                <button class="btn-primary" onclick="showMap(${entry.id}, '${entry.date}', '${entry.logon_time}', '${entry.logon_location}', '${entry.logoff_time}', '${entry.logoff_location}')">
-                                    Voir carte
-                                </button>
-                            </td>
-                        `;
-                        
+                       row.innerHTML = `
+                         <td>
+                            <button class="btn-primary" onclick="showMap(${entry.id}, '${entry.date}', '${entry.logon_time}', '${entry.logon_location}', '${entry.logoff_time}', '${entry.logoff_location}')">
+                                Voir carte
+                            </button>
+                        </td>
+                        <td>${entry.date}</td>
+                        <td>${entry.logon_time}</td>
+                        <td>${formatLocation(entry.logon_location)}</td>
+                        <td>${entry.logoff_time}</td>
+                        <td>${entry.break_minutes > 0 ? entry.break_minutes + ' min' : '--'}</td>
+                        <td>${totalDuration}</td>
+                    `;
+
                         tableBody.appendChild(row);
                     });
+
+                     // After loading history, update button states based on the most recent entry (today's)
+                     checkLatestEntryStatus();
+
                 } else {
                     tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Erreur: ' + response.message + '</td></tr>';
+                     updateButtonStates(false, false); // Assume error means no valid state, disable both
+                     document.getElementById('btn-break').disabled = true; // Disable break button
                 }
             });
         }
-        
+
         // Format location text to avoid overly long displays
         function formatLocation(location) {
             if (!location || location === 'Non enregistré') return 'Non enregistré';
-            
+
             // If it contains coordinates, shorten them
             if (location.includes('Lat:')) {
                 return 'Position GPS enregistrée';
             }
-            
+
             // Otherwise return the first 20 chars with ellipsis if needed
             return location.length > 20 ? location.substring(0, 20) + '...' : location;
         }
-        
+
         // Show map modal with location details
         function showMap(id, date, entreeTime, entreeLoc, sortieTime, sortieLoc) {
             // Update modal content
@@ -924,16 +909,18 @@ nav a.active {
             document.getElementById('map-entree-loc').textContent = entreeLoc;
             document.getElementById('map-sortie-time').textContent = sortieTime;
             document.getElementById('map-sortie-loc').textContent = sortieLoc;
-            
+
             // Show the modal
             document.getElementById('map-modal').style.display = 'block';
         }
-        
+
         // Location toggle functionality
         document.addEventListener('DOMContentLoaded', function() {
             const toggleLocation = document.getElementById('toggle-location');
             const locationStatusText = document.getElementById('location-status-text');
-            
+            const breakDropdown = document.getElementById('break-dropdown');
+            const btnBreak = document.getElementById('btn-break');
+
             if (toggleLocation && locationStatusText) {
                 toggleLocation.addEventListener('change', function() {
                     if (this.checked) {
@@ -943,15 +930,15 @@ nav a.active {
                     } else {
                         locationStatusText.textContent = 'Désactivée';
                         locationStatusText.style.color = '#ff3b30'; // Red
-                        
+
                         // Reset location display
                         const locationStatus = document.getElementById('location-status');
                         const locationAddress = document.getElementById('location-address');
-                        
+
                         if (locationStatus) locationStatus.textContent = 'Désactivée';
                         if (locationStatus) locationStatus.className = 'error';
                         if (locationAddress) locationAddress.textContent = '';
-                        
+
                         // Reset global variables
                         currentLatitude = null;
                         currentLongitude = null;
@@ -959,16 +946,34 @@ nav a.active {
                     }
                 });
             }
-            
+
+            // Toggle dropdown visibility on break button click
+            if (btnBreak && breakDropdown) {
+                btnBreak.addEventListener('click', function(event) {
+                    breakDropdown.classList.toggle('show');
+                    event.stopPropagation(); // Prevent click from closing immediately
+                });
+
+                // Close the dropdown if the user clicks outside of it
+                window.addEventListener('click', function(event) {
+                    if (!event.target.matches('#btn-break') && !event.target.closest('.dropdown-content')) {
+                         if (breakDropdown.classList.contains('show')) {
+                            breakDropdown.classList.remove('show');
+                        }
+                    }
+                });
+            }
+
+
             // Initial location check if toggle is on
             if (toggleLocation && toggleLocation.checked) {
                 getLocation();
             }
-            
-            // Load initial timesheet history
+
+            // Load initial timesheet history and update button states
             loadTimesheetHistory();
         });
-        
+
         // Check location every 5 minutes if enabled
         setInterval(function() {
             const toggleLocation = document.getElementById('toggle-location');
@@ -976,15 +981,18 @@ nav a.active {
                 getLocation();
             }
         }, 300000); // 5 minutes = 300000ms
-        
+
 let mapInitialized = false;
 let mapInstance;
 
 function showMap(id, startDate, startTime, startLocation, endTime, endLocation) {
     document.getElementById('map-modal').style.display = 'block';
 
-    const startCoords = extractCoordinates(startLocation);
-    const endCoords = extractCoordinates(endLocation);
+    // Default coordinates if location is 'Non enregistré' or parsing fails
+    const defaultCoords = [0, 0]; // You might want to set a default central location
+
+    const startCoords = extractCoordinates(startLocation) || defaultCoords;
+    const endCoords = extractCoordinates(endLocation) || defaultCoords;
 
     document.getElementById('map-modal-title').textContent = "Pointages du " + startDate;
     document.getElementById('map-entree-time').textContent = startTime;
@@ -999,37 +1007,164 @@ function showMap(id, startDate, startTime, startLocation, endTime, endLocation) 
         }).addTo(mapInstance);
         mapInitialized = true;
     } else {
-        mapInstance.setView(startCoords, 13);
+        // Clear existing layers (markers, polylines)
         mapInstance.eachLayer(function (layer) {
             if (layer instanceof L.Marker || layer instanceof L.Polyline) {
                 mapInstance.removeLayer(layer);
             }
         });
+
+        // Set view to the entry location if available, otherwise use exit location
+        if (startCoords !== defaultCoords) {
+             mapInstance.setView(startCoords, 13);
+        } else if (endCoords !== defaultCoords) {
+             mapInstance.setView(endCoords, 13);
+        } else {
+             // If neither are valid, set view to a default or previous view
+             mapInstance.setView([0,0], 2); // Example: World view
+        }
     }
 
-    L.marker(startCoords).addTo(mapInstance).bindPopup(`Entrée: ${startTime}`).openPopup();
-    L.marker(endCoords).addTo(mapInstance).bindPopup(`Sortie: ${endTime}`);
-    L.polyline([startCoords, endCoords], { color: 'blue' }).addTo(mapInstance);
+    // Add entry marker if coordinates are valid
+    if (startCoords !== defaultCoords) {
+        L.marker(startCoords).addTo(mapInstance).bindPopup(`Entrée: ${startTime}`).openPopup();
+    }
+
+    // Add exit marker if coordinates are valid
+    if (endCoords !== defaultCoords) {
+         L.marker(endCoords).addTo(mapInstance).bindPopup(`Sortie: ${endTime}`).openPopup(); // Open exit popup by default
+    }
+
+
+    // Add polyline if both coordinates are valid
+    if (startCoords !== defaultCoords && endCoords !== defaultCoords) {
+        L.polyline([startCoords, endCoords], { color: 'blue' }).addTo(mapInstance);
+    }
+
+    // Invalidate size to fix map rendering issues in modal
+    setTimeout(() => {
+        if (mapInstance) {
+            mapInstance.invalidateSize();
+        }
+    }, 100); // Small delay to allow modal to be visible
+
+
 }
 
 function extractCoordinates(locationString) {
+     if (!locationString || locationString === 'Non enregistré') return null; // Return null if location is not recorded
+
     const match = locationString.match(/Lat:\s*(-?\d+\.\d+),\s*Lon:\s*(-?\d+\.\d+)/);
     if (match) {
         return [parseFloat(match[1]), parseFloat(match[2])];
     }
-    return [0, 0]; // fallback if parsing fails
+    return null; // Return null if parsing fails
 }
+
+// Function to check the latest entry status and update button states
+function checkLatestEntryStatus() {
+     makeAjaxRequest('get_latest_entry_status', {}, function(error, response) {
+        const btnEntree = document.getElementById('btn-entree');
+        const btnSortie = document.getElementById('btn-sortie');
+         const btnBreak = document.getElementById('btn-break');
+
+        if (error) {
+            console.error("Error checking latest entry status:", error);
+            // On error, default to disabling buttons for safety
+            updateButtonStates(false, false);
+             btnBreak.disabled = true;
+            return;
+        }
+
+        if (response.status === "success" && response.data) {
+            const hasEntry = response.data.has_entry;
+            const hasExit = response.data.has_exit;
+
+            updateButtonStates(hasEntry, hasExit);
+
+             // Enable break button only if entry exists and no exit recorded
+            if (hasEntry && !hasExit) {
+                 btnBreak.disabled = false;
+             } else {
+                 btnBreak.disabled = true;
+             }
+
+        } else {
+            console.error("Error in response data for latest entry status:", response.message);
+            // On error, default to disabling buttons for safety
+            updateButtonStates(false, false);
+            btnBreak.disabled = true;
+        }
+     });
+}
+
+// Function to update the disabled state of buttons
+function updateButtonStates(hasEntry, hasExit) {
+    const btnEntree = document.getElementById('btn-entree');
+    const btnSortie = document.getElementById('btn-sortie');
+    const btnBreak = document.getElementById('btn-break');
+
+
+    if (!btnEntree || !btnSortie || !btnBreak) return; // Exit if buttons not found
+
+    if (hasEntry && hasExit) {
+        // Both entry and exit recorded
+        btnEntree.disabled = true;
+        btnSortie.disabled = true;
+        btnBreak.disabled = true; // Disable break button
+    } else if (hasEntry && !hasExit) {
+        // Entry recorded, but not exit
+        btnEntree.disabled = true;
+        btnSortie.disabled = false;
+         btnBreak.disabled = false; // Enable break button
+    } else {
+        // No entry recorded for today
+        btnEntree.disabled = false;
+        btnSortie.disabled = true;
+        btnBreak.disabled = true; // Disable break button
+    }
+}
+
+
         document.addEventListener('DOMContentLoaded', function () {
-    const hamburgerButton = document.querySelector('.hamburger-menu');
-    const navLinks = document.querySelector('.nav-center'); // Select the container of the links
+    // Corrected selector to target the Bootstrap navbar toggler button
+    const hamburgerButton = document.querySelector('.navbar-toggler');
+    // Corrected selector to target the collapsible navbar content
+    const navLinks = document.getElementById('navbarNav');
 
     if (hamburgerButton && navLinks) {
         hamburgerButton.addEventListener('click', function () {
-            navLinks.classList.toggle('show'); // Toggle the 'show' class
+            // Bootstrap 4's JS handles the 'show' class toggle on the target element (#navbarNav)
+            // when the button with data-toggle="collapse" and data-target="#navbarNav" is clicked.
+            // You generally don't need to manually toggle the class here if Bootstrap JS is working.
+            // If Bootstrap JS is NOT being used for collapse, uncomment the line below:
+            // navLinks.classList.toggle('show');
         });
     }
+
+    // Added event listener to close the menu when a link is clicked in mobile view
+     const navLinkItems = navLinks.querySelectorAll('.nav-link');
+     navLinkItems.forEach(link => {
+         link.addEventListener('click', function() {
+             // Check if the navbar is currently expanded (has the 'show' class)
+             if (navLinks.classList.contains('show')) {
+                 // Trigger Bootstrap's collapse hide method if Bootstrap JS is available
+                 // This is the standard way to close the collapsible menu programmatically
+                 if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                      const collapseElement = document.getElementById('navbarNav');
+                      const collapse = new bootstrap.Collapse(collapseElement, { toggle: false });
+                      collapse.hide();
+                 } else if (typeof $ !== 'undefined' && $.fn.collapse) {
+                      // Fallback for older jQuery/Bootstrap 4 setups
+                     $('#navbarNav').collapse('hide');
+                 } else {
+                      // Manual class removal if Bootstrap JS is not available
+                      navLinks.classList.remove('show');
+                 }
+             }
+         });
+     });
 });
 </script>
 </body>
 </html>
-            
