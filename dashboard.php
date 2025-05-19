@@ -9,12 +9,10 @@ requireLogin();
 // 3. Get current user info
 $user = getCurrentUser();
 if ($user['role'] !== 'admin') {
-    // If not admin, redirect to a non-admin page or show an error
-    header('Location: timesheet.php'); // Or an appropriate page
+    header('Location: timesheet.php'); 
     exit;
 }
 
-// ... (PHP functions getDashboardStats, getRecentActivities, getAllEmployees remain the same) ...
 function getDashboardStats($conn) {
     $stats = [];
     try {
@@ -120,7 +118,7 @@ function getAllEmployees($conn) {
     return $employees;
 }
 
-$stats = getDashboardStats($conn);
+$stats = getDashboardStats($conn); 
 $activities = getRecentActivities($conn);
 $all_employees = getAllEmployees($conn);
 
@@ -137,7 +135,6 @@ $all_employees = getAllEmployees($conn);
      crossorigin=""/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
-        /* ... (All CSS from the previous response remains the same) ... */
         /* Basic Reset and Font */
         * {
             margin: 0;
@@ -205,39 +202,6 @@ $all_employees = getAllEmployees($conn);
         .shortcut-btn:hover i {
             color: #0056b3; 
         }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); 
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            padding: 20px; 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border: 1px solid #e5e5e5; 
-        }
-        .stat-card-title {
-            font-size: 15px; 
-            color: #6e6e73; 
-            margin-bottom: 8px; 
-            font-weight: 500;
-            text-align: center;
-        }
-        .stat-card-value {
-            font-size: 38px; 
-            font-weight: 600;
-            color: #1d1d1f; 
-        }
-        .stat-card.present .stat-card-value { color: #34c759; } 
-        .stat-card.absent .stat-card-value { color: #ff3b30; } 
-        .stat-card.pending .stat-card-value { color: #ff9500; } 
 
         .content-card {
             background-color: #ffffff;
@@ -352,7 +316,6 @@ $all_employees = getAllEmployees($conn);
         .action-button:hover { background-color: #0056b3; }
         .btn-sm { padding: .25rem .5rem; font-size: .875rem; line-height: 1.5; border-radius: .2rem;}
 
-
         .status-tag {
             display: inline-block; padding: 4px 10px; border-radius: 12px; 
             font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; color: white; 
@@ -368,7 +331,7 @@ $all_employees = getAllEmployees($conn);
             background-color: rgba(0,0,0,0.5); 
         }
         #mapModal.modal {
-            z-index: 1070; /* Ensure map modal is on top */
+            z-index: 1070; /* Ensures map modal is on top of other modals */
         }
         .modal-content {
             background-color: #ffffff; margin: 5% auto; 
@@ -379,32 +342,38 @@ $all_employees = getAllEmployees($conn);
         .modal-lg { max-width: 800px; } 
         .modal-xl { max-width: 1140px; } 
 
-        /* Ensure Bootstrap's default .close class is used for modal headers */
         .modal-header .close { 
             padding: 1rem 1rem;
             margin: -1rem -1rem -1rem auto;
-            /* Bootstrap default styling for '×' will apply */
+            /* Uses Bootstrap's default styling for '×' */
         }
-        /* If you use a custom span with class .close-button, style it similarly */
-        .close-button { 
-            color: #aaa; font-size: 28px; font-weight: 300; 
-            position: absolute; top: 15px; right: 20px; 
-            cursor: pointer; transition: color 0.2s;
-        }
-        .close-button:hover { color: #333; text-decoration: none;}
-
-
+        
         #map-modal-content-container { height: 350px; width: 100%; margin-bottom: 15px; }
         #map-modal-title { margin-bottom: 15px; font-size: 18px; font-weight: 600; }
         #map-modal-details p { margin-bottom: 5px; font-size: 14px; color: #333;}
         #map-modal-details strong { color: #1d1d1f; }
 
         .modal-alert { display: none; margin-bottom: 15px; }
+        
+        #congesAdminModal .nav-tabs .nav-link {
+            border-radius: 0.25rem 0.25rem 0 0;
+            color: #007bff;
+        }
+        #congesAdminModal .nav-tabs .nav-link.active {
+            color: #495057;
+            background-color: #fff;
+            border-color: #dee2e6 #dee2e6 #fff;
+            font-weight: bold;
+        }
+        #congesAdminModal .tab-content {
+            border: 1px solid #dee2e6;
+            border-top: none;
+            padding: 15px;
+            border-radius: 0 0 0.25rem 0.25rem;
+        }
 
         @media (max-width: 768px) {
             h1 { font-size: 24px; }
-            .stat-card { padding: 15px; }
-            .stat-card-value { font-size: 32px; }
             .content-card { padding: 20px; }
             h2 { font-size: 20px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
@@ -438,8 +407,6 @@ $all_employees = getAllEmployees($conn);
             .modal-content { margin: 10% auto; }
         }
         @media (max-width: 480px) {
-            .stats-grid { grid-template-columns: 1fr; } 
-            .stat-card-value { font-size: 28px; }
             table th, table td { padding: 8px 10px; font-size: 12px; }
             .modal-content { margin: 5% auto; width: 95%; padding: 15px;}
             #map-modal-content-container { height: 300px; }
@@ -473,25 +440,7 @@ $all_employees = getAllEmployees($conn);
             <button class="shortcut-btn" data-toggle="modal" data-target="#feuilleDeTempsModal">
                 <i class="fas fa-user-clock"></i>Feuille de Temps
             </button>
-            <button class="shortcut-btn" data-toggle="modal" data-target="#listeCongesModal">
-                <i class="fas fa-list-alt"></i>Liste Congés
-            </button>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card present">
-                <div class="stat-card-title">Employés présents</div>
-                <div class="stat-card-value" id="stats-employees-present"><?php echo htmlspecialchars($stats['employees_present']); ?></div>
             </div>
-            <div class="stat-card absent">
-                <div class="stat-card-title">Employés absents</div>
-                <div class="stat-card-value" id="stats-employees-absent"><?php echo htmlspecialchars($stats['employees_absent']); ?></div>
-            </div>
-            <div class="stat-card pending">
-                <div class="stat-card-title">Demandes de congé en attente</div>
-                <div class="stat-card-value" id="stats-pending-requests"><?php echo htmlspecialchars($stats['pending_requests']); ?></div>
-            </div>
-        </div>
 
         <div class="content-card">
             <h2>Dernières activités</h2>
@@ -541,26 +490,81 @@ $all_employees = getAllEmployees($conn);
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="congesAdminModalLabel">Administration des Congés - Demandes en Attente</h5>
+                    <h5 class="modal-title" id="congesAdminModalLabel">Gestion des Congés</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 </div>
                 <div class="modal-body">
-                    <div id="congesAdminAlert" class="alert modal-alert" role="alert" style="display:none;"></div>
-                    <div class="table-container">
-                        <table class="table table-striped table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Employé</th>
-                                    <th>Dates</th>
-                                    <th>Type</th>
-                                    <th>Durée</th>
-                                    <th>Document</th>
-                                    <th>Demandé le</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="congesAdminTableBody"></tbody>
-                        </table>
+                    <ul class="nav nav-tabs" id="congesAdminTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="approval-tab-link" data-toggle="tab" href="#leaveApprovalContent" role="tab" aria-controls="leaveApprovalContent" aria-selected="true">Approbation des Congés</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="list-all-leaves-tab-link" data-toggle="tab" href="#listAllLeavesContent" role="tab" aria-controls="listAllLeavesContent" aria-selected="false">Liste des Congés (Tous)</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content pt-3" id="congesAdminTabsContent">
+                        <div class="tab-pane fade show active" id="leaveApprovalContent" role="tabpanel" aria-labelledby="approval-tab-link">
+                            <h6 class="mt-2">Demandes en Attente</h6>
+                            <div id="congesAdminAlert" class="alert modal-alert" role="alert" style="display:none;"></div>
+                            <div class="table-container">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Employé</th>
+                                            <th>Dates</th>
+                                            <th>Type</th>
+                                            <th>Durée</th>
+                                            <th>Document</th>
+                                            <th>Demandé le</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="congesAdminTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="listAllLeavesContent" role="tabpanel" aria-labelledby="list-all-leaves-tab-link">
+                            <h6 class="mt-2">Consulter la Liste des Congés</h6>
+                            <div class="filter-controls">
+                                <div class="filter-item">
+                                    <label for="caLeaveEmployeeFilter">Employé:</label>
+                                    <select id="caLeaveEmployeeFilter" class="form-control form-control-sm">
+                                        <option value="">Tous</option>
+                                        <?php foreach ($all_employees as $emp): ?>
+                                            <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
+                                                <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="filter-item">
+                                    <label for="caLeaveMonthFilter">Mois:</label>
+                                    <input type="month" id="caLeaveMonthFilter" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
+                                </div>
+                                <div class="filter-item">
+                                    <label for="caLeaveDayFilter">Jour:</label>
+                                    <input type="date" id="caLeaveDayFilter" class="form-control form-control-sm">
+                                </div>
+                                <div class="filter-item export-button-group">
+                                    <button class="export-button btn-sm" onclick="exportTableToCSV('caListeCongesTable', 'liste_conges_admin_modal.csv')">Exporter CSV</button>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table id="caListeCongesTable" class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Employé</th>
+                                            <th>Type</th>
+                                            <th>Début</th>
+                                            <th>Fin</th>
+                                            <th>Durée</th>
+                                            <th>Statut</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="caListeCongesTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -678,61 +682,6 @@ $all_employees = getAllEmployees($conn);
         </div>
     </div>
 
-    <div class="modal fade" id="listeCongesModal" tabindex="-1" aria-labelledby="listeCongesModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="listeCongesModalLabel">Liste des Congés</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                </div>
-                <div class="modal-body">
-                     <div class="filter-controls">
-                        <div class="filter-item">
-                            <label for="leaveEmployeeFilterModal">Employé:</label>
-                            <select id="leaveEmployeeFilterModal" class="form-control form-control-sm">
-                                <option value="">Tous</option>
-                                 <?php foreach ($all_employees as $emp): ?>
-                                    <option value="<?php echo htmlspecialchars($emp['user_id']); ?>">
-                                        <?php echo htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="filter-item">
-                            <label for="leaveMonthFilterModal">Mois:</label>
-                            <input type="month" id="leaveMonthFilterModal" class="form-control form-control-sm" value="<?php echo date('Y-m'); ?>">
-                        </div>
-                        <div class="filter-item">
-                            <label for="leaveDayFilterModal">Jour:</label>
-                            <input type="date" id="leaveDayFilterModal" class="form-control form-control-sm">
-                        </div>
-                        <div class="filter-item export-button-group">
-                            <button class="export-button btn-sm" onclick="exportTableToCSV('leaveTableModal', 'liste_conges_modal.csv')">Exporter CSV</button>
-                        </div>
-                    </div>
-                    <div class="table-container">
-                        <table id="leaveTableModal" class="table table-striped table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Employé</th>
-                                    <th>Type</th>
-                                    <th>Début</th>
-                                    <th>Fin</th>
-                                    <th>Durée</th>
-                                    <th>Statut</th>
-                                </tr>
-                            </thead>
-                            <tbody id="leaveTableBodyModal"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <?php 
         if (file_exists('footer.php')) {
             include 'footer.php'; 
@@ -747,9 +696,6 @@ $all_employees = getAllEmployees($conn);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // --- Start of Custom JavaScript ---
-        // (All JavaScript functions from the previous response are included here, 
-        // they should be correct regarding string concatenation and logic)
         let map; 
         let currentMapMarkers = []; 
 
@@ -778,14 +724,16 @@ $all_employees = getAllEmployees($conn);
                         return response.json();
                     })
                     .then(data => {
-                        if (data.status === 'success') {
-                            document.getElementById('stats-employees-present').textContent = data.data.stats.employees_present;
-                            document.getElementById('stats-employees-absent').textContent = data.data.stats.employees_absent;
-                            document.getElementById('stats-pending-requests').textContent = data.data.stats.pending_requests;
-                            updateActivitiesTable(data.data.activities);
+                        if (data.status === 'success' && data.data) { // Ensure data.data exists
+                            // The stat cards are removed, so no need to update their specific elements by ID here
+                            // document.getElementById('stats-employees-present').textContent = data.data.stats.employees_present;
+                            // document.getElementById('stats-employees-absent').textContent = data.data.stats.employees_absent;
+                            // document.getElementById('stats-pending-requests').textContent = data.data.stats.pending_requests;
+                            if (data.data.activities) { // Check if activities exist
+                                updateActivitiesTable(data.data.activities);
+                            }
                         } else {
-                            console.error('Error from handler (status not success):', data.message);
-                            displayGlobalError("Impossible de rafraîchir les données du tableau de bord: " + (data.message || "Erreur inconnue"));
+                            console.error('Error from handler or missing data:', data.message);
                         }
                     })
                     .catch(error => {
@@ -1078,15 +1026,15 @@ $all_employees = getAllEmployees($conn);
             }
         }
         
-        function loadLeaveDataForModal() {
+        function loadAllLeavesForCongesAdminModal() {
             try {
-                const employeeFilter = $('#leaveEmployeeFilterModal');
-                const monthFilter = $('#leaveMonthFilterModal');
-                const dayFilter = $('#leaveDayFilterModal');
-                const tbody = $('#leaveTableBodyModal');
+                const employeeFilter = $('#caLeaveEmployeeFilter');
+                const monthFilter = $('#caLeaveMonthFilter');
+                const dayFilter = $('#caLeaveDayFilter');
+                const tbody = $('#caListeCongesTableBody');
 
                 if (!employeeFilter.length || !monthFilter.length || !dayFilter.length || !tbody.length) {
-                    console.error("Modal filter or table body elements not found for Leave modal.");
+                    console.error("Filter or table body elements not found for 'Liste des Congés (Tous)' tab.");
                     if(tbody.length) tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>');
                     return;
                 }
@@ -1096,7 +1044,7 @@ $all_employees = getAllEmployees($conn);
                 tbody.html('<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
-                    action: 'get_monthly_leaves',
+                    action: 'get_monthly_leaves', 
                     employee_id: employeeId
                 };
                 
@@ -1110,7 +1058,7 @@ $all_employees = getAllEmployees($conn);
                 }
 
                 $.ajax({
-                    url: 'dashboard-handler.php',
+                    url: 'dashboard-handler.php', 
                     type: 'GET',
                     data: ajaxData, 
                     dataType: 'json',
@@ -1135,13 +1083,13 @@ $all_employees = getAllEmployees($conn);
                         }
                     },
                     error: function(xhr) {
-                        console.error("AJAX error loading leaves for modal:", xhr.responseText);
+                        console.error("AJAX error loading all leaves for Conges Admin modal:", xhr.responseText);
                         tbody.html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur de communication.</td></tr>');
                     }
                 });
             } catch (e) {
-                 console.error("Error in loadLeaveDataForModal:", e);
-                 $('#leaveTableBodyModal').html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
+                 console.error("Error in loadAllLeavesForCongesAdminModal:", e);
+                 $('#caListeCongesTableBody').html('<tr><td colspan="6" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
             }
         }
         
@@ -1223,8 +1171,6 @@ $all_employees = getAllEmployees($conn);
                 }
                 
                 $('#mapModal').modal('show'); 
-                
-                // No longer using setTimeout for invalidateSize, relying on 'shown.bs.modal'
             } catch (e) {
                 console.error("Error in showTimesheetMapModal:", e);
                  if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
@@ -1232,23 +1178,15 @@ $all_employees = getAllEmployees($conn);
             }
         }
         
-        function closeMapModal() { // This function is directly called by the map modal's original close button
-            try {
-                $('#mapModal').modal('hide'); 
-                // Cleanup will be handled by 'hidden.bs.modal'
-            } catch (e) {
-                console.error("Error in closeMapModal (invoking hide):", e);
-            }
-        }
-        
-        function cleanupMapResources() { // Centralized cleanup
+        function cleanupMapResources() { 
              try {
                 if (currentMapMarkers && currentMapMarkers.length > 0) {
                     currentMapMarkers.forEach(marker => marker.remove());
                     currentMapMarkers = [];
                 }
                 if (map) {
-                    map.remove();
+                    map.off(); // Unbind all event listeners
+                    map.remove(); // Remove map from DOM
                     map = null;
                 }
             } catch(e) {
@@ -1302,7 +1240,20 @@ $all_employees = getAllEmployees($conn);
                 refreshDashboardData(); 
                 
                 $('#congesAdminModal').on('show.bs.modal', function () {
-                    loadPendingLeaveRequestsForModal();
+                    loadPendingLeaveRequestsForModal(); 
+                    $('#caLeaveEmployeeFilter').val(''); 
+                    $('#caLeaveMonthFilter').val('<?php echo date('Y-m'); ?>'); 
+                    $('#caLeaveDayFilter').val('');
+                    $('#caListeCongesTableBody').html('<tr><td colspan="6" style="text-align:center;">Sélectionnez les filtres pour afficher la liste.</td></tr>');
+                });
+
+                $('a[data-toggle="tab"][href="#listAllLeavesContent"]').on('shown.bs.tab', function (e) {
+                    loadAllLeavesForCongesAdminModal();
+                });
+
+                $('#caLeaveEmployeeFilter, #caLeaveMonthFilter, #caLeaveDayFilter').on('change', loadAllLeavesForCongesAdminModal);
+                $('#caLeaveMonthFilter').on('change', function() {
+                    $('#caLeaveDayFilter').val(''); 
                 });
 
                 $('#feuilleDeTempsModal').on('show.bs.modal', function () {
@@ -1310,13 +1261,6 @@ $all_employees = getAllEmployees($conn);
                     $('#timesheetMonthFilterModal').val('<?php echo date('Y-m'); ?>'); 
                     $('#timesheetDayFilterModal').val(''); 
                     loadTimesheetDataForModal();
-                });
-
-                $('#listeCongesModal').on('show.bs.modal', function () {
-                    $('#leaveEmployeeFilterModal').val(''); 
-                    $('#leaveMonthFilterModal').val('<?php echo date('Y-m'); ?>'); 
-                    $('#leaveDayFilterModal').val(''); 
-                    loadLeaveDataForModal();
                 });
 
                 $('#eventCreationModal').on('show.bs.modal', function () {
@@ -1341,35 +1285,25 @@ $all_employees = getAllEmployees($conn);
                 });
 
                 $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal, #timesheetDayFilterModal').on('change', loadTimesheetDataForModal);
-                $('#leaveEmployeeFilterModal, #leaveMonthFilterModal, #leaveDayFilterModal').on('change', loadLeaveDataForModal);
-
+                
                 $('#timesheetMonthFilterModal').on('change', function() {
                     $('#timesheetDayFilterModal').val(''); 
                 });
-                $('#leaveMonthFilterModal').on('change', function() {
-                    $('#leaveDayFilterModal').val(''); 
-                });
-
-                 // Centralized map cleanup when mapModal is hidden for any reason
+                
                 $('#mapModal').on('hidden.bs.modal', function () {
                     cleanupMapResources();
                 });
-                // Ensure map resizes after it's fully shown if Leaflet is loaded
                 $('#mapModal').on('shown.bs.modal', function() {
-                    if (typeof L !== 'undefined' && map) { // Check if L and map are defined
+                    if (typeof L !== 'undefined' && map) { 
                         map.invalidateSize();
                     }
                 });
-
 
             } catch (e) {
                 console.error("Error in DOMContentLoaded:", e);
                 displayGlobalError("Erreur lors de l'initialisation de la page.");
             }
         });
-
-        // Removed the global window.onclick for map modal as Bootstrap's data-dismiss and 'hidden.bs.modal' are preferred.
-        // --- End of Custom JavaScript ---
     </script>
 </body>
 </html>
