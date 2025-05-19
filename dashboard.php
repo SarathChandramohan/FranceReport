@@ -448,7 +448,7 @@ $all_employees = getAllEmployees($conn);
     ?>
 
     <div class="container">
-        <h1>Tableau de bord Administrateur</h1>
+        <h1>Administrateur</h1>
 
         <div class="shortcut-buttons-grid">
             <button class="shortcut-btn" data-toggle="modal" data-target="#congesAdminModal">
