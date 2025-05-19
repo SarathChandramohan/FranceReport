@@ -1,22 +1,17 @@
 <?php
 // dashboard-handler.php - AJAX handler for dashboard statistics and data
 
-// Enable error logging to a file, disable direct display of errors to avoid breaking JSON
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // DO NOT display errors to browser
+ini_set('display_errors', 0); 
 ini_set('log_errors', 1);
 // Ensure this path is writable by the web server if you uncomment it:
-// ini_set('error_log', __DIR__ . '/php-error.log'); // Log errors to a file in the same directory
+// ini_set('error_log', __DIR__ . '/php-error.log'); 
 
-// Include database connection and session management
-require_once 'db-connection.php'; // This already has a try-catch for connection
+require_once 'db-connection.php'; 
 require_once 'session-management.php';
 
-// --- Critical: Ensure this script ALWAYS returns JSON ---
-// Set content type to JSON at the very beginning
 header('Content-Type: application/json');
 
-// --- Session and Authorization Check ---
 if (!isLoggedIn()) {
     respondWithError('Session expirée ou non authentifié. Veuillez vous reconnecter.');
     exit;
@@ -27,14 +22,9 @@ if ($currentUser['role'] !== 'admin') {
     respondWithError('Accès non autorisé. Cette section est réservée aux administrateurs.');
     exit;
 }
-// --- End Session and Authorization Check ---
 
-
-// Get the action from the GET request
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// Handle different actions
-// Wrap the main switch in a try-catch to catch any unexpected errors
 try {
     switch ($action) {
         case 'get_dashboard_all_data':
@@ -49,39 +39,27 @@ try {
         default:
             respondWithError('Action non valide spécifiée: ' . htmlspecialchars($action));
     }
-} catch (Throwable $e) { // Catch all throwables (PHP 7+)
+} catch (Throwable $e) { 
     error_log("Unhandled error in dashboard-handler.php: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
     respondWithError('Une erreur interne du serveur est survenue. Veuillez réessayer plus tard.');
 }
 
-
-/**
- * Gets all dashboard data: stats and recent activities
- */
 function getDashboardAllData() {
     global $conn; 
-    
     $stats = getDashboardStats($conn);
     $activities = getRecentActivities($conn);
-    
     respondWithSuccess('Données du tableau de bord récupérées avec succès.', [
         'stats' => $stats,
         'activities' => $activities
     ]);
 }
 
-
-/**
- * Gets dashboard statistics
- * @param PDO $conn Database connection
- * @return array Array of statistics
- */
 function getDashboardStats($conn) {
+    // ... (same as previous version) ...
     $stats = [];
     $today = date('Y-m-d');
     
     try {
-        // Employees present today
         $stmt = $conn->prepare("
             SELECT COUNT(DISTINCT user_id) AS present_count
             FROM Timesheet
@@ -91,9 +69,6 @@ function getDashboardStats($conn) {
         $stmt->execute([':today' => $today, ':today_alt' => $today]);
         $stats['employees_present'] = $stmt->fetch(PDO::FETCH_ASSOC)['present_count'] ?? 0;
         
-        // Employees absent today
-        // This logic might need refinement based on how "absent" is truly defined
-        // (e.g., not on approved leave and no timesheet entry)
         $stmt = $conn->prepare("
             SELECT COUNT(DISTINCT u.user_id) AS absent_count
             FROM Users u
@@ -104,7 +79,6 @@ function getDashboardStats($conn) {
         $stmt->execute([':today' => $today]);
         $stats['employees_absent'] = $stmt->fetch(PDO::FETCH_ASSOC)['absent_count'] ?? 0;
         
-        // Pending leave requests for the current month
         $stmt = $conn->prepare("
             SELECT COUNT(conge_id) AS pending_requests_count
             FROM Conges
@@ -121,12 +95,8 @@ function getDashboardStats($conn) {
     }
 }
 
-/**
- * Gets recent activities for the dashboard
- * @param PDO $conn Database connection
- * @return array Array of recent activities
- */
 function getRecentActivities($conn) {
+    // ... (same as previous version) ...
     try {
         $sql = "
             WITH CombinedActivities AS (
@@ -138,7 +108,7 @@ function getRecentActivities($conn) {
                         ELSE 'Activité de pointage' 
                     END AS action,
                     COALESCE(t.logoff_time, t.logon_time) AS action_time,
-                    1 AS sort_priority -- Higher priority for timesheet
+                    1 AS sort_priority 
                 FROM Timesheet t
                 INNER JOIN Users u ON t.user_id = u.user_id
                 WHERE t.logon_time IS NOT NULL OR t.logoff_time IS NOT NULL
@@ -149,7 +119,7 @@ function getRecentActivities($conn) {
                     u.prenom + ' ' + u.nom AS employee_name,
                     'Demande de congé (' + c.type_conge + ')' AS action,
                     c.date_demande AS action_time,
-                    2 AS sort_priority -- Lower priority for conges
+                    2 AS sort_priority
                 FROM Conges c
                 INNER JOIN Users u ON c.user_id = u.user_id
             )
@@ -166,7 +136,7 @@ function getRecentActivities($conn) {
             foreach ($activities as $activity) {
                 $timestamp = strtotime($activity['action_time']);
                 $formattedActivities[] = [
-                    'employee_name' => $activity['employee_name'],
+                    'employee_name' => $activity['employee_name'], 
                     'action' => $activity['action'],
                     'date' => date('d/m/Y', $timestamp),
                     'hour' => date('H:i', $timestamp)
@@ -177,27 +147,31 @@ function getRecentActivities($conn) {
         
     } catch (PDOException $e) {
         error_log("PDO Error in getRecentActivities: " . $e->getMessage());
-        return [['error' => 'Database error in activities']];
+        return [['error' => 'Database error in activities']]; 
     }
 }
 
-/**
- * Gets monthly timesheet data, filterable by employee, month/year, and specific day
- */
 function getMonthlyTimesheetData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
-    $monthYear = isset($_GET['month_year']) ? $_GET['month_year'] : date('Y-m'); 
+    // Default to current month if month_year is empty but specific_day is also empty
+    $monthYear = (isset($_GET['month_year']) && !empty($_GET['month_year'])) ? $_GET['month_year'] : date('Y-m');
     $specificDay = isset($_GET['specific_day']) && !empty($_GET['specific_day']) ? $_GET['specific_day'] : null;
 
     if ($specificDay && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $specificDay)) {
         respondWithError("Format de jour invalide. Utilisez YYYY-MM-DD.");
         return;
     }
-    if (!$specificDay && !preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
-        respondWithError("Format de mois invalide. Utilisez YYYY-MM.");
+    // monthYear is only strictly required if specificDay is not set.
+    if (!$specificDay && ($monthYear && !preg_match('/^\d{4}-\d{2}$/', $monthYear))) {
+        respondWithError("Format de mois invalide. Utilisez YYYY-MM ou laissez vide si un jour est sélectionné.");
         return;
     }
+    if (!$specificDay && !$monthYear) {
+         respondWithError("Veuillez sélectionner un mois ou un jour spécifique.");
+        return;
+    }
+
 
     try {
         $sql = "SELECT 
@@ -222,7 +196,7 @@ function getMonthlyTimesheetData() {
         if ($specificDay) {
             $sql .= " AND t.entry_date = :specific_day";
             $params[':specific_day'] = $specificDay;
-        } else { 
+        } elseif ($monthYear) { // Only use monthYear if specificDay is not set
             list($year, $month) = explode('-', $monthYear);
             $sql .= " AND MONTH(t.entry_date) = :month_val AND YEAR(t.entry_date) = :year_val";
             $params[':month_val'] = $month;
@@ -265,21 +239,22 @@ function getMonthlyTimesheetData() {
     }
 }
 
-/**
- * Gets monthly leave data, filterable by employee, month/year, and specific day
- */
 function getMonthlyLeaveData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
-    $monthYear = isset($_GET['month_year']) ? $_GET['month_year'] : date('Y-m');
+    $monthYear = (isset($_GET['month_year']) && !empty($_GET['month_year'])) ? $_GET['month_year'] : date('Y-m');
     $specificDay = isset($_GET['specific_day']) && !empty($_GET['specific_day']) ? $_GET['specific_day'] : null;
 
     if ($specificDay && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $specificDay)) {
         respondWithError("Format de jour invalide. Utilisez YYYY-MM-DD.");
         return;
     }
-    if (!$specificDay && !preg_match('/^\d{4}-\d{2}$/', $monthYear)) {
-        respondWithError("Format de mois invalide. Utilisez YYYY-MM.");
+    if (!$specificDay && ($monthYear && !preg_match('/^\d{4}-\d{2}$/', $monthYear))) {
+        respondWithError("Format de mois invalide. Utilisez YYYY-MM ou laissez vide si un jour est sélectionné.");
+        return;
+    }
+     if (!$specificDay && !$monthYear) {
+         respondWithError("Veuillez sélectionner un mois ou un jour spécifique.");
         return;
     }
     
@@ -301,7 +276,7 @@ function getMonthlyLeaveData() {
         if ($specificDay) {
             $sql .= " AND :specific_day BETWEEN c.date_debut AND c.date_fin";
             $params[':specific_day'] = $specificDay;
-        } else { 
+        } elseif ($monthYear) { 
             list($year, $month) = explode('-', $monthYear);
             $firstDayOfMonth = "$year-$month-01";
             $lastDayOfMonth = date("Y-m-t", strtotime($firstDayOfMonth));
@@ -344,17 +319,17 @@ function getMonthlyLeaveData() {
     }
 }
 
-/** Helper function to get display name for leave type */
 function getTypeCongeDisplayName($typeKey) {
+    // ... (same as previous version) ...
     $types = [
         'cp' => 'Congés Payés', 'rtt' => 'RTT', 'sans-solde' => 'Congé Sans Solde',
         'special' => 'Congé Spécial', 'maladie' => 'Congé Maladie'
     ];
-    return $types[$typeKey] ?? ucfirst(str_replace('_', ' ', $typeKey)); // More generic fallback
+    return $types[$typeKey] ?? ucfirst(str_replace('_', ' ', $typeKey));
 }
 
-/** Helper function to get display name for status */
 function getStatusDisplayName($statusKey) {
+    // ... (same as previous version) ...
     $statuses = [
         'pending' => 'En attente', 'approved' => 'Approuvé',
         'rejected' => 'Refusé', 'cancelled' => 'Annulé'
@@ -362,12 +337,8 @@ function getStatusDisplayName($statusKey) {
     return $statuses[$statusKey] ?? ucfirst($statusKey);
 }
 
-/**
- * Sends a success response with JSON
- * @param string $message Success message
- * @param array $data Optional data to include in the response
- */
 function respondWithSuccess($message, $data = []) {
+    // ... (same as previous version) ...
     echo json_encode([
         'status' => 'success',
         'message' => $message,
@@ -376,11 +347,8 @@ function respondWithSuccess($message, $data = []) {
     exit;
 }
 
-/**
- * Sends an error response with JSON
- * @param string $message Error message
- */
 function respondWithError($message) {
+    // ... (same as previous version) ...
     error_log("Responding with error (dashboard-handler): " . $message);
     echo json_encode([
         'status' => 'error',
