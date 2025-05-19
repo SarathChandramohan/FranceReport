@@ -126,7 +126,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
 </head>
 <body>
 
-<?php include 'navbar.php'; ?>
+
 
 <div class="container-fluid mt-4" id="main-content-area">
     <h2>Tableau de Bord des Employés</h2>
