@@ -14,12 +14,11 @@ if ($user['role'] !== 'admin') {
     exit;
 }
 
-// 4. Get dashboard statistics
+// ... (PHP functions getDashboardStats, getRecentActivities, getAllEmployees remain the same) ...
 function getDashboardStats($conn) {
     $stats = [];
     try {
         $today = date('Y-m-d');
-        // Employees present today
         $stmt = $conn->prepare("
             SELECT COUNT(DISTINCT user_id) AS present_count
             FROM Timesheet
@@ -29,7 +28,6 @@ function getDashboardStats($conn) {
         $stmt->execute([':today' => $today, ':today_alt' => $today]);
         $stats['employees_present'] = $stmt->fetch(PDO::FETCH_ASSOC)['present_count'] ?? 0;
         
-        // Employees absent today
         $stmt = $conn->prepare("
             SELECT COUNT(DISTINCT u.user_id) AS absent_count
             FROM Users u
@@ -40,7 +38,6 @@ function getDashboardStats($conn) {
         $stmt->execute([':today' => $today]);
         $stats['employees_absent'] = $stmt->fetch(PDO::FETCH_ASSOC)['absent_count'] ?? 0;
         
-        // Pending leave requests for the current month
         $stmt = $conn->prepare("
             SELECT COUNT(conge_id) AS pending_requests_count
             FROM Conges
@@ -56,7 +53,6 @@ function getDashboardStats($conn) {
     }
 }
 
-// 5. Get recent activities
 function getRecentActivities($conn) {
     $activities = [];
     try {
@@ -112,7 +108,6 @@ function getRecentActivities($conn) {
     }
 }
 
-// 6. Get all employees for filter dropdowns
 function getAllEmployees($conn) {
     $employees = [];
     try {
@@ -125,7 +120,6 @@ function getAllEmployees($conn) {
     return $employees;
 }
 
-// 7. Get statistics, activities, and employees
 $stats = getDashboardStats($conn);
 $activities = getRecentActivities($conn);
 $all_employees = getAllEmployees($conn);
@@ -143,6 +137,7 @@ $all_employees = getAllEmployees($conn);
      crossorigin=""/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
+        /* ... (All CSS from the previous response remains the same) ... */
         /* Basic Reset and Font */
         * {
             margin: 0;
@@ -372,8 +367,8 @@ $all_employees = getAllEmployees($conn);
             left: 0; top: 0; width: 100%; height: 100%; overflow: auto; 
             background-color: rgba(0,0,0,0.5); 
         }
-        #mapModal.modal { /* Ensure map modal is on top of other modals */
-            z-index: 1070; 
+        #mapModal.modal {
+            z-index: 1070; /* Ensure map modal is on top */
         }
         .modal-content {
             background-color: #ffffff; margin: 5% auto; 
@@ -384,10 +379,20 @@ $all_employees = getAllEmployees($conn);
         .modal-lg { max-width: 800px; } 
         .modal-xl { max-width: 1140px; } 
 
+        /* Ensure Bootstrap's default .close class is used for modal headers */
         .modal-header .close { 
             padding: 1rem 1rem;
             margin: -1rem -1rem -1rem auto;
+            /* Bootstrap default styling for '×' will apply */
         }
+        /* If you use a custom span with class .close-button, style it similarly */
+        .close-button { 
+            color: #aaa; font-size: 28px; font-weight: 300; 
+            position: absolute; top: 15px; right: 20px; 
+            cursor: pointer; transition: color 0.2s;
+        }
+        .close-button:hover { color: #333; text-decoration: none;}
+
 
         #map-modal-content-container { height: 350px; width: 100%; margin-bottom: 15px; }
         #map-modal-title { margin-bottom: 15px; font-size: 18px; font-weight: 600; }
@@ -523,7 +528,9 @@ $all_employees = getAllEmployees($conn);
 
     <div id="mapModal" class="modal fade"> 
         <div class="modal-content">
-            <span class="close-button" onclick="closeMapModal()">&times;</span>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
             <h3 id="map-modal-title">Localisation Pointage</h3>
             <div id="map-modal-content-container"></div>
             <div id="map-modal-details"></div>
@@ -741,6 +748,8 @@ $all_employees = getAllEmployees($conn);
 
     <script>
         // --- Start of Custom JavaScript ---
+        // (All JavaScript functions from the previous response are included here, 
+        // they should be correct regarding string concatenation and logic)
         let map; 
         let currentMapMarkers = []; 
 
@@ -917,7 +926,7 @@ $all_employees = getAllEmployees($conn);
         function rejectLeaveFromModal(leaveId) {
             try {
                 const commentaire = prompt("Motif du refus (obligatoire):");
-                if (commentaire === null) return; // User cancelled
+                if (commentaire === null) return; 
                 if (!commentaire.trim()) { 
                     displayModalAlert('congesAdminModal', 'Un motif de refus est requis.', 'warning');
                     return;
@@ -1215,11 +1224,7 @@ $all_employees = getAllEmployees($conn);
                 
                 $('#mapModal').modal('show'); 
                 
-                $('#mapModal').on('shown.bs.modal', function() {
-                    if (map) {
-                        map.invalidateSize();
-                    }
-                });
+                // No longer using setTimeout for invalidateSize, relying on 'shown.bs.modal'
             } catch (e) {
                 console.error("Error in showTimesheetMapModal:", e);
                  if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
@@ -1227,14 +1232,27 @@ $all_employees = getAllEmployees($conn);
             }
         }
         
-        function closeMapModal() {
+        function closeMapModal() { // This function is directly called by the map modal's original close button
             try {
                 $('#mapModal').modal('hide'); 
-                currentMapMarkers.forEach(marker => marker.remove());
-                currentMapMarkers = [];
-                if (map) { map.remove(); map = null; }
+                // Cleanup will be handled by 'hidden.bs.modal'
             } catch (e) {
-                console.error("Error in closeMapModal:", e);
+                console.error("Error in closeMapModal (invoking hide):", e);
+            }
+        }
+        
+        function cleanupMapResources() { // Centralized cleanup
+             try {
+                if (currentMapMarkers && currentMapMarkers.length > 0) {
+                    currentMapMarkers.forEach(marker => marker.remove());
+                    currentMapMarkers = [];
+                }
+                if (map) {
+                    map.remove();
+                    map = null;
+                }
+            } catch(e) {
+                console.error("Error during map resource cleanup:", e);
             }
         }
         
@@ -1332,8 +1350,13 @@ $all_employees = getAllEmployees($conn);
                     $('#leaveDayFilterModal').val(''); 
                 });
 
-                 $('#mapModal').on('shown.bs.modal', function() { // Ensure map resizes after it's fully shown
-                    if (map) {
+                 // Centralized map cleanup when mapModal is hidden for any reason
+                $('#mapModal').on('hidden.bs.modal', function () {
+                    cleanupMapResources();
+                });
+                // Ensure map resizes after it's fully shown if Leaflet is loaded
+                $('#mapModal').on('shown.bs.modal', function() {
+                    if (typeof L !== 'undefined' && map) { // Check if L and map are defined
                         map.invalidateSize();
                     }
                 });
@@ -1345,12 +1368,7 @@ $all_employees = getAllEmployees($conn);
             }
         });
 
-        window.onclick = function(event) {
-            const mapModalElement = document.getElementById('mapModal');
-            if (event.target == mapModalElement) { 
-                closeMapModal(); 
-            }
-        }
+        // Removed the global window.onclick for map modal as Bootstrap's data-dismiss and 'hidden.bs.modal' are preferred.
         // --- End of Custom JavaScript ---
     </script>
 </body>
