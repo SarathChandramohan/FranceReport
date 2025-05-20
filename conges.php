@@ -397,9 +397,9 @@ $user = getCurrentUser();
             <!-- Tabs for Leave Management -->
             <div class="tabs-container">
                 <div class="tabs-nav">
-                   <?php if ($user['role'] == 'admin'): ?>
+                    <!-- <?php if ($user['role'] == 'admin'): ?>
         <button class="tab-button" onclick="openTab('admin-approvals')">Administration</button>
-        <?php endif; ?> 
+        <?php endif; ?> -->
         <button class="tab-button active" onclick="openTab('new-leave')">Nouvelle Demande</button>
         <button class="tab-button" onclick="openTab('leave-history')">Historique des Demandes</button>
         
