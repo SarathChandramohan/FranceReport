@@ -154,13 +154,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
 </head>
 <body>
 
-<?php
-    if (file_exists('navbar.php')) {
-        include 'navbar.php';
-    } else {
-        echo '<p class="text-danger text-center">Erreur: Le fichier navbar.php est introuvable.</p>';
-    }
-?>
+
 
 <div class="container-fluid mt-4" id="main-content-area">
     <?php
