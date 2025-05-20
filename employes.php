@@ -242,8 +242,8 @@ function renderStats(stats, userRoleForStats) {
 
     const statTypes = [
         { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: true },
-        { key: 'assigned_today', label: 'Assignés Aujourd\'hui (Planning)', icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: true },
-        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: true }, 
+        { key: 'assigned_today', label: 'Assignés Aujourd\'hui (Planning)', icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: true }, // label contains a single quote
+        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: true },
         { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: true },
         { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: true }
     ];
@@ -251,12 +251,15 @@ function renderStats(stats, userRoleForStats) {
     statTypes.forEach(type => {
         if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
             const count = parseInt(stats[type.key], 10) || 0;
-            const canBeClickedByRole = type.adminOnly ? isAdmin : true; 
-            const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero); 
-            
-            const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : (type.key === 'total_employees' && isAdmin ? `showInitialEmployeeList()` : '');
-            const cardClass = `stat-card ${type.cssClass} ${(isClickable || (type.key === 'total_employees' && isAdmin)) ? 'clickable' : ''}`;
+            const canBeClickedByRole = type.adminOnly ? isAdmin : true;
+            const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero);
 
+            // Escape the label for use within a JavaScript string literal
+            // This will replace ' with \'
+            const escapedLabelForJSString = type.label.replace(/'/g, "\\'");
+
+            const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${escapedLabelForJSString}')` : (type.key === 'total_employees' && isAdmin ? `showInitialEmployeeList()` : '');
+            const cardClass = `stat-card ${type.cssClass} ${(isClickable || (type.key === 'total_employees' && isAdmin)) ? 'clickable' : ''}`;
 
             html += `<div class="${cardClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''}>
                         <div class="stat-icon"><i class="${type.icon}"></i></div>
