@@ -45,13 +45,14 @@ $initial_employee_list = getInitialEmployeeList($conn);
             background-color: #f5f5f7;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             color: #1d1d1f;
+            /* Adjust this value to the EXACT height of your navbar. */
             padding-top: 80px; /* Increased to ensure navbar content is not overlapped */
             display: flex;
             flex-direction: column; 
         }
         .container-fluid {
             flex-grow: 1; 
-            padding-bottom: 20px; /* Add some padding at the bottom */
+            padding-bottom: 20px;
         }
         .card {
             background-color: #ffffff;
@@ -95,13 +96,13 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
         .stat-card.total-employees { border-left-color: #007bff; }
         .stat-card.total-employees .stat-icon { color: #007bff; }
-        .stat-card.assigned-today { border-left-color: #ff9500; } 
+        .stat-card.assigned-today { border-left-color: #ff9500; } /* Orange */
         .stat-card.assigned-today .stat-icon { color: #ff9500; }
-        .stat-card.active-today { border-left-color: #34c759; } 
+        .stat-card.active-today { border-left-color: #34c759; } /* Green */
         .stat-card.active-today .stat-icon { color: #34c759; }
-        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } 
+        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } /* Purple */
         .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
-        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } 
+        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } /* Red */
         .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
 
         .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; background-color: #fff; }
@@ -216,7 +217,10 @@ function fetchEmployeeStats() {
 
     fetch('employee_handler.php?action=get_employee_overview_stats')
     .then(response => {
-        if (!response.ok) return response.text().then(text => { throw new Error('Network error: ' + response.status + ' ' + text.substring(0,100))});
+        if (!response.ok) return response.text().then(text => { 
+            console.error("Fetch stats raw error response:", text);
+            throw new Error('Network error: ' + response.status + ' ' + text.substring(0,100))
+        });
         return response.json();
     })
     .then(data => {
@@ -242,7 +246,7 @@ function renderStats(stats, userRoleForStats) {
     const statTypes = [
         { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: false },
         { key: 'assigned_today', label: 'Assignés Aujourd\'hui (Planning)', icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: false },
-        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: false },
+        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: false }, // Non-admin can see this count, and list
         { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: false },
         { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: false }
     ];
@@ -250,10 +254,7 @@ function renderStats(stats, userRoleForStats) {
     statTypes.forEach(type => {
         if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
             const count = parseInt(stats[type.key], 10) || 0;
-            // Card is clickable if adminOnly is true OR if it's not adminOnly (meaning general users can click too, like 'active_today')
-            // And if count > 0 or clickableIfZero is true.
-            // Total Employees is generally not clickable to a list.
-            const canBeClickedByRole = type.adminOnly ? isAdmin : true;
+            const canBeClickedByRole = type.adminOnly ? isAdmin : true; // User can click 'active_today'
             const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero) && type.key !== 'total_employees';
             
             const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : '';
@@ -278,43 +279,53 @@ function showInitialEmployeeList() {
     const backButton = document.getElementById('backToListButton');
     if (titleEl) titleEl.textContent = 'Liste Générale des Employés Actifs';
     if (backButton) backButton.style.display = 'none';
-    renderEmployeeTable(initialEmployeeData, 'total_employees'); // Use 'total_employees' as a general type
+    renderEmployeeTable(initialEmployeeData, 'total_employees');
 }
 
 function loadFilteredEmployeeList(statType, title) {
+    console.log(`Attempting to load list for: ${statType}`);
     const titleEl = document.getElementById('employeeListTitle');
     const backButton = document.getElementById('backToListButton');
     if (titleEl) titleEl.textContent = title;
     if (backButton) backButton.style.display = 'inline-block';
 
     const tableBody = document.getElementById('employees-table-body');
-    if (!tableBody) return;
+    if (!tableBody) {
+        console.error("Table body not found for list rendering.");
+        return;
+    }
 
-    // Determine colspan before clearing table body
-    let colspan = 4; // Default: Nom, Prénom, Email, Rôle
-    if (statType === 'assigned_today') {
-        colspan = 5; // Add Mission
-    } else if (statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
-        colspan = 5; // Add Type de congé
+    let colspan = 4; 
+    if (statType === 'assigned_today' || statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
+        colspan = 5; 
     }
     
-    tableBody.innerHTML = `<tr><td colspan="${colspan}" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
     setTableHeaders(statType); 
-
+    tableBody.innerHTML = `<tr><td colspan="${colspan}" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
+    
+    console.log(`Workspaceing: employee_handler.php?action=get_employee_list_for_stat&type=${statType}`);
     fetch(`employee_handler.php?action=get_employee_list_for_stat&type=${statType}`)
         .then(response => {
-            if (!response.ok) return response.text().then(text => { throw new Error('Network error: ' + response.status + ' ' + text.substring(0,100))});
+            console.log(`Response status for ${statType}: ${response.status}`);
+            if (!response.ok) {
+                return response.text().then(text => { 
+                    console.error(`Network error text for ${statType}:`, text);
+                    throw new Error('Network error: ' + response.status + ' ' + text.substring(0,200));
+                });
+            }
             return response.json();
         })
         .then(data => {
+            console.log(`Data received for ${statType}:`, data);
             if (data.status === 'success' && data.employees) {
                 renderEmployeeTable(data.employees, statType);
             } else {
+                console.error(`Error in data for ${statType}: ${data.message}`);
                 tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
             }
         })
         .catch(error => {
-            console.error('Fetch filtered list error:', error);
+            console.error(`Workspace catch error for ${statType}:`, error);
             tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur de communication: ${error.message}</td></tr>`;
         });
 }
@@ -334,16 +345,20 @@ function setTableHeaders(statType) {
 
 function renderEmployeeTable(employees, statType) {
     const tableBody = document.getElementById('employees-table-body');
-    if (!tableBody) return;
-    tableBody.innerHTML = ''; 
+    if (!tableBody) {
+        console.error("Cannot render table: employees-table-body not found.");
+        return;
+    }
+    tableBody.innerHTML = ''; // Clear previous content
 
+    // Headers should be set by setTableHeaders before this function is called with new data,
+    // but calling it here again ensures correctness if renderEmployeeTable is called directly for initial list.
     setTableHeaders(statType); 
 
-    let colspan = 4; // Default
+    let colspan = 4; 
     if (statType === 'assigned_today' || statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
         colspan = 5;
     }
-
 
     if (!employees || employees.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="${colspan}" class="info-placeholder">Aucun employé ne correspond à ce critère.</td></tr>`;
@@ -357,11 +372,9 @@ function renderEmployeeTable(employees, statType) {
                         <td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
                         <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>`;
         if (statType === 'assigned_today') {
-            // 'mission' should come from employee_handler.php for 'assigned_today'
             rowHtml += `<td>${emp.mission ? escapeHtml(emp.mission) : (emp.shift_type === 'repos' ? 'Repos' : 'N/A')}</td>`;
         } else if (statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
-            // 'type_conge_display' should come from employee_handler.php
-            rowHtml += `<td>${emp.type_conge_display ? escapeHtml(emp.type_conge_display) : 'N/A'}</td>`;
+            rowHtml += `<td>${emp.type_conge_display ? escapeHtml(emp.type_conge_display) : (emp.type_conge ? escapeHtml(ucfirst(emp.type_conge)) : 'N/A')}</td>`;
         }
         rowHtml += `</tr>`;
         tableBody.innerHTML += rowHtml;
