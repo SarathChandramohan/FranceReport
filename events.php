@@ -169,9 +169,7 @@ try {
           }
 
           /* Style for the new Create Event button */
-          #create-event-button {
-              margin-bottom: 15px; /* Add some space below the button */
-          }
+         
     </style>
 </head>
 <body>
@@ -181,9 +179,7 @@ try {
 <div class="container-fluid mt-4">
     <h2>Planning des Événements</h2>
 
-    <button type="button" id="create-event-button" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Créer un événement
-    </button>
+    
 
 
     <div class="card">
