@@ -12,12 +12,15 @@ require_once 'db-connection.php';
 function getInitialEmployeeList($conn) {
     $employees = [];
     try {
+        // Added 'id' alias for user_id for consistency if used by JS expecting 'id'
         $query = "SELECT user_id as id, nom, prenom, email, role, status FROM Users WHERE status = 'Active' ORDER BY nom, prenom";
         $stmt = $conn->prepare($query);
         $stmt->execute();
         $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         error_log("Database error in getInitialEmployeeList: " . $e->getMessage());
+        // Optionally, you could set a variable here to inform the user on the page
+        // For example: $GLOBALS['initial_employee_list_error'] = "Could not load employee list.";
     }
     return $employees;
 }
@@ -39,18 +42,18 @@ $initial_employee_list = getInitialEmployeeList($conn);
             margin: 0;
             padding: 0;
             width: 100%;
+            height: 100%; /* Ensure body takes full height if content is short */
         }
         body {
             background-color: #f5f5f7;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             color: #1d1d1f;
-            /*
-            IMPORTANT NAVBAR FIX:
-            Set this padding-top to the EXACT height of your navbar.
-            Inspect your navbar in the browser's developer tools to find its computed height.
-            Example: If your navbar is 56px tall, use padding-top: 56px;
-            */
-            padding-top: 60px; /* <<< ADJUST THIS VALUE! */
+            padding-top: 60px; /* Adjust this value to the height of your navbar */
+            display: flex;
+            flex-direction: column; /* Allow footer to stick to bottom */
+        }
+        .container-fluid {
+            flex-grow: 1; /* Allows the container to take up available space */
         }
         .card {
             background-color: #ffffff;
@@ -81,11 +84,12 @@ $initial_employee_list = getInitialEmployeeList($conn);
             text-align: center;
             border-left: 5px solid #007aff;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            cursor: pointer;
+            cursor: default; /* Default cursor */
         }
-        .stat-card:hover {
+        .stat-card.clickable:hover { /* Specific class for clickable cards */
             transform: translateY(-5px);
             box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+            cursor: pointer; /* Pointer cursor for clickable cards */
         }
         .stat-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 8px; line-height: 1.1; color: #333; }
         .stat-label { font-size: 0.95rem; color: #555; font-weight: 500; }
@@ -93,13 +97,13 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
         .stat-card.total-employees { border-left-color: #007bff; }
         .stat-card.total-employees .stat-icon { color: #007bff; }
-        .stat-card.assigned-today { border-left-color: #ff9500; }
+        .stat-card.assigned-today { border-left-color: #ff9500; } /* Orange */
         .stat-card.assigned-today .stat-icon { color: #ff9500; }
-        .stat-card.active-today { border-left-color: #34c759; }
+        .stat-card.active-today { border-left-color: #34c759; } /* Green */
         .stat-card.active-today .stat-icon { color: #34c759; }
-        .stat-card.on-leave-today { border-left-color: #5856d6; }
-        .stat-card.on-leave-today .stat-icon { color: #5856d6; }
-        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; }
+        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } /* Purple */
+        .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
+        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } /* Red */
         .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
 
         .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; background-color: #fff; }
@@ -107,7 +111,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
         table th, table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e0e0e0; font-size: 14px; vertical-align: middle; }
         table th { background-color: #f8f9fa; font-weight: 600; color: #495057; }
         table tr:hover { background-color: #f1f3f5; }
-        .loading-placeholder, .error-placeholder { text-align: center; padding: 40px 20px; color: #6c757d; font-size: 1.1rem; }
+        .loading-placeholder, .error-placeholder, .info-placeholder { text-align: center; padding: 40px 20px; color: #6c757d; font-size: 1.1rem; }
         .error-placeholder { color: #dc3545; }
         .alert-custom { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: .35rem; }
         .alert-danger-custom { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
@@ -117,20 +121,58 @@ $initial_employee_list = getInitialEmployeeList($conn);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap; /* Allow wrapping for smaller screens */
+        }
+        #employeeListCardHeader h3 {
+            margin-bottom: 0.5rem; /* Adjust margin for smaller screens */
         }
         #backToListButton {
             display: none; /* Hidden by default */
+            margin-bottom: 0.5rem; /* Adjust margin */
+        }
+
+        /* Ensure footer is at the bottom */
+        footer {
+            width: 100%;
+            background-color: #333; /* Example background */
+            color: white; /* Example text color */
+            text-align: center;
+            padding: 10px 0;
+            margin-top: auto; /* Pushes footer to bottom in flex container */
+        }
+         @media (max-width: 576px) {
+            #employeeListCardHeader {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            #employeeListCardHeader h3 {
+                margin-bottom: 10px; /* Space between title and button when stacked */
+            }
+            #backToListButton {
+                 width: 100%; /* Make button full width */
+                 text-align: center;
+            }
         }
 
     </style>
 </head>
 <body>
 
-
+<?php
+    // Assuming navbar.php is in the same directory
+    if (file_exists('navbar.php')) {
+        include 'navbar.php';
+    } else {
+        echo '<p class="text-danger text-center">Erreur: Le fichier navbar.php est introuvable.</p>';
+    }
+?>
 
 <div class="container-fluid mt-4" id="main-content-area">
-    
-
+    <?php
+        if (isset($GLOBALS['initial_employee_list_error'])) {
+            echo '<div class="alert alert-danger-custom text-center">' . htmlspecialchars($GLOBALS['initial_employee_list_error']) . '</div>';
+        }
+    ?>
     <div class="card">
         <h3>Statistiques du Jour</h3>
         <div class="stats-container" id="employee-stats-container">
@@ -159,7 +201,12 @@ $initial_employee_list = getInitialEmployeeList($conn);
     </div>
 </div>
 
-<?php include('footer.php'); ?>
+<?php
+    // Assuming footer.php is in the same directory
+    if (file_exists('footer.php')) {
+        include 'footer.php';
+    }
+?>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
@@ -167,6 +214,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
 <script>
 const initialEmployeeData = <?php echo json_encode($initial_employee_list); ?>;
+const currentUserRole = '<?php echo $user_role; ?>';
 
 document.addEventListener('DOMContentLoaded', function() {
     fetchEmployeeStats();
@@ -175,6 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function fetchEmployeeStats() {
     const statsContainer = document.getElementById('employee-stats-container');
+    if (!statsContainer) return;
     statsContainer.innerHTML = `<div class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement...</div>`;
 
     fetch('employee_handler.php?action=get_employee_overview_stats')
@@ -184,59 +233,74 @@ function fetchEmployeeStats() {
     })
     .then(data => {
         if (data.status === 'success' && data.stats) {
-            renderStats(data.stats, data.role);
+            renderStats(data.stats, data.role || currentUserRole); // Use role from response or current user
         } else {
             statsContainer.innerHTML = '<div class="error-placeholder">Erreur: ' + (data.message || 'Impossible de charger les stats.') + '</div>';
         }
     })
     .catch(error => {
         console.error('Fetch stats error:', error);
-        statsContainer.innerHTML = '<div class="error-placeholder">Communication error: ' + error.message + '</div>';
+        statsContainer.innerHTML = '<div class="error-placeholder">Erreur de communication: ' + error.message + '</div>';
     });
 }
 
-function renderStats(stats, userRole) {
+function renderStats(stats, userRoleForStats) {
     const statsContainer = document.getElementById('employee-stats-container');
+    if (!statsContainer) return;
     statsContainer.innerHTML = '';
-    const isAdmin = userRole === 'admin';
+    const isAdmin = userRoleForStats === 'admin';
     let html = '';
+
+    // Define stat types: key from stats object, label for display, icon, adminOnly flag, CSS class for styling
     const statTypes = [
-        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees' },
-        { key: 'assigned_today', label: 'Assignés Aujourd\'hui', icon: 'fas fa-user-check', adminOnly: true, cssClass: 'assigned-today' },
-        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today' },
-        { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-leave-today' },
-        { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today' }
+        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: false },
+        { key: 'assigned_today', label: 'Assignés Aujourd\'hui', icon: 'fas fa-user-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: false },
+        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: false },
+        { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: false },
+        { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: false }
     ];
 
     statTypes.forEach(type => {
+        // Only display if stat exists and (not adminOnly OR current user is admin)
         if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
-            const isClickable = stats[type.key] > 0 && type.key !== 'total_employees';
+            const count = parseInt(stats[type.key], 10) || 0;
+            // Card is clickable if count > 0 OR if it's specifically allowed to be clickable at zero
+            const isClickable = count > 0 || type.clickableIfZero;
             const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : '';
-            const cursorStyle = isClickable ? 'cursor: pointer;' : 'cursor: default;';
-            html += `<div class="stat-card ${type.cssClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''} style="${cursorStyle}">
+            const cardClass = `stat-card ${type.cssClass} ${isClickable ? 'clickable' : ''}`;
+
+            html += `<div class="${cardClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''}>
                         <div class="stat-icon"><i class="${type.icon}"></i></div>
-                        <div class="stat-value">${stats[type.key]}</div>
+                        <div class="stat-value">${count}</div>
                         <div class="stat-label">${type.label}</div>
                      </div>`;
         }
     });
-    if (html === '') html = '<div class="alert alert-info-custom w-100 text-center">Aucune stat à afficher.</div>';
+    if (html === '') {
+        html = '<div class="info-placeholder w-100 text-center">Aucune statistique à afficher pour votre rôle.</div>';
+    }
     statsContainer.innerHTML = html;
 }
 
+
 function showInitialEmployeeList() {
-    document.getElementById('employeeListTitle').textContent = 'Liste Générale des Employés Actifs';
-    document.getElementById('backToListButton').style.display = 'none';
+    const titleEl = document.getElementById('employeeListTitle');
+    const backButton = document.getElementById('backToListButton');
+    if (titleEl) titleEl.textContent = 'Liste Générale des Employés Actifs';
+    if (backButton) backButton.style.display = 'none';
     renderEmployeeTable(initialEmployeeData, 'general');
 }
 
 function loadFilteredEmployeeList(statType, title) {
-    document.getElementById('employeeListTitle').textContent = title;
-    document.getElementById('backToListButton').style.display = 'inline-block';
-    const tableBody = document.getElementById('employees-table-body');
-    tableBody.innerHTML = `<tr><td colspan="5" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement...</td></tr>`;
-    setTableHeaders(statType);
+    const titleEl = document.getElementById('employeeListTitle');
+    const backButton = document.getElementById('backToListButton');
+    if (titleEl) titleEl.textContent = title;
+    if (backButton) backButton.style.display = 'inline-block';
 
+    const tableBody = document.getElementById('employees-table-body');
+    if (!tableBody) return;
+    tableBody.innerHTML = `<tr><td colspan="5" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
+    setTableHeaders(statType); // Set headers before fetching data
 
     fetch(`employee_handler.php?action=get_employee_list_for_stat&type=${statType}`)
         .then(response => {
@@ -247,55 +311,68 @@ function loadFilteredEmployeeList(statType, title) {
             if (data.status === 'success' && data.employees) {
                 renderEmployeeTable(data.employees, statType);
             } else {
-                tableBody.innerHTML = `<tr><td colspan="5" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
+                 const colspan = (statType === 'assigned_today') ? 5 : 4;
+                tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
             }
         })
         .catch(error => {
             console.error('Fetch filtered list error:', error);
-            tableBody.innerHTML = `<tr><td colspan="5" class="error-placeholder">Communication error: ${error.message}</td></tr>`;
+             const colspan = (statType === 'assigned_today') ? 5 : 4;
+            tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur de communication: ${error.message}</td></tr>`;
         });
 }
 
 function setTableHeaders(statType) {
     const tableHead = document.getElementById('employees-table-head');
-    let headers = '<tr><th>Nom</th><th>Prénom</th>';
+    if (!tableHead) return;
+    let headers = '<tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Rôle</th>';
     if (statType === 'assigned_today') {
-        headers += '<th>Événement</th>';
+        headers += '<th>Mission Assignée</th>'; // New column for mission
     }
-    headers += '<th>Email</th><th>Rôle</th></tr>';
+    headers += '</tr>';
     tableHead.innerHTML = headers;
 }
 
-
 function renderEmployeeTable(employees, statType) {
     const tableBody = document.getElementById('employees-table-body');
+    if (!tableBody) return;
     tableBody.innerHTML = ''; // Clear existing rows
 
-    setTableHeaders(statType); // Ensure headers are correct for the current view
+    setTableHeaders(statType); // Ensure headers are set correctly for the current list type
 
-    if (employees && employees.length > 0) {
-        employees.forEach(emp => {
-            let rowHtml = `<tr>
-                            <td>${emp.nom ? escapeHtml(emp.nom) : 'N/A'}</td>
-                            <td>${emp.prenom ? escapeHtml(emp.prenom) : 'N/A'}</td>`;
-            if (statType === 'assigned_today') {
-                rowHtml += `<td>${emp.event_title ? escapeHtml(emp.event_title) : 'N/A'}</td>`;
-            }
-            rowHtml += `<td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
-                        <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>
-                      </tr>`;
-            tableBody.innerHTML += rowHtml;
-        });
-    } else {
-        const colspan = (statType === 'assigned_today') ? 5 : 4;
-        tableBody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted p-4">Aucun employé ne correspond à ce critère.</td></tr>`;
+    const colspan = (statType === 'assigned_today') ? 5 : 4;
+
+    if (!employees || employees.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="${colspan}" class="info-placeholder">Aucun employé ne correspond à ce critère.</td></tr>`;
+        return;
     }
+
+    employees.forEach(emp => {
+        let rowHtml = `<tr>
+                        <td>${emp.nom ? escapeHtml(emp.nom) : 'N/A'}</td>
+                        <td>${emp.prenom ? escapeHtml(emp.prenom) : 'N/A'}</td>
+                        <td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
+                        <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>`;
+        if (statType === 'assigned_today') {
+            // Assuming 'event_title' is the mission from employee_handler.php
+            rowHtml += `<td>${emp.event_title ? escapeHtml(emp.event_title) : 'N/A'}</td>`;
+        }
+        rowHtml += `</tr>`;
+        tableBody.innerHTML += rowHtml;
+    });
 }
 
 function escapeHtml(text) {
     if (text === null || text === undefined) return '';
-    const str = String(text);
-    return str.replace(/[&<>"']/g, match => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[match]);
+    const str = String(text); // Ensure it's a string
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return str.replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
 function ucfirst(str) {
