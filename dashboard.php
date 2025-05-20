@@ -13,6 +13,7 @@ if ($user['role'] !== 'admin') {
     exit;
 }
 
+// Functions from original dashboard.php
 function getDashboardStats($conn) {
     $stats = [];
     try {
@@ -118,9 +119,25 @@ function getAllEmployees($conn) {
     return $employees;
 }
 
+// Function from employes.php
+function getInitialEmployeeList($conn) {
+    $employees = [];
+    try {
+        $query = "SELECT user_id as id, nom, prenom, email, role, status FROM Users WHERE status = 'Active' ORDER BY nom, prenom";
+        $stmt = $conn->prepare($query);
+        $stmt->execute();
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database error in getInitialEmployeeList: " . $e->getMessage());
+        $GLOBALS['initial_employee_list_error'] = "Could not load employee list.";
+    }
+    return $employees;
+}
+
 $stats = getDashboardStats($conn);
 $activities = getRecentActivities($conn);
-$all_employees = getAllEmployees($conn);
+$all_employees = getAllEmployees($conn); // Used for modals
+$initial_employee_list = getInitialEmployeeList($conn); // For the integrated employes section
 
 ?>
 
@@ -212,12 +229,71 @@ $all_employees = getAllEmployees($conn);
             border: 1px solid #e5e5e5;
             margin-bottom: 30px;
         }
-        h2 {
+        h2 { /* General h2 for content cards */
             margin-bottom: 20px;
             color: #1d1d1f;
             font-size: 22px;
             font-weight: 600;
         }
+
+        /* Styles from employes.php, adapted for dashboard integration */
+        h3 { /* Specific h3 for integrated employes section titles */
+            color: #1d1d1f;
+            font-weight: 600;
+             margin-bottom: 20px;
+             font-size: 20px; /* Slightly smaller than main card h2 */
+        }
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+            padding: 20px;
+            text-align: center;
+            border-left: 5px solid #007aff;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: default;
+        }
+        .stat-card.clickable:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        .stat-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 8px; line-height: 1.1; color: #333; }
+        .stat-label { font-size: 0.95rem; color: #555; font-weight: 500; }
+        .stat-icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.7; }
+
+        .stat-card.total-employees { border-left-color: #007bff; }
+        .stat-card.total-employees .stat-icon { color: #007bff; }
+        .stat-card.assigned-today { border-left-color: #ff9500; }
+        .stat-card.assigned-today .stat-icon { color: #ff9500; }
+        .stat-card.active-today { border-left-color: #34c759; }
+        .stat-card.active-today .stat-icon { color: #34c759; }
+        .stat-card.on-generic-leave-today { border-left-color: #5856d6; }
+        .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
+        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; }
+        .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
+
+        #employeeListCardHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        #employeeListCardHeader h3 {
+            margin-bottom: 0.5rem;
+        }
+        #backToListButton {
+            display: none;
+            margin-bottom: 0.5rem;
+        }
+         /* End of employes.php specific styles */
+
 
         .filter-controls {
             margin-bottom: 20px;
@@ -343,24 +419,9 @@ $all_employees = getAllEmployees($conn);
         .modal-lg { max-width: 800px; }
         .modal-xl { max-width: 1140px; }
 
-        /* Modal for Employes page */
-        #employesModal .modal-dialog {
-            max-width: 90%; /* Make the modal wider */
-        }
-        #employesModal .modal-content {
-            height: 85vh; /* Set a height for the modal content */
-        }
-        #employesModal iframe {
-            width: 100%;
-            height: calc(100% - 50px); /* Adjust height to account for header/footer */
-            border: none;
-        }
-
-
         .modal-header .close {
             padding: 1rem 1rem;
             margin: -1rem -1rem -1rem auto;
-            /* Uses Bootstrap's default styling for '×' */
         }
 
         #map-modal-content-container { height: 350px; width: 100%; margin-bottom: 15px; }
@@ -386,7 +447,6 @@ $all_employees = getAllEmployees($conn);
             padding: 15px;
             border-radius: 0 0 0.25rem 0.25rem;
         }
-        /* Added style for Details Modal Content */
         #leaveDetailsModal .modal-body p {
             font-size: 1rem;
             margin-bottom: 0.8rem;
@@ -411,12 +471,18 @@ $all_employees = getAllEmployees($conn);
              padding: 0.25em 0.6em;
              font-size: 0.9em;
         }
+         .loading-placeholder, .error-placeholder, .info-placeholder { text-align: center; padding: 40px 20px; color: #6c757d; font-size: 1.1rem; }
+        .error-placeholder { color: #dc3545; }
+        .alert-custom { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: .35rem; }
+        .alert-danger-custom { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
+        .alert-info-custom { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
 
 
         @media (max-width: 768px) {
             h1 { font-size: 24px; }
             .content-card { padding: 20px; }
-            h2 { font-size: 20px; }
+            h2 { font-size: 20px; } /* General h2 */
+            h3 { font-size: 18px; } /* employes.php h3 */
             table th, table td { padding: 10px 12px; font-size: 13px; }
 
             .filter-controls {
@@ -446,11 +512,17 @@ $all_employees = getAllEmployees($conn);
             .shortcut-btn { padding: 15px; font-size: 0.8rem;}
             .shortcut-btn i { font-size: 1.8em;}
             .modal-content { margin: 10% auto; }
-            #employesModal .modal-dialog {
-                max-width: 95%;
+
+             #employeeListCardHeader {
+                flex-direction: column;
+                align-items: flex-start;
             }
-            #employesModal .modal-content {
-                height: 90vh;
+            #employeeListCardHeader h3 {
+                margin-bottom: 10px;
+            }
+            #backToListButton {
+                 width: 100%;
+                 text-align: center;
             }
         }
         @media (max-width: 480px) {
@@ -475,9 +547,6 @@ $all_employees = getAllEmployees($conn);
             <button class="shortcut-btn" data-toggle="modal" data-target="#congesAdminModal">
                 <i class="fas fa-user-shield"></i>Congés Admin
             </button>
-            <button class="shortcut-btn" onclick="openEmployesPopup()">
-                <i class="fas fa-users"></i>Employés
-            </button>
             <a href="planning.php" class="shortcut-btn">
                 <i class="fas fa-calendar-alt"></i>Planning Admin
             </a>
@@ -487,8 +556,39 @@ $all_employees = getAllEmployees($conn);
             <button class="shortcut-btn" data-toggle="modal" data-target="#feuilleDeTempsModal">
                 <i class="fas fa-user-clock"></i>Feuille de Temps
             </button>
+        </div>
+
+        <div class="content-card" id="integrated-employes-section">
+             <?php
+                if (isset($GLOBALS['initial_employee_list_error'])) {
+                    echo '<div class="alert alert-danger-custom text-center">' . htmlspecialchars($GLOBALS['initial_employee_list_error']) . '</div>';
+                }
+            ?>
+            <div class="card" style="border: none; box-shadow: none; padding: 0;"> <h3>Statistiques du Jour</h3>
+                <div class="stats-container" id="employee-stats-container">
+                    <div class="loading-placeholder">
+                        <div class="spinner-border spinner-border-sm" role="status"><span class="sr-only">Chargement...</span></div>
+                        Chargement des statistiques...
+                    </div>
+                </div>
             </div>
 
+            <div class="card" id="employeeListCard" style="border: none; box-shadow: none; padding: 0; margin-top: 20px;"> <div id="employeeListCardHeader">
+                    <h3 id="employeeListTitle">Liste Générale des Employés Actifs</h3>
+                    <button id="backToListButton" class="btn btn-sm btn-outline-secondary" onclick="showInitialEmployeeList()">
+                        <i class="fas fa-arrow-left"></i> Retour à la liste générale
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table id="employees-table" class="table table-striped table-hover">
+                        <thead class="thead-light" id="employees-table-head">
+                            </thead>
+                        <tbody id="employees-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
         <div class="content-card">
             <h2>Dernières activités</h2>
             <div class="table-container">
@@ -521,42 +621,6 @@ $all_employees = getAllEmployees($conn);
             </div>
         </div>
     </div>
-
-    <div class="modal fade" id="employesModal" tabindex="-1" aria-labelledby="employesModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl"> <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="employesModalLabel">Gestion des Employés</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body p-0"> <iframe id="employesModalFrame" src="about:blank" style="width: 100%; height: 100%; border: none;"></iframe>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-    <div id="mapModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="mapModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="map-modal-title">Localisation Pointage</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div id="map-modal-content-container"></div>
-                    <div id="map-modal-details" class="mt-2"></div>
-                </div>
-                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
 
     <div class="modal fade" id="congesAdminModal" tabindex="-1" aria-labelledby="congesAdminModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
@@ -662,7 +726,6 @@ $all_employees = getAllEmployees($conn);
             </div>
         </div>
     </div>
-
 
     <div class="modal fade" id="eventCreationModal" tabindex="-1" aria-labelledby="eventCreationModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -773,6 +836,27 @@ $all_employees = getAllEmployees($conn);
         </div>
     </div>
 
+     <div id="mapModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="mapModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="map-modal-title-main">Localisation Pointage</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="map-modal-content-container-main" style="height: 350px; width: 100%; margin-bottom: 15px;"></div>
+                    <div id="map-modal-details-main" class="mt-2"></div>
+                </div>
+                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <?php
         if (file_exists('footer.php')) {
             include 'footer.php';
@@ -787,23 +871,10 @@ $all_employees = getAllEmployees($conn);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        let map;
-        let currentMapMarkers = [];
+        let map; // For the main map modal in dashboard.php
+        let currentMapMarkers = []; // For the main map modal
 
-        // SCRIPT for Employes Modal
-        function openEmployesPopup() {
-            const iframe = document.getElementById('employesModalFrame');
-            iframe.src = 'employes.php'; // Set the source for the iframe
-            $('#employesModal').modal('show'); // Show the modal using jQuery
-        }
-
-        $('#employesModal').on('hidden.bs.modal', function (e) {
-            const iframe = document.getElementById('employesModalFrame');
-            iframe.src = 'about:blank'; // Clear the iframe src when modal is closed to free up resources
-        });
-        // END SCRIPT for Employes Modal
-
-
+        // Original dashboard.php scripts (modified paths/IDs if necessary for integrated section)
         function escapeHtml(text) {
             if (text === null || typeof text === 'undefined') return '';
             const strText = String(text);
@@ -812,9 +883,9 @@ $all_employees = getAllEmployees($conn);
             return div.innerHTML;
         }
 
-        function refreshDashboardData() {
+        function refreshDashboardData() { // This will now also trigger employes.php data refresh
             try {
-                fetch('dashboard-handler.php?action=get_dashboard_all_data')
+                fetch('dashboard-handler.php?action=get_dashboard_all_data') // Fetches activities
                     .then(response => {
                         if (!response.ok) {
                             return response.text().then(text => {
@@ -834,18 +905,26 @@ $all_employees = getAllEmployees($conn);
                                 updateActivitiesTable(data.data.activities);
                             }
                         } else {
-                            console.error('Error from handler or missing data:', data.message);
+                            console.error('Error from dashboard-handler or missing data:', data.message);
                         }
                     })
                     .catch(error => {
-                        console.error('Error refreshing dashboard (fetch/parse):', error);
-                        displayGlobalError("Erreur de communication pour rafraîchir le tableau de bord: " + error.message);
+                        console.error('Error refreshing dashboard (fetch/parse activities):', error);
+                        displayGlobalError("Erreur de communication pour rafraîchir les activités: " + error.message);
                     });
+
+                fetchEmployeeStats(); // Fetch stats for the integrated employes section
+                // If a filtered list is shown in integrated employes, decide if it should be refreshed or reset to initial
+                // For simplicity, we can reset to initial list or just refresh stats.
+                // To keep current filter: you'd need to store current statType and call loadFilteredEmployeeList again.
+                // For now, just refreshing stats. The user can click a stat card to reload a list.
+
             } catch (e) {
                 console.error("Error in refreshDashboardData:", e);
-                displayGlobalError("Une erreur s'est produite lors du rafraîchissement des données.");
+                displayGlobalError("Une erreur s'est produite lors du rafraîchissement des données du tableau de bord.");
             }
         }
+
 
         function displayGlobalError(message) {
             console.error("Global Error:", message);
@@ -862,7 +941,7 @@ $all_employees = getAllEmployees($conn);
                     alertElement.show();
                      setTimeout(() => { alertElement.hide(); }, 5000);
                 } else {
-                    console.warn("Alert element not found for modal: " + modalId + " with selector " + alertSelector + ". Falling back to global alert.");
+                    console.warn("Alert element not found for modal: " + modalId + ". Falling back to global alert.");
                     alert(type.toUpperCase() + ": " + message);
                 }
             } catch (e) {
@@ -924,7 +1003,6 @@ $all_employees = getAllEmployees($conn);
                                     '<td>' +
                                         '<button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(' + req.id + ')">Approuver</button>' +
                                         '<button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(' + req.id + ')">Refuser</button>' +
-                                        // MODIFIED: Added Details button
                                         '<button class="btn btn-info btn-sm ml-1 py-0 px-1 action-button" onclick="showLeaveDetailsModal(' + req.id + ')">Détails</button>' +
                                     '</td>' +
                                 '</tr>';
@@ -948,8 +1026,7 @@ $all_employees = getAllEmployees($conn);
                 $('#congesAdminTableBody').html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
             }
         }
-         // Helper to get user-friendly leave type names
-        function getLeaveTypeName(typeKey) {
+         function getLeaveTypeName(typeKey) {
             const types = {
                 'cp': 'Congés Payés', 'rtt': 'RTT', 'sans-solde': 'Congé Sans Solde',
                 'special': 'Congé Spécial', 'maladie': 'Congé Maladie'
@@ -957,12 +1034,11 @@ $all_employees = getAllEmployees($conn);
             return types[typeKey] || typeKey;
         }
 
-        // Function to show leave details in a new modal
         function showLeaveDetailsModal(leaveId) {
              $.ajax({
-                url: 'conges-handler.php', // Assuming this handler can fetch details by ID
+                url: 'conges-handler.php',
                 type: 'POST',
-                data: { action: 'get_details_for_admin', leave_id: leaveId }, // Might need a new action in conges-handler.php
+                data: { action: 'get_details_for_admin', leave_id: leaveId },
                 dataType: 'json',
                 success: function(response) {
                     if (response.status === 'success' && response.data) {
@@ -992,7 +1068,6 @@ $all_employees = getAllEmployees($conn);
                 }
             });
         }
-
 
         function approveLeaveFromModal(leaveId) {
              try {
@@ -1101,13 +1176,13 @@ $all_employees = getAllEmployees($conn);
 
                 if (!employeeFilter.length || !monthFilter.length || !dayFilter.length || !tbody.length) {
                     console.error("Modal filter or table body elements not found for Timesheet modal.");
-                    if(tbody.length) tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>'); // MODIFIED: colspan to 7
+                    if(tbody.length) tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>');
                     return;
                 }
                 const employeeId = employeeFilter.val();
                 const monthYearInput = monthFilter.val();
                 const specificDay = dayFilter.val();
-                tbody.html('<tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>'); // MODIFIED: colspan to 7
+                tbody.html('<tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>');
 
                 let ajaxData = {
                     action: 'get_monthly_timesheet',
@@ -1119,7 +1194,7 @@ $all_employees = getAllEmployees($conn);
                 } else if (monthYearInput && monthYearInput !== '') {
                     ajaxData.month_year = monthYearInput;
                 } else {
-                     tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>'); // MODIFIED: colspan to 7
+                     tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>');
                      return;
                 }
 
@@ -1134,7 +1209,7 @@ $all_employees = getAllEmployees($conn);
                             response.data.timesheet.forEach(function(entry) {
                                 let mapButtonHTML = '--';
                                 if ((entry.logon_latitude && entry.logon_longitude) || (entry.logoff_latitude && entry.logoff_longitude)) {
-                                    mapButtonHTML = '<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapModal(' +
+                                     mapButtonHTML = '<button class="action-button btn-sm py-0 px-1" onclick="showTimesheetMapInDashboardModal(' + // Changed function name
                                         '\'' + escapeHtml(String(entry.employee_name !== undefined && entry.employee_name !== null ? entry.employee_name : '')) + '\',' +
                                         '\'' + escapeHtml(String(entry.entry_date !== undefined && entry.entry_date !== null ? entry.entry_date : '')) + '\',' +
                                         '\'' + String(entry.logon_latitude !== undefined && entry.logon_latitude !== null ? entry.logon_latitude : '') + '\',' +
@@ -1147,32 +1222,31 @@ $all_employees = getAllEmployees($conn);
                                         '\'' + escapeHtml(String(entry.logoff_time || '')) + '\'' +
                                     ')">Carte</button>';
                                 }
-                                // MODIFIED: Added entry.break_minutes for "Pause prise"
                                 let rowHTML = '<tr>' +
                                     '<td>' + mapButtonHTML + '</td>' +
                                     '<td>' + escapeHtml(String(entry.employee_name)) + '</td>' +
                                     '<td>' + escapeHtml(String(entry.entry_date)) + '</td>' +
                                     '<td>' + (escapeHtml(String(entry.logon_time || '--'))) + '</td>' +
                                     '<td>' + (escapeHtml(String(entry.logoff_time || '--'))) + '</td>' +
-                                    '<td>' + (escapeHtml(String(entry.break_minutes || '0'))) + ' min</td>' + // Assuming break_minutes is fetched
+                                    '<td>' + (escapeHtml(String(entry.break_minutes || '0'))) + ' min</td>' +
                                     '<td>' + (escapeHtml(String(entry.duration || '--'))) + '</td>' +
                                 '</tr>';
                                 tbody.append(rowHTML);
                             });
                         } else if (response.status === 'success') {
-                            tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>'); // MODIFIED: colspan to 7
+                            tbody.html('<tr><td colspan="7" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
                         } else {
-                            tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>'); // MODIFIED: colspan to 7
+                            tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>');
                         }
                     },
                     error: function(xhr) {
                         console.error("AJAX error loading timesheet for modal:", xhr.responseText);
-                        tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur de communication.</td></tr>'); // MODIFIED: colspan to 7
+                        tbody.html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur de communication.</td></tr>');
                     }
                 });
             } catch (e) {
                 console.error("Error in loadTimesheetDataForModal:", e);
-                 $('#timesheetTableBodyModal').html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur interne du script.</td></tr>'); // MODIFIED: colspan to 7
+                 $('#timesheetTableBodyModal').html('<tr><td colspan="7" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
             }
         }
 
@@ -1243,24 +1317,26 @@ $all_employees = getAllEmployees($conn);
             }
         }
 
-        function showTimesheetMapModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
+        // Renamed function for clarity, specific to dashboard's main map modal
+        function showTimesheetMapInDashboardModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
             try {
-                const modal = $('#mapModal'); // Use jQuery selector for Bootstrap modal
-                const mapContainer = document.getElementById('map-modal-content-container');
-                const mapTitleElem = document.getElementById('map-modal-title');
-                const mapDetailsElem = document.getElementById('map-modal-details');
+                const modal = $('#mapModal');
+                const mapContainer = document.getElementById('map-modal-content-container-main'); // Use new ID
+                const mapTitleElem = document.getElementById('map-modal-title-main'); // Use new ID
+                const mapDetailsElem = document.getElementById('map-modal-details-main'); // Use new ID
+
 
                 if(!mapContainer || !mapTitleElem || !mapDetailsElem) {
-                    console.error("Map modal elements not found."); return;
+                    console.error("Main map modal elements not found in dashboard."); return;
                 }
 
                 mapTitleElem.textContent = 'Localisation pour ' + escapeHtml(employeeName) + ' - ' + escapeHtml(entryDate);
 
                 currentMapMarkers.forEach(marker => marker.remove());
                 currentMapMarkers = [];
-                if (map) { map.remove(); map = null; }
+                if (map) { map.remove(); map = null; } // Use the global 'map' variable for this modal
 
-                mapContainer.innerHTML = ''; // Clear previous map instance
+                mapContainer.innerHTML = '';
 
                 if (typeof L === 'undefined') {
                     mapContainer.innerHTML = "Erreur: La bibliothèque de cartographie (Leaflet) n'a pas pu être chargée.";
@@ -1268,7 +1344,7 @@ $all_employees = getAllEmployees($conn);
                     return;
                 }
 
-                map = L.map(mapContainer);
+                map = L.map(mapContainer); // Initialize the global 'map' variable
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
@@ -1316,33 +1392,32 @@ $all_employees = getAllEmployees($conn);
                         map.fitBounds(bounds, { padding: [50, 50] });
                     }
                 } else {
-                    map.setView([48.8566, 2.3522], 5);
+                    map.setView([48.8566, 2.3522], 5); // Default to Paris if no coords
                     mapDetailsElem.innerHTML = "<p>Aucune localisation GPS enregistrée pour cette entrée.</p>";
                 }
 
                 modal.modal('show');
-                 // Ensure map size is correct after modal is shown
                 modal.on('shown.bs.modal', function () {
                     if (map) {
                         map.invalidateSize();
                     }
                 });
 
-
             } catch (e) {
-                console.error("Error in showTimesheetMapModal:", e);
-                 if(document.getElementById('map-modal-details')) document.getElementById('map-modal-details').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
+                console.error("Error in showTimesheetMapInDashboardModal:", e);
+                 if(document.getElementById('map-modal-details-main')) document.getElementById('map-modal-details-main').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
                  $('#mapModal').modal('show');
             }
         }
 
-        function cleanupMapResources() {
+
+        function cleanupMapResources() { // For the main map modal
              try {
                 if (currentMapMarkers && currentMapMarkers.length > 0) {
                     currentMapMarkers.forEach(marker => marker.remove());
                     currentMapMarkers = [];
                 }
-                if (map) {
+                if (map) { // Use the global 'map' variable
                     map.off();
                     map.remove();
                     map = null;
@@ -1364,22 +1439,24 @@ $all_employees = getAllEmployees($conn);
                     const cols = row.querySelectorAll("td, th");
                     for (const col of cols) {
                         let cellContent = col.cloneNode(true);
+                        // Remove buttons before extracting text
                         cellContent.querySelectorAll('button.action-button, button.btn, a.btn').forEach(el => el.remove());
+                        // Handle status tags - extract text content
                         cellContent.querySelectorAll('.status-tag').forEach(el => {
                             const statusText = el.textContent || el.innerText;
                             el.parentNode.insertBefore(document.createTextNode(statusText), el);
                             el.remove();
                         });
-                        let text = cellContent.innerText.trim().replace(/"/g, '""');
+                        let text = cellContent.innerText.trim().replace(/"/g, '""'); // Escape double quotes
                         rowData.push('"' + text + '"');
                     }
                     csv.push(rowData.join(","));
                 }
-                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && rows.length === 1) ) {
+                if (csv.length === 0 || (csv.length === 1 && rows[0].querySelectorAll("th").length > 0 && rows.length === 1) ) { // Check if only header or empty
                     displayGlobalError("Aucune donnée à exporter de la table #" + tableId + ".");
                     return;
                 }
-                const csvFile = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+                const csvFile = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" }); // Add BOM for Excel
                 const downloadLink = document.createElement("a");
                 downloadLink.download = filename;
                 downloadLink.href = window.URL.createObjectURL(csvFile);
@@ -1393,10 +1470,16 @@ $all_employees = getAllEmployees($conn);
             }
         }
 
+
+        // Scripts from employes.php, adapted for dashboard integration
+        const initialEmployeeData = <?php echo json_encode($initial_employee_list); ?>;
+        const currentUserRole = '<?php echo $user['role']; // Use the user role from dashboard's PHP scope ?>';
+
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                refreshDashboardData();
+                refreshDashboardData(); // This will now call fetchEmployeeStats as well
 
+                 // Event listeners for modals from original dashboard.php
                 $('#congesAdminModal').on('show.bs.modal', function () {
                     loadPendingLeaveRequestsForModal();
                     $('#caLeaveEmployeeFilter').val('');
@@ -1410,9 +1493,10 @@ $all_employees = getAllEmployees($conn);
                 });
 
                 $('#caLeaveEmployeeFilter, #caLeaveMonthFilter, #caLeaveDayFilter').on('change', loadAllLeavesForCongesAdminModal);
-                $('#caLeaveMonthFilter').on('change', function() {
+                 $('#caLeaveMonthFilter').on('change', function() { // If month changes, clear specific day
                     $('#caLeaveDayFilter').val('');
                 });
+
 
                 $('#feuilleDeTempsModal').on('show.bs.modal', function () {
                     $('#timesheetEmployeeFilterModal').val('');
@@ -1421,11 +1505,14 @@ $all_employees = getAllEmployees($conn);
                     loadTimesheetDataForModal();
                 });
 
-                $('#eventCreationModal').on('show.bs.modal', function () {
+                 $('#eventCreationModal').on('show.bs.modal', function () {
                     $('#eventCreationForm')[0].reset();
                     $('#eventCreationAlert').hide().removeClass('alert-success alert-danger alert-warning').text('');
+                    // Set default start and end times for event creation
                     const now = new Date();
+                    // Default start: next hour, rounded to 00 minutes
                     const startDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
+                    // Default end: 1 hour after start
                     const endDateTime = new Date(startDateTime.getTime() + (60 * 60 * 1000));
 
                     function formatDateTimeLocal(date) {
@@ -1439,25 +1526,202 @@ $all_employees = getAllEmployees($conn);
 
                     $('#eventStartModal').val(formatDateTimeLocal(startDateTime));
                     $('#eventEndModal').val(formatDateTimeLocal(endDateTime));
-                    $('#eventColorModal').val('#007bff');
+                    $('#eventColorModal').val('#007bff'); // Default color
                 });
 
-                $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal, #timesheetDayFilterModal').on('change', loadTimesheetDataForModal);
 
-                $('#timesheetMonthFilterModal').on('change', function() {
+                $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal, #timesheetDayFilterModal').on('change', loadTimesheetDataForModal);
+                $('#timesheetMonthFilterModal').on('change', function() { // If month changes, clear specific day
                     $('#timesheetDayFilterModal').val('');
                 });
 
-                // MODIFIED: Map modal close handling
+                // Map modal close handling (for the main map modal)
                 $('#mapModal').on('hidden.bs.modal', function () {
                     cleanupMapResources();
                 });
 
+
+                // Initialization for integrated employes section
+                fetchEmployeeStats();
+                showInitialEmployeeList(); // Display the general list by default in the integrated section
+
             } catch (e) {
-                console.error("Error in DOMContentLoaded:", e);
-                displayGlobalError("Erreur lors de l'initialisation de la page.");
+                console.error("Error in DOMContentLoaded (Dashboard):", e);
+                displayGlobalError("Erreur lors de l'initialisation de la page du tableau de bord.");
             }
         });
+
+        // Functions for integrated employes section (from employes.php)
+        function fetchEmployeeStats() {
+            const statsContainer = document.getElementById('employee-stats-container');
+            if (!statsContainer) return;
+            statsContainer.innerHTML = `<div class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement...</div>`;
+
+            fetch('employee_handler.php?action=get_employee_overview_stats')
+            .then(response => {
+                if (!response.ok) return response.text().then(text => {
+                    console.error("Fetch stats raw error response:", text);
+                    throw new Error('Network error: ' + response.status + ' ' + text.substring(0,100))
+                });
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success' && data.stats) {
+                    renderStats(data.stats, data.role || currentUserRole);
+                } else {
+                    statsContainer.innerHTML = '<div class="error-placeholder">Erreur: ' + (data.message || 'Impossible de charger les stats.') + '</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Fetch stats error:', error);
+                statsContainer.innerHTML = '<div class="error-placeholder">Erreur de communication: ' + error.message + '</div>';
+            });
+        }
+
+        function renderStats(stats, userRoleForStats) {
+            const statsContainer = document.getElementById('employee-stats-container');
+            if (!statsContainer) return;
+            statsContainer.innerHTML = '';
+            const isAdmin = userRoleForStats === 'admin';
+            let html = '';
+
+            const statTypes = [
+                { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: true },
+                { key: 'assigned_today', label: "Assignés Aujourd'hui (Planning)", icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: true },
+                { key: 'active_today', label: "En Activité (Pointage)", icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: true },
+                { key: 'on_generic_leave_today', label: "En Congé (Autre)", icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: true },
+                { key: 'on_sick_leave_today', label: "En Arrêt Maladie", icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: true }
+            ];
+
+            statTypes.forEach(type => {
+                if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
+                    const count = parseInt(stats[type.key], 10) || 0;
+                    const canBeClickedByRole = type.adminOnly ? isAdmin : true;
+                    const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero);
+                    const escapedLabelForJSString = type.label.replace(/'/g, "\\'");
+                    const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${escapedLabelForJSString}')` : (type.key === 'total_employees' && isAdmin ? `showInitialEmployeeList()` : '');
+                    const cardClass = `stat-card ${type.cssClass} ${(isClickable || (type.key === 'total_employees' && isAdmin)) ? 'clickable' : ''}`;
+
+                    html += `<div class="${cardClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''}>
+                                <div class="stat-icon"><i class="${type.icon}"></i></div>
+                                <div class="stat-value">${count}</div>
+                                <div class="stat-label">${type.label}</div>
+                             </div>`;
+                }
+            });
+            if (html === '') {
+                html = '<div class="info-placeholder w-100 text-center">Aucune statistique à afficher pour votre rôle.</div>';
+            }
+            statsContainer.innerHTML = html;
+        }
+
+        function showInitialEmployeeList() {
+            const titleEl = document.getElementById('employeeListTitle');
+            const backButton = document.getElementById('backToListButton');
+            if (titleEl) titleEl.textContent = 'Liste Générale des Employés Actifs';
+            if (backButton) backButton.style.display = 'none';
+            renderEmployeeTable(initialEmployeeData, 'total_employees');
+        }
+
+        function loadFilteredEmployeeList(statType, title) {
+            const titleEl = document.getElementById('employeeListTitle');
+            const backButton = document.getElementById('backToListButton');
+            if (titleEl) titleEl.textContent = title;
+            if (backButton) {
+                if (statType !== 'total_employees') {
+                    backButton.style.display = 'inline-block';
+                } else {
+                    backButton.style.display = 'none';
+                }
+            }
+
+            const tableBody = document.getElementById('employees-table-body');
+            if (!tableBody) return;
+
+            let colspan = 4;
+            const dynamicColspanTypes = ['assigned_today', 'on_generic_leave_today', 'on_sick_leave_today'];
+            if (dynamicColspanTypes.includes(statType)) {
+                colspan = 5;
+            }
+
+            setTableHeaders(statType);
+            tableBody.innerHTML = `<tr><td colspan="${colspan}" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
+
+            fetch(`employee_handler.php?action=get_employee_list_for_stat&type=${statType}`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error('Network error: ' + response.status + ' ' + text.substring(0,200));
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success' && data.employees) {
+                        renderEmployeeTable(data.employees, statType);
+                    } else {
+                        tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
+                    }
+                })
+                .catch(error => {
+                    tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur de communication: ${error.message}</td></tr>`;
+                });
+        }
+
+        function setTableHeaders(statType) {
+            const tableHead = document.getElementById('employees-table-head');
+            if (!tableHead) return;
+            let headers = '<tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Rôle</th>';
+            if (statType === 'assigned_today') {
+                headers += '<th>Mission (Planning)</th>';
+            } else if (statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
+                headers += '<th>Type de Congé</th>';
+            }
+            headers += '</tr>';
+            tableHead.innerHTML = headers;
+        }
+
+        function renderEmployeeTable(employees, statType) {
+            const tableBody = document.getElementById('employees-table-body');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '';
+            setTableHeaders(statType);
+
+            let colspan = 4;
+            const dynamicColspanTypes = ['assigned_today', 'on_generic_leave_today', 'on_sick_leave_today'];
+            if (dynamicColspanTypes.includes(statType)) {
+                colspan = 5;
+            }
+
+            if (!employees || employees.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="${colspan}" class="info-placeholder">Aucun employé ne correspond à ce critère.</td></tr>`;
+                return;
+            }
+
+            let rowsHtml = '';
+            employees.forEach(emp => {
+                let rowHtml = `<tr>
+                                <td>${emp.nom ? escapeHtml(emp.nom) : 'N/A'}</td>
+                                <td>${emp.prenom ? escapeHtml(emp.prenom) : 'N/A'}</td>
+                                <td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
+                                <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>`;
+                if (statType === 'assigned_today') {
+                    rowHtml += `<td>${emp.mission ? escapeHtml(emp.mission) : 'N/A'}</td>`;
+                } else if (statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
+                    rowHtml += `<td>${emp.type_conge_display ? escapeHtml(emp.type_conge_display) : (emp.type_conge ? escapeHtml(ucfirst(emp.type_conge)) : 'N/A')}</td>`;
+                }
+                rowHtml += `</tr>`;
+                rowsHtml += rowHtml;
+            });
+            tableBody.innerHTML = rowsHtml;
+        }
+
+        function ucfirst(str) {
+            if (typeof str !== 'string' || str.length === 0) return '';
+            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+        }
+
     </script>
 </body>
 </html>
