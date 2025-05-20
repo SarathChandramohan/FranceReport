@@ -45,7 +45,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
             background-color: #f5f5f7;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             color: #1d1d1f;
-            padding-top: 80px; 
+            padding-top: 20px; /* Adjusted padding-top since navbar is removed */
             display: flex;
             flex-direction: column; 
         }
@@ -154,14 +154,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
 </head>
 <body>
 
-<?php
-    if (file_exists('navbar.php')) {
-        include 'navbar.php';
-    } else {
-        echo '<p class="text-danger text-center">Erreur: Le fichier navbar.php est introuvable.</p>';
-    }
-?>
-
 <div class="container-fluid mt-4" id="main-content-area">
     <?php
         if (isset($GLOBALS['initial_employee_list_error'])) {
@@ -249,7 +241,7 @@ function renderStats(stats, userRoleForStats) {
     let html = '';
 
     const statTypes = [
-        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: true }, // Made clickable even if zero to show an empty list
+        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: true },
         { key: 'assigned_today', label: 'Assignés Aujourd\'hui (Planning)', icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: true },
         { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: true }, 
         { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: true },
@@ -260,7 +252,6 @@ function renderStats(stats, userRoleForStats) {
         if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
             const count = parseInt(stats[type.key], 10) || 0;
             const canBeClickedByRole = type.adminOnly ? isAdmin : true; 
-            // Make 'total_employees' clickable to show the general list
             const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero); 
             
             const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : (type.key === 'total_employees' && isAdmin ? `showInitialEmployeeList()` : '');
@@ -290,12 +281,11 @@ function showInitialEmployeeList() {
 }
 
 function loadFilteredEmployeeList(statType, title) {
-    console.log(`[loadFilteredEmployeeList] Attempting to load list for: ${statType}, Title: ${title}`);
+    console.log(`[loadFilteredEmployeeList] Attempting to load list for: ${statType}, Title: ${title}`); // Debug
     const titleEl = document.getElementById('employeeListTitle');
     const backButton = document.getElementById('backToListButton');
     if (titleEl) titleEl.textContent = title;
     if (backButton) {
-        // Only show back button if it's not the initial/total employees list view
         if (statType !== 'total_employees') {
             backButton.style.display = 'inline-block';
         } else {
@@ -303,44 +293,44 @@ function loadFilteredEmployeeList(statType, title) {
         }
     }
 
-
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) {
-        console.error("[loadFilteredEmployeeList] Table body not found for list rendering.");
+        console.error("[loadFilteredEmployeeList] Table body not found for list rendering."); // Debug
         return;
     }
 
     let colspan = 4; 
-    if (statType === 'assigned_today' || statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
+    const dynamicColspanTypes = ['assigned_today', 'on_generic_leave_today', 'on_sick_leave_today'];
+    if (dynamicColspanTypes.includes(statType)) {
         colspan = 5; 
     }
     
     setTableHeaders(statType); 
     tableBody.innerHTML = `<tr><td colspan="${colspan}" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
     
-    console.log(`[loadFilteredEmployeeList] Fetching: employee_handler.php?action=get_employee_list_for_stat&type=${statType}`);
+    console.log(`[loadFilteredEmployeeList] Fetching: employee_handler.php?action=get_employee_list_for_stat&type=${statType}`); // Debug
     fetch(`employee_handler.php?action=get_employee_list_for_stat&type=${statType}`)
         .then(response => {
-            console.log(`[loadFilteredEmployeeList] Response status for ${statType}: ${response.status}`);
+            console.log(`[loadFilteredEmployeeList] Response status for ${statType}: ${response.status}`); // Debug
             if (!response.ok) {
                 return response.text().then(text => { 
-                    console.error(`[loadFilteredEmployeeList] Network error text for ${statType}:`, text);
+                    console.error(`[loadFilteredEmployeeList] Network error text for ${statType}:`, text); // Debug
                     throw new Error('Network error: ' + response.status + ' ' + text.substring(0,200));
                 });
             }
             return response.json();
         })
         .then(data => {
-            console.log(`[loadFilteredEmployeeList] Data received for ${statType}:`, data);
+            console.log(`[loadFilteredEmployeeList] Data received for ${statType}:`, data); // IMPORTANT DEBUG: Check this output
             if (data.status === 'success' && data.employees) {
                 renderEmployeeTable(data.employees, statType);
             } else {
-                console.error(`[loadFilteredEmployeeList] Error in data for ${statType}: ${data.message}`);
+                console.error(`[loadFilteredEmployeeList] Error in data for ${statType}: ${data.message}`); // Debug
                 tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
             }
         })
         .catch(error => {
-            console.error(`[loadFilteredEmployeeList] Fetch catch error for ${statType}:`, error);
+            console.error(`[loadFilteredEmployeeList] Fetch catch error for ${statType}:`, error); // Debug
             tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur de communication: ${error.message}</td></tr>`;
         });
 }
@@ -348,7 +338,7 @@ function loadFilteredEmployeeList(statType, title) {
 function setTableHeaders(statType) {
     const tableHead = document.getElementById('employees-table-head');
     if (!tableHead) {
-        console.error("[setTableHeaders] Table head not found.");
+        console.error("[setTableHeaders] Table head not found."); // Debug
         return;
     }
     let headers = '<tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Rôle</th>';
@@ -359,32 +349,28 @@ function setTableHeaders(statType) {
     }
     headers += '</tr>';
     tableHead.innerHTML = headers;
-    console.log(`[setTableHeaders] Headers set for ${statType}: ${headers}`);
+    // console.log(`[setTableHeaders] Headers set for ${statType}: ${headers}`); // Optional Debug
 }
 
 function renderEmployeeTable(employees, statType) {
-    console.log(`[renderEmployeeTable] Rendering table for statType: ${statType}, with ${employees ? employees.length : 0} employees.`);
+    console.log(`[renderEmployeeTable] Rendering table for statType: ${statType}, with ${employees ? employees.length : 0} employees.`); // Debug
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) {
-        console.error("[renderEmployeeTable] Cannot render table: employees-table-body not found.");
+        console.error("[renderEmployeeTable] Cannot render table: employees-table-body not found."); // Debug
         return;
     }
     
-    // Clear previous content explicitly
     tableBody.innerHTML = ''; 
-
-    // Ensure headers are set according to the current statType
-    // This is crucial because this function might be called directly (e.g., by showInitialEmployeeList)
-    // or after a fetch (by loadFilteredEmployeeList).
     setTableHeaders(statType); 
 
-    let colspan = 4; 
-    if (statType === 'assigned_today' || statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
+    let colspan = 4;
+    const dynamicColspanTypes = ['assigned_today', 'on_generic_leave_today', 'on_sick_leave_today'];
+    if (dynamicColspanTypes.includes(statType)) {
         colspan = 5;
     }
 
     if (!employees || employees.length === 0) {
-        console.log(`[renderEmployeeTable] No employees to render for ${statType}.`);
+        console.log(`[renderEmployeeTable] No employees to render for ${statType}.`); // Debug
         tableBody.innerHTML = `<tr><td colspan="${colspan}" class="info-placeholder">Aucun employé ne correspond à ce critère.</td></tr>`;
         return;
     }
@@ -397,7 +383,9 @@ function renderEmployeeTable(employees, statType) {
                         <td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
                         <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>`;
         if (statType === 'assigned_today') {
-            rowHtml += `<td>${emp.mission ? escapeHtml(emp.mission) : (emp.shift_type === 'repos' ? 'Repos' : 'N/A')}</td>`;
+            // The SQL query filters out 'repos', so emp.shift_type === 'repos' will be false here.
+            // It will display emp.mission if available, otherwise 'N/A'.
+            rowHtml += `<td>${emp.mission ? escapeHtml(emp.mission) : 'N/A'}</td>`;
         } else if (statType === 'on_generic_leave_today' || statType === 'on_sick_leave_today') {
             rowHtml += `<td>${emp.type_conge_display ? escapeHtml(emp.type_conge_display) : (emp.type_conge ? escapeHtml(ucfirst(emp.type_conge)) : 'N/A')}</td>`;
         }
@@ -405,7 +393,7 @@ function renderEmployeeTable(employees, statType) {
         rowsHtml += rowHtml;
     });
     tableBody.innerHTML = rowsHtml;
-    console.log(`[renderEmployeeTable] Table rendered for ${statType}.`);
+    // console.log(`[renderEmployeeTable] Table rendered for ${statType}.`); // Optional Debug
 }
 
 function escapeHtml(text) {
