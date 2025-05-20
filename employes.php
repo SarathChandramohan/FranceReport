@@ -1,378 +1,228 @@
 <?php
-// employes.php
+// employee_handler.php
 
 require_once 'session-management.php';
 requireLogin();
 $currentUser = getCurrentUser();
-$user_role = $currentUser['role'];
+$userRole = $currentUser['role'];
 
 require_once 'db-connection.php';
 
-// This function will now only be used for the initial "all active employees" list
-function getInitialEmployeeList($conn) {
-    $employees = [];
+header('Content-Type: application/json');
+
+$action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? $_POST['action'] : '');
+
+if (empty($action)) {
+    echo json_encode(['status' => 'error', 'message' => 'Aucune action spécifiée.']);
+    exit;
+}
+
+switch ($action) {
+    case 'get_employee_overview_stats':
+        getEmployeeOverviewStats($conn, $userRole);
+        break;
+    case 'get_employee_list_for_stat':
+        getEmployeeListForStat($conn, $userRole, isset($_GET['type']) ? $_GET['type'] : '');
+        break;
+    default:
+        echo json_encode(['status' => 'error', 'message' => 'Action non reconnue: ' . htmlspecialchars($action)]);
+        break;
+}
+
+function getEmployeeOverviewStats($conn, $role) {
+    $today_sql_server_format = date('Y-m-d');
+    $stats = [];
+
     try {
-        // Added 'id' alias for user_id for consistency if used by JS expecting 'id'
-        $query = "SELECT user_id as id, nom, prenom, email, role, status FROM Users WHERE status = 'Active' ORDER BY nom, prenom";
-        $stmt = $conn->prepare($query);
-        $stmt->execute();
-        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // En Activité (Pointage)
+        $stmt_active = $conn->prepare("
+            SELECT COUNT(DISTINCT user_id) AS count_active
+            FROM Timesheet
+            WHERE entry_date = :today AND logon_time IS NOT NULL AND 
+                  (logoff_time IS NULL OR CAST(logoff_time AS DATE) = :today_alt)
+        ");
+        $stmt_active->execute([':today' => $today_sql_server_format, ':today_alt' => $today_sql_server_format]);
+        $stats['active_today'] = (int)($stmt_active->fetchColumn() ?: 0);
+
+        if ($role === 'admin') {
+            // Total Employés Actifs
+            $stmt_total = $conn->prepare("SELECT COUNT(user_id) AS count_total FROM Users WHERE status = 'Active'");
+            $stmt_total->execute();
+            $stats['total_employees'] = (int)($stmt_total->fetchColumn() ?: 0);
+
+            // Assignés Aujourd'hui (using Planning_Assignments table)
+            $stmt_assigned = $conn->prepare("
+                SELECT COUNT(DISTINCT pa.assigned_user_id) AS count_assigned
+                FROM Planning_Assignments pa
+                JOIN Users u ON pa.assigned_user_id = u.user_id
+                WHERE pa.assignment_date = :today AND u.status = 'Active' AND pa.shift_type <> 'repos' 
+            ");
+            // Consider if 'repos' should be excluded or if any assignment means "assigned"
+            $stmt_assigned->bindParam(':today', $today_sql_server_format, PDO::PARAM_STR);
+            $stmt_assigned->execute();
+            $stats['assigned_today'] = (int)($stmt_assigned->fetchColumn() ?: 0);
+
+            // En Congé (Autre)
+            $stmt_leave = $conn->prepare("
+                SELECT COUNT(DISTINCT user_id) AS count_leave
+                FROM Conges
+                WHERE :today BETWEEN date_debut AND date_fin 
+                  AND status = 'approved' 
+                  AND type_conge <> 'maladie' AND type_conge <> 'Arrêt maladie' 
+            ");
+            $stmt_leave->bindParam(':today', $today_sql_server_format, PDO::PARAM_STR);
+            $stmt_leave->execute();
+            $stats['on_generic_leave_today'] = (int)($stmt_leave->fetchColumn() ?: 0);
+
+            // En Arrêt Maladie
+            $stmt_sick = $conn->prepare("
+                SELECT COUNT(DISTINCT user_id) AS count_sick
+                FROM Conges
+                WHERE :today BETWEEN date_debut AND date_fin 
+                  AND status = 'approved' 
+                  AND (type_conge = 'maladie' OR type_conge = 'Arrêt maladie')
+            ");
+            $stmt_sick->bindParam(':today', $today_sql_server_format, PDO::PARAM_STR);
+            $stmt_sick->execute();
+            $stats['on_sick_leave_today'] = (int)($stmt_sick->fetchColumn() ?: 0);
+        }
+
+        echo json_encode(['status' => 'success', 'stats' => $stats, 'role' => $role]);
+
     } catch (PDOException $e) {
-        error_log("Database error in getInitialEmployeeList: " . $e->getMessage());
-        // Optionally, you could set a variable here to inform the user on the page
-        // For example: $GLOBALS['initial_employee_list_error'] = "Could not load employee list.";
+        error_log("PDOException in getEmployeeOverviewStats: " . $e->getMessage());
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Erreur de base de données lors de la récupération des statistiques. Code: ' . $e->getCode()
+        ]);
+    } catch (Exception $e) {
+        error_log("Exception in getEmployeeOverviewStats: " . $e->getMessage());
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Une erreur générale est survenue. Code: ' . $e->getCode()
+        ]);
     }
-    return $employees;
 }
 
-$initial_employee_list = getInitialEmployeeList($conn);
+function getEmployeeListForStat($conn, $role, $statType) {
+    $today_sql_server_format = date('Y-m-d');
+    $employees = [];
+    $sql = "";
+    $params = [':today' => $today_sql_server_format];
 
-?>
+    // Corrected: Added 'total_employees' to allowed types for admin
+    $allowedStatTypesForAdmin = ['total_employees', 'assigned_today', 'active_today', 'on_generic_leave_today', 'on_sick_leave_today'];
+    $allowedStatTypesForUser = ['active_today']; // Example, adjust if users can see other lists
 
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employés - Gestion</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%; /* Ensure body takes full height if content is short */
+    if ($role === 'admin') {
+        if (!in_array($statType, $allowedStatTypesForAdmin)) {
+            echo json_encode(['status' => 'error', 'message' => 'Type de statistique non valide pour admin: ' . htmlspecialchars($statType) ]);
+            exit;
         }
-        body {
-            background-color: #f5f5f7;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-            color: #1d1d1f;
-            padding-top: 60px; /* Adjust this value to the height of your navbar */
-            display: flex;
-            flex-direction: column; /* Allow footer to stick to bottom */
+    } else {
+        if (!in_array($statType, $allowedStatTypesForUser)) {
+            echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé à cette liste de statistiques.']);
+            exit;
         }
-        .container-fluid {
-            flex-grow: 1; /* Allows the container to take up available space */
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            padding: 25px;
-            margin-bottom: 25px;
-            border: 1px solid #e5e5e5;
-        }
-        h2, h3 {
-            color: #1d1d1f;
-            font-weight: 600;
-        }
-        h2 { margin-bottom: 25px; font-size: 28px; }
-        h3 { margin-bottom: 20px; font-size: 22px; }
-
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-            padding: 20px;
-            text-align: center;
-            border-left: 5px solid #007aff;
-            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            cursor: default; /* Default cursor */
-        }
-        .stat-card.clickable:hover { /* Specific class for clickable cards */
-            transform: translateY(-5px);
-            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
-            cursor: pointer; /* Pointer cursor for clickable cards */
-        }
-        .stat-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 8px; line-height: 1.1; color: #333; }
-        .stat-label { font-size: 0.95rem; color: #555; font-weight: 500; }
-        .stat-icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.7; }
-
-        .stat-card.total-employees { border-left-color: #007bff; }
-        .stat-card.total-employees .stat-icon { color: #007bff; }
-        .stat-card.assigned-today { border-left-color: #ff9500; } /* Orange */
-        .stat-card.assigned-today .stat-icon { color: #ff9500; }
-        .stat-card.active-today { border-left-color: #34c759; } /* Green */
-        .stat-card.active-today .stat-icon { color: #34c759; }
-        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } /* Purple */
-        .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
-        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } /* Red */
-        .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
-
-        .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; background-color: #fff; }
-        table { width: 100%; border-collapse: collapse; min-width: 700px; }
-        table th, table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e0e0e0; font-size: 14px; vertical-align: middle; }
-        table th { background-color: #f8f9fa; font-weight: 600; color: #495057; }
-        table tr:hover { background-color: #f1f3f5; }
-        .loading-placeholder, .error-placeholder, .info-placeholder { text-align: center; padding: 40px 20px; color: #6c757d; font-size: 1.1rem; }
-        .error-placeholder { color: #dc3545; }
-        .alert-custom { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: .35rem; }
-        .alert-danger-custom { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
-        .alert-info-custom { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
-
-        #employeeListCardHeader {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap; /* Allow wrapping for smaller screens */
-        }
-        #employeeListCardHeader h3 {
-            margin-bottom: 0.5rem; /* Adjust margin for smaller screens */
-        }
-        #backToListButton {
-            display: none; /* Hidden by default */
-            margin-bottom: 0.5rem; /* Adjust margin */
-        }
-
-        /* Ensure footer is at the bottom */
-        footer {
-            width: 100%;
-            background-color: #333; /* Example background */
-            color: white; /* Example text color */
-            text-align: center;
-            padding: 10px 0;
-            margin-top: auto; /* Pushes footer to bottom in flex container */
-        }
-         @media (max-width: 576px) {
-            #employeeListCardHeader {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            #employeeListCardHeader h3 {
-                margin-bottom: 10px; /* Space between title and button when stacked */
-            }
-            #backToListButton {
-                 width: 100%; /* Make button full width */
-                 text-align: center;
-            }
-        }
-
-    </style>
-</head>
-<body>
-
-
-
-<div class="container-fluid mt-4" id="main-content-area">
-    <?php
-        if (isset($GLOBALS['initial_employee_list_error'])) {
-            echo '<div class="alert alert-danger-custom text-center">' . htmlspecialchars($GLOBALS['initial_employee_list_error']) . '</div>';
-        }
-    ?>
-    <div class="card">
-        <h3>Statistiques du Jour</h3>
-        <div class="stats-container" id="employee-stats-container">
-            <div class="loading-placeholder">
-                <div class="spinner-border spinner-border-sm" role="status"><span class="sr-only">Chargement...</span></div>
-                Chargement des statistiques...
-            </div>
-        </div>
-    </div>
-
-    <div class="card" id="employeeListCard">
-        <div id="employeeListCardHeader">
-            <h3 id="employeeListTitle">Liste Générale des Employés Actifs</h3>
-            <button id="backToListButton" class="btn btn-sm btn-outline-secondary" onclick="showInitialEmployeeList()">
-                <i class="fas fa-arrow-left"></i> Retour à la liste générale
-            </button>
-        </div>
-        <div class="table-container">
-            <table id="employees-table" class="table table-striped table-hover">
-                <thead class="thead-light" id="employees-table-head">
-                    </thead>
-                <tbody id="employees-table-body">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<?php
-    // Assuming footer.php is in the same directory
-    if (file_exists('footer.php')) {
-        include 'footer.php';
     }
-?>
 
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
 
-<script>
-const initialEmployeeData = <?php echo json_encode($initial_employee_list); ?>;
-const currentUserRole = '<?php echo $user_role; ?>';
+    $baseSelect = "SELECT DISTINCT u.user_id, u.nom, u.prenom, u.email, u.role";
+    
+    // Add specific columns based on statType
+    if ($statType === 'assigned_today') {
+        // Use mission_text from Planning_Assignments as 'mission'
+        $baseSelect .= ", pa.mission_text AS mission, pa.shift_type ";
+    } elseif ($statType === 'on_generic_leave_today' || $statType === 'on_sick_leave_today') {
+        $baseSelect .= ", c.type_conge ";
+    }
+    
+    $baseSelect .= " FROM Users u ";
 
-document.addEventListener('DOMContentLoaded', function() {
-    fetchEmployeeStats();
-    showInitialEmployeeList(); // Load the initial general list
-});
+    switch ($statType) {
+        case 'total_employees':
+             if ($role !== 'admin') {
+                echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé.']);
+                exit;
+            }
+            // For total_employees, we just list all active users.
+            $sql = $baseSelect . "WHERE u.status = 'Active'";
+            $params = []; // No :today needed for this one
+            break;
+        case 'assigned_today':
+             if ($role !== 'admin') { /* ... access denied ... */ }
+            // Switched to Planning_Assignments table
+            $sql = $baseSelect .
+                   "JOIN Planning_Assignments pa ON u.user_id = pa.assigned_user_id " .
+                   "WHERE pa.assignment_date = :today AND u.status = 'Active' AND pa.shift_type <> 'repos'";
+            break;
+        case 'active_today':
+            $sql = $baseSelect .
+                   "JOIN Timesheet t ON u.user_id = t.user_id " .
+                   "WHERE t.entry_date = :today AND t.logon_time IS NOT NULL AND u.status = 'Active' AND (t.logoff_time IS NULL OR CAST(t.logoff_time AS DATE) = :today)";
+            break;
+        case 'on_generic_leave_today':
+             if ($role !== 'admin') { /* ... access denied ... */ }
+            $sql = $baseSelect .
+                   "JOIN Conges c ON u.user_id = c.user_id " .
+                   "WHERE :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved' " .
+                   "AND c.type_conge <> 'maladie' AND c.type_conge <> 'Arrêt maladie' AND u.status = 'Active'";
+            break;
+        case 'on_sick_leave_today':
+             if ($role !== 'admin') { /* ... access denied ... */ }
+            $sql = $baseSelect .
+                   "JOIN Conges c ON u.user_id = c.user_id " .
+                   "WHERE :today BETWEEN c.date_debut AND c.date_fin AND c.status = 'approved' " .
+                   "AND (c.type_conge = 'maladie' OR c.type_conge = 'Arrêt maladie') AND u.status = 'Active'";
+            break;
+        default:
+            // This case should ideally not be reached if $allowedStatTypes check is done first
+            echo json_encode(['status' => 'error', 'message' => 'Type de statistique non géré pour la liste: ' . htmlspecialchars($statType)]);
+            exit;
+    }
+    $sql .= " ORDER BY u.nom, u.prenom";
+    if ($statType === 'assigned_today') {
+        $sql .= ", mission"; 
+    } elseif ($statType === 'on_generic_leave_today' || $statType === 'on_sick_leave_today') {
+        $sql .= ", c.type_conge";
+    }
 
-function fetchEmployeeStats() {
-    const statsContainer = document.getElementById('employee-stats-container');
-    if (!statsContainer) return;
-    statsContainer.innerHTML = `<div class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement...</div>`;
+    try {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    fetch('employee_handler.php?action=get_employee_overview_stats')
-    .then(response => {
-        if (!response.ok) return response.text().then(text => { throw new Error('Network error: ' + response.status + ' ' + text.substring(0,100))});
-        return response.json();
-    })
-    .then(data => {
-        if (data.status === 'success' && data.stats) {
-            renderStats(data.stats, data.role || currentUserRole); // Use role from response or current user
-        } else {
-            statsContainer.innerHTML = '<div class="error-placeholder">Erreur: ' + (data.message || 'Impossible de charger les stats.') + '</div>';
+        // Format leave type for display if present
+        if ($statType === 'on_generic_leave_today' || $statType === 'on_sick_leave_today') {
+            foreach ($employees as &$emp) {
+                if (isset($emp['type_conge'])) {
+                    $emp['type_conge_display'] = getTypeCongeDisplayName($emp['type_conge']);
+                }
+            }
         }
-    })
-    .catch(error => {
-        console.error('Fetch stats error:', error);
-        statsContainer.innerHTML = '<div class="error-placeholder">Erreur de communication: ' + error.message + '</div>';
-    });
+
+
+        echo json_encode(['status' => 'success', 'employees' => $employees]);
+    } catch (PDOException $e) {
+        error_log("PDOException in getEmployeeListForStat ($statType): " . $e->getMessage() . " SQL: " . $sql . " Params: " . json_encode($params));
+        echo json_encode(['status' => 'error', 'message' => 'Erreur de base de données lors de la récupération de la liste. Code: ' . $e->getCode()]);
+    } catch (Exception $e) {
+        error_log("Exception in getEmployeeListForStat ($statType): " . $e->getMessage());
+        echo json_encode(['status' => 'error', 'message' => 'Une erreur générale est survenue. Code: ' . $e->getCode()]);
+    }
 }
 
-function renderStats(stats, userRoleForStats) {
-    const statsContainer = document.getElementById('employee-stats-container');
-    if (!statsContainer) return;
-    statsContainer.innerHTML = '';
-    const isAdmin = userRoleForStats === 'admin';
-    let html = '';
-
-    // Define stat types: key from stats object, label for display, icon, adminOnly flag, CSS class for styling
-    const statTypes = [
-        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: false },
-        { key: 'assigned_today', label: 'Assignés Aujourd\'hui', icon: 'fas fa-user-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: false },
-        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: false },
-        { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: false },
-        { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: false }
+// Helper function to get display name for leave types
+function getTypeCongeDisplayName($typeKey) {
+    $types = [
+        'cp' => 'Congés Payés',
+        'rtt' => 'RTT',
+        'sans-solde' => 'Congé Sans Solde',
+        'special' => 'Congé Spécial',
+        'maladie' => 'Arrêt maladie' // Consistent with conges.php
     ];
-
-    statTypes.forEach(type => {
-        // Only display if stat exists and (not adminOnly OR current user is admin)
-        if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
-            const count = parseInt(stats[type.key], 10) || 0;
-            // Card is clickable if count > 0 OR if it's specifically allowed to be clickable at zero
-            const isClickable = count > 0 || type.clickableIfZero;
-            const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : '';
-            const cardClass = `stat-card ${type.cssClass} ${isClickable ? 'clickable' : ''}`;
-
-            html += `<div class="${cardClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''}>
-                        <div class="stat-icon"><i class="${type.icon}"></i></div>
-                        <div class="stat-value">${count}</div>
-                        <div class="stat-label">${type.label}</div>
-                     </div>`;
-        }
-    });
-    if (html === '') {
-        html = '<div class="info-placeholder w-100 text-center">Aucune statistique à afficher pour votre rôle.</div>';
-    }
-    statsContainer.innerHTML = html;
+    return $types[$typeKey] ?? ucfirst(str_replace('_', ' ', $typeKey));
 }
 
 
-function showInitialEmployeeList() {
-    const titleEl = document.getElementById('employeeListTitle');
-    const backButton = document.getElementById('backToListButton');
-    if (titleEl) titleEl.textContent = 'Liste Générale des Employés Actifs';
-    if (backButton) backButton.style.display = 'none';
-    renderEmployeeTable(initialEmployeeData, 'general');
-}
-
-function loadFilteredEmployeeList(statType, title) {
-    const titleEl = document.getElementById('employeeListTitle');
-    const backButton = document.getElementById('backToListButton');
-    if (titleEl) titleEl.textContent = title;
-    if (backButton) backButton.style.display = 'inline-block';
-
-    const tableBody = document.getElementById('employees-table-body');
-    if (!tableBody) return;
-    tableBody.innerHTML = `<tr><td colspan="5" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
-    setTableHeaders(statType); // Set headers before fetching data
-
-    fetch(`employee_handler.php?action=get_employee_list_for_stat&type=${statType}`)
-        .then(response => {
-            if (!response.ok) return response.text().then(text => { throw new Error('Network error: ' + response.status + ' ' + text.substring(0,100))});
-            return response.json();
-        })
-        .then(data => {
-            if (data.status === 'success' && data.employees) {
-                renderEmployeeTable(data.employees, statType);
-            } else {
-                 const colspan = (statType === 'assigned_today') ? 5 : 4;
-                tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
-            }
-        })
-        .catch(error => {
-            console.error('Fetch filtered list error:', error);
-             const colspan = (statType === 'assigned_today') ? 5 : 4;
-            tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur de communication: ${error.message}</td></tr>`;
-        });
-}
-
-function setTableHeaders(statType) {
-    const tableHead = document.getElementById('employees-table-head');
-    if (!tableHead) return;
-    let headers = '<tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Rôle</th>';
-    if (statType === 'assigned_today') {
-        headers += '<th>Mission Assignée</th>'; // New column for mission
-    }
-    headers += '</tr>';
-    tableHead.innerHTML = headers;
-}
-
-function renderEmployeeTable(employees, statType) {
-    const tableBody = document.getElementById('employees-table-body');
-    if (!tableBody) return;
-    tableBody.innerHTML = ''; // Clear existing rows
-
-    setTableHeaders(statType); // Ensure headers are set correctly for the current list type
-
-    const colspan = (statType === 'assigned_today') ? 5 : 4;
-
-    if (!employees || employees.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="${colspan}" class="info-placeholder">Aucun employé ne correspond à ce critère.</td></tr>`;
-        return;
-    }
-
-    employees.forEach(emp => {
-        let rowHtml = `<tr>
-                        <td>${emp.nom ? escapeHtml(emp.nom) : 'N/A'}</td>
-                        <td>${emp.prenom ? escapeHtml(emp.prenom) : 'N/A'}</td>
-                        <td>${emp.email ? escapeHtml(emp.email) : 'N/A'}</td>
-                        <td>${emp.role ? escapeHtml(ucfirst(emp.role)) : 'N/A'}</td>`;
-        if (statType === 'assigned_today') {
-            // Assuming 'event_title' is the mission from employee_handler.php
-            rowHtml += `<td>${emp.event_title ? escapeHtml(emp.event_title) : 'N/A'}</td>`;
-        }
-        rowHtml += `</tr>`;
-        tableBody.innerHTML += rowHtml;
-    });
-}
-
-function escapeHtml(text) {
-    if (text === null || text === undefined) return '';
-    const str = String(text); // Ensure it's a string
-    var map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return str.replace(/[&<>"']/g, function(m) { return map[m]; });
-}
-
-function ucfirst(str) {
-    if (typeof str !== 'string' || str.length === 0) return '';
-    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-}
-
-</script>
-</body>
-</html>
+?>
