@@ -45,8 +45,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
             background-color: #f5f5f7;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
             color: #1d1d1f;
-            /* Adjust this value to the EXACT height of your navbar. */
-            padding-top: 80px; /* Increased to ensure navbar content is not overlapped */
+            padding-top: 80px; 
             display: flex;
             flex-direction: column; 
         }
@@ -96,13 +95,13 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
         .stat-card.total-employees { border-left-color: #007bff; }
         .stat-card.total-employees .stat-icon { color: #007bff; }
-        .stat-card.assigned-today { border-left-color: #ff9500; } /* Orange */
+        .stat-card.assigned-today { border-left-color: #ff9500; } 
         .stat-card.assigned-today .stat-icon { color: #ff9500; }
-        .stat-card.active-today { border-left-color: #34c759; } /* Green */
+        .stat-card.active-today { border-left-color: #34c759; } 
         .stat-card.active-today .stat-icon { color: #34c759; }
-        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } /* Purple */
+        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } 
         .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
-        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } /* Red */
+        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } 
         .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
 
         .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; background-color: #fff; }
@@ -155,7 +154,13 @@ $initial_employee_list = getInitialEmployeeList($conn);
 </head>
 <body>
 
-
+<?php
+    if (file_exists('navbar.php')) {
+        include 'navbar.php';
+    } else {
+        echo '<p class="text-danger text-center">Erreur: Le fichier navbar.php est introuvable.</p>';
+    }
+?>
 
 <div class="container-fluid mt-4" id="main-content-area">
     <?php
@@ -244,21 +249,23 @@ function renderStats(stats, userRoleForStats) {
     let html = '';
 
     const statTypes = [
-        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: false },
-        { key: 'assigned_today', label: 'Assignés Aujourd\'hui (Planning)', icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: false },
-        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: false }, // Non-admin can see this count, and list
-        { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: false },
-        { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: false }
+        { key: 'total_employees', label: 'Total Employés Actifs', icon: 'fas fa-users', adminOnly: true, cssClass: 'total-employees', clickableIfZero: true }, // Made clickable even if zero to show an empty list
+        { key: 'assigned_today', label: 'Assignés Aujourd\'hui (Planning)', icon: 'fas fa-calendar-check', adminOnly: true, cssClass: 'assigned-today', clickableIfZero: true },
+        { key: 'active_today', label: 'En Activité (Pointage)', icon: 'fas fa-clipboard-check', adminOnly: false, cssClass: 'active-today', clickableIfZero: true }, 
+        { key: 'on_generic_leave_today', label: 'En Congé (Autre)', icon: 'fas fa-plane-departure', adminOnly: true, cssClass: 'on-generic-leave-today', clickableIfZero: true },
+        { key: 'on_sick_leave_today', label: 'En Arrêt Maladie', icon: 'fas fa-briefcase-medical', adminOnly: true, cssClass: 'on-sick-leave-today', clickableIfZero: true }
     ];
 
     statTypes.forEach(type => {
         if (stats[type.key] !== undefined && (!type.adminOnly || isAdmin)) {
             const count = parseInt(stats[type.key], 10) || 0;
-            const canBeClickedByRole = type.adminOnly ? isAdmin : true; // User can click 'active_today'
-            const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero) && type.key !== 'total_employees';
+            const canBeClickedByRole = type.adminOnly ? isAdmin : true; 
+            // Make 'total_employees' clickable to show the general list
+            const isClickable = canBeClickedByRole && (count > 0 || type.clickableIfZero); 
             
-            const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : '';
-            const cardClass = `stat-card ${type.cssClass} ${isClickable ? 'clickable' : ''}`;
+            const clickHandler = isClickable ? `loadFilteredEmployeeList('${type.key}', '${type.label}')` : (type.key === 'total_employees' && isAdmin ? `showInitialEmployeeList()` : '');
+            const cardClass = `stat-card ${type.cssClass} ${(isClickable || (type.key === 'total_employees' && isAdmin)) ? 'clickable' : ''}`;
+
 
             html += `<div class="${cardClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''}>
                         <div class="stat-icon"><i class="${type.icon}"></i></div>
@@ -279,19 +286,27 @@ function showInitialEmployeeList() {
     const backButton = document.getElementById('backToListButton');
     if (titleEl) titleEl.textContent = 'Liste Générale des Employés Actifs';
     if (backButton) backButton.style.display = 'none';
-    renderEmployeeTable(initialEmployeeData, 'total_employees');
+    renderEmployeeTable(initialEmployeeData, 'total_employees'); 
 }
 
 function loadFilteredEmployeeList(statType, title) {
-    console.log(`Attempting to load list for: ${statType}`);
+    console.log(`[loadFilteredEmployeeList] Attempting to load list for: ${statType}, Title: ${title}`);
     const titleEl = document.getElementById('employeeListTitle');
     const backButton = document.getElementById('backToListButton');
     if (titleEl) titleEl.textContent = title;
-    if (backButton) backButton.style.display = 'inline-block';
+    if (backButton) {
+        // Only show back button if it's not the initial/total employees list view
+        if (statType !== 'total_employees') {
+            backButton.style.display = 'inline-block';
+        } else {
+            backButton.style.display = 'none';
+        }
+    }
+
 
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) {
-        console.error("Table body not found for list rendering.");
+        console.error("[loadFilteredEmployeeList] Table body not found for list rendering.");
         return;
     }
 
@@ -303,36 +318,39 @@ function loadFilteredEmployeeList(statType, title) {
     setTableHeaders(statType); 
     tableBody.innerHTML = `<tr><td colspan="${colspan}" class="loading-placeholder"><div class="spinner-border spinner-border-sm"></div> Chargement de la liste...</td></tr>`;
     
-    console.log(`Workspaceing: employee_handler.php?action=get_employee_list_for_stat&type=${statType}`);
+    console.log(`[loadFilteredEmployeeList] Fetching: employee_handler.php?action=get_employee_list_for_stat&type=${statType}`);
     fetch(`employee_handler.php?action=get_employee_list_for_stat&type=${statType}`)
         .then(response => {
-            console.log(`Response status for ${statType}: ${response.status}`);
+            console.log(`[loadFilteredEmployeeList] Response status for ${statType}: ${response.status}`);
             if (!response.ok) {
                 return response.text().then(text => { 
-                    console.error(`Network error text for ${statType}:`, text);
+                    console.error(`[loadFilteredEmployeeList] Network error text for ${statType}:`, text);
                     throw new Error('Network error: ' + response.status + ' ' + text.substring(0,200));
                 });
             }
             return response.json();
         })
         .then(data => {
-            console.log(`Data received for ${statType}:`, data);
+            console.log(`[loadFilteredEmployeeList] Data received for ${statType}:`, data);
             if (data.status === 'success' && data.employees) {
                 renderEmployeeTable(data.employees, statType);
             } else {
-                console.error(`Error in data for ${statType}: ${data.message}`);
+                console.error(`[loadFilteredEmployeeList] Error in data for ${statType}: ${data.message}`);
                 tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur: ${data.message || 'Impossible de charger la liste.'}</td></tr>`;
             }
         })
         .catch(error => {
-            console.error(`Workspace catch error for ${statType}:`, error);
+            console.error(`[loadFilteredEmployeeList] Fetch catch error for ${statType}:`, error);
             tableBody.innerHTML = `<tr><td colspan="${colspan}" class="error-placeholder">Erreur de communication: ${error.message}</td></tr>`;
         });
 }
 
 function setTableHeaders(statType) {
     const tableHead = document.getElementById('employees-table-head');
-    if (!tableHead) return;
+    if (!tableHead) {
+        console.error("[setTableHeaders] Table head not found.");
+        return;
+    }
     let headers = '<tr><th>Nom</th><th>Prénom</th><th>Email</th><th>Rôle</th>';
     if (statType === 'assigned_today') {
         headers += '<th>Mission (Planning)</th>';
@@ -341,18 +359,23 @@ function setTableHeaders(statType) {
     }
     headers += '</tr>';
     tableHead.innerHTML = headers;
+    console.log(`[setTableHeaders] Headers set for ${statType}: ${headers}`);
 }
 
 function renderEmployeeTable(employees, statType) {
+    console.log(`[renderEmployeeTable] Rendering table for statType: ${statType}, with ${employees ? employees.length : 0} employees.`);
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) {
-        console.error("Cannot render table: employees-table-body not found.");
+        console.error("[renderEmployeeTable] Cannot render table: employees-table-body not found.");
         return;
     }
-    tableBody.innerHTML = ''; // Clear previous content
+    
+    // Clear previous content explicitly
+    tableBody.innerHTML = ''; 
 
-    // Headers should be set by setTableHeaders before this function is called with new data,
-    // but calling it here again ensures correctness if renderEmployeeTable is called directly for initial list.
+    // Ensure headers are set according to the current statType
+    // This is crucial because this function might be called directly (e.g., by showInitialEmployeeList)
+    // or after a fetch (by loadFilteredEmployeeList).
     setTableHeaders(statType); 
 
     let colspan = 4; 
@@ -361,10 +384,12 @@ function renderEmployeeTable(employees, statType) {
     }
 
     if (!employees || employees.length === 0) {
+        console.log(`[renderEmployeeTable] No employees to render for ${statType}.`);
         tableBody.innerHTML = `<tr><td colspan="${colspan}" class="info-placeholder">Aucun employé ne correspond à ce critère.</td></tr>`;
         return;
     }
 
+    let rowsHtml = '';
     employees.forEach(emp => {
         let rowHtml = `<tr>
                         <td>${emp.nom ? escapeHtml(emp.nom) : 'N/A'}</td>
@@ -377,8 +402,10 @@ function renderEmployeeTable(employees, statType) {
             rowHtml += `<td>${emp.type_conge_display ? escapeHtml(emp.type_conge_display) : (emp.type_conge ? escapeHtml(ucfirst(emp.type_conge)) : 'N/A')}</td>`;
         }
         rowHtml += `</tr>`;
-        tableBody.innerHTML += rowHtml;
+        rowsHtml += rowHtml;
     });
+    tableBody.innerHTML = rowsHtml;
+    console.log(`[renderEmployeeTable] Table rendered for ${statType}.`);
 }
 
 function escapeHtml(text) {
