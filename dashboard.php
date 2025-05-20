@@ -540,7 +540,7 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
         }
     ?>
 
-    <div class="container">
+    <div class="container-fluid">
         <h1>Administrateur</h1>
 
         <div class="shortcut-buttons-grid">
