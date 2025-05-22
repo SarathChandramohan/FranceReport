@@ -1029,7 +1029,7 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
          function getLeaveTypeName(typeKey) {
             const types = {
                 'cp': 'Congés Payés', 'rtt': 'RTT', 'sans-solde': 'Congé Sans Solde',
-                'special': 'Congé Spécial', 'maladie': 'Congé Maladie'
+                'special': 'Congé Spécial', 'maladie': 'arrêt maladie'
             };
             return types[typeKey] || typeKey;
         }
