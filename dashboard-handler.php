@@ -339,7 +339,7 @@ function getMonthlyLeaveData() {
 function getTypeCongeDisplayName($typeKey) {
     $types = [
         'cp' => 'Congés Payés', 'rtt' => 'RTT', 'sans-solde' => 'Congé Sans Solde',
-        'special' => 'Congé Spécial', 'maladie' => 'Congé Maladie'
+        'special' => 'Congé Spécial', 'maladie' => 'arrêt maladie'
     ];
     return $types[$typeKey] ?? ucfirst(str_replace('_', ' ', $typeKey));
 }
