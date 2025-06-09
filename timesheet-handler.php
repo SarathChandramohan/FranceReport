@@ -1,24 +1,19 @@
 <?php
 // timesheet-handler.php - Handles all AJAX requests for timesheet operations
 
-// Include database connection
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
-// Ensure user is logged in
 requireLogin();
 
-// Get the current user ID
 $user = getCurrentUser();
 $user_id = $user['user_id'];
 
-// Define the target timezone
 define('APP_TIMEZONE', 'Europe/Paris');
+define('MAX_DISTANCE_METERS', 100); // Define the 100-meter threshold
 
-// Get the action from the POST request
 $action = isset($_POST['action']) ? $_POST['action'] : '';
 
-// Handle different actions
 switch($action) {
     case 'record_entry':
         recordTimeEntry($user_id, 'logon');
@@ -42,35 +37,24 @@ switch($action) {
         respondWithError('Invalid action specified');
 }
 
-/**
- * Calculates the distance between two points on Earth in meters.
- */
 function calculateDistance($lat1, $lon1, $lat2, $lon2) {
-    $earth_radius = 6371000; // Earth radius in meters
+    $earth_radius = 6371000;
     $dLat = deg2rad($lat2 - $lat1);
     $dLon = deg2rad($lon2 - $lon1);
-    $a = sin($dLat / 2) * sin($dLat / 2) +
-         cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-         sin($dLon / 2) * sin($dLon / 2);
+    $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
     $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
     return $earth_radius * $c;
 }
 
-/**
- * Finds the nearest work location and the distance to it.
- * @return array|null ['distance' => float, 'name' => string] or null
- */
 function findNearestWorkLocation($user_lat, $user_lon) {
     global $conn;
     $stmt = $conn->prepare("SELECT latitude, longitude, location_name FROM WorkLocations WHERE is_active = 1");
     $stmt->execute();
     $work_locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
     if (empty($work_locations)) return null;
 
     $min_distance = PHP_INT_MAX;
     $nearest_location_name = '';
-
     foreach ($work_locations as $location) {
         $distance = calculateDistance($user_lat, $user_lon, $location['latitude'], $location['longitude']);
         if ($distance < $min_distance) {
@@ -81,29 +65,28 @@ function findNearestWorkLocation($user_lat, $user_lon) {
     return ['distance' => round($min_distance), 'name' => $nearest_location_name];
 }
 
-/**
- * Checks the user's distance from the nearest work location for the UI.
- */
 function checkLocationStatus() {
     $user_lat = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
     $user_lon = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
-
     if ($user_lat === null || $user_lon === null) {
-        respondWithError('Coordonnées de l\'utilisateur non fournies.');
+        respondWithError('Coordonnées utilisateur non fournies.');
         return;
     }
+
     $nearest = findNearestWorkLocation($user_lat, $user_lon);
     if ($nearest === null) {
-        respondWithSuccess('Aucun site de travail actif trouvé.', ['message' => 'Aucun site de travail n\'est configuré.']);
+        respondWithSuccess('Aucun site de travail trouvé.', ['in_range' => false, 'message' => 'Aucun site de travail n\'est configuré.']);
         return;
     }
-    $message = "Vous êtes à environ {$nearest['distance']}m du site: {$nearest['name']}";
-    respondWithSuccess('Distance calculée.', ['message' => $message]);
+
+    $is_in_range = $nearest['distance'] <= MAX_DISTANCE_METERS;
+    $message = $is_in_range
+        ? "Vous êtes à portée ({$nearest['distance']}m de: {$nearest['name']})."
+        : "Vous êtes trop loin ({$nearest['distance']}m). Le pointage est désactivé.";
+
+    respondWithSuccess('Statut de localisation vérifié.', ['in_range' => $is_in_range, 'message' => $message]);
 }
 
-/**
- * Records a time entry, only storing the distance, not the user's coordinates.
- */
 function recordTimeEntry($user_id, $type) {
     global $conn;
 
@@ -111,9 +94,25 @@ function recordTimeEntry($user_id, $type) {
     $current_time_for_sql = (new DateTime('now', $paris_tz))->format('Y-m-d H:i:s');
     $current_date_for_sql = (new DateTime('now', $paris_tz))->format('Y-m-d');
 
-    // Get geolocation data for distance calculation only
     $latitude = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
     $longitude = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
+
+    if ($latitude === null || $longitude === null) {
+        respondWithError("Les coordonnées GPS sont requises pour pointer.");
+        return;
+    }
+
+    // Security Check: Validate distance before any database operation
+    $nearest = findNearestWorkLocation($latitude, $longitude);
+    if ($nearest === null) {
+        respondWithError("Aucun site de travail configuré. Impossible de pointer.");
+        return;
+    }
+    if ($nearest['distance'] > MAX_DISTANCE_METERS) {
+        respondWithError("Pointage refusé. Vous n'êtes pas sur un site de travail autorisé (à {$nearest['distance']}m).");
+        return;
+    }
+    $distance_meters = $nearest['distance'];
 
     try {
         $conn->beginTransaction();
@@ -127,32 +126,13 @@ function recordTimeEntry($user_id, $type) {
                 respondWithError("Une entrée a déjà été enregistrée pour aujourd'hui.");
                 return;
             }
-
-            // Calculate distance but do not store coordinates
-            $distance_meters = null;
-            if ($latitude !== null && $longitude !== null) {
-                $nearest = findNearestWorkLocation($latitude, $longitude);
-                if ($nearest !== null) {
-                    $distance_meters = $nearest['distance'];
-                }
-            }
-
-            $stmt = $conn->prepare(
-                "INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters)
-                 VALUES (?, ?, ?, ?)"
-            );
-            $stmt->execute([
-                $user_id,
-                $current_date_for_sql,
-                $current_time_for_sql,
-                $distance_meters
-            ]);
+            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters]);
             $message = "Entrée enregistrée avec succès.";
-
         } else if ($type === 'logoff') {
             if (!$existing_entry || $existing_entry['logon_time'] === null) {
                 $conn->rollBack();
-                respondWithError("Impossible d'enregistrer la sortie sans une entrée préalable pour aujourd'hui.");
+                respondWithError("Impossible d'enregistrer la sortie sans une entrée préalable.");
                 return;
             }
             if ($existing_entry['logoff_time'] !== null) {
@@ -160,83 +140,65 @@ function recordTimeEntry($user_id, $type) {
                 respondWithError("Une sortie a déjà été enregistrée pour aujourd'hui.");
                 return;
             }
-
-            $stmt = $conn->prepare("UPDATE Timesheet SET logoff_time = ? WHERE timesheet_id = ?");
-            $stmt->execute([$current_time_for_sql, $existing_entry['timesheet_id']]);
+            $stmt = $conn->prepare("UPDATE Timesheet SET logoff_time = ?, logoff_distance_meters = ? WHERE timesheet_id = ?");
+            $stmt->execute([$current_time_for_sql, $distance_meters, $existing_entry['timesheet_id']]);
             $message = "Sortie enregistrée avec succès.";
         }
-
         $conn->commit();
-        respondWithSuccess($message, [
-            'timesheet_id' => $existing_entry ? $existing_entry['timesheet_id'] : $conn->lastInsertId(),
-        ]);
-    } catch(PDOException $e) {
+        respondWithSuccess($message);
+    } catch (PDOException $e) {
         if ($conn->inTransaction()) $conn->rollBack();
         respondWithError('Database error: ' . $e->getMessage());
     }
 }
 
-/**
- * Gets the timesheet history, including distance at logon.
- */
 function getTimesheetHistory($user_id) {
     global $conn;
-    $paris_tz = new DateTimeZone(APP_TIMEZONE);
-
     try {
         $stmt = $conn->prepare("SELECT
-                                    timesheet_id, entry_date,
-                                    logon_time, logon_distance_meters,
-                                    logoff_time, break_minutes
-                                FROM Timesheet
-                                WHERE user_id = ?
-                                ORDER BY entry_date DESC
-                                OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
+                                    timesheet_id, entry_date, logon_time, logon_distance_meters,
+                                    logoff_time, logoff_distance_meters, break_minutes
+                                FROM Timesheet WHERE user_id = ? ORDER BY entry_date DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
         $stmt->execute([$user_id]);
         $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $formatted_history = [];
         foreach ($history as $entry) {
             $duration = '';
-            $break_minutes_val = $entry['break_minutes'] ?? 0;
-
             if ($entry['logon_time'] && $entry['logoff_time']) {
-                 $logon_dt = new DateTime($entry['logon_time'], $paris_tz);
-                 $logoff_dt = new DateTime($entry['logoff_time'], $paris_tz);
-                 $interval = $logon_dt->diff($logoff_dt);
-                 $total_minutes_worked = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
-                 $effective_minutes_worked = $total_minutes_worked - $break_minutes_val;
-                 if ($effective_minutes_worked < 0) $effective_minutes_worked = 0;
-                 $hours = floor($effective_minutes_worked / 60);
-                 $minutes = $effective_minutes_worked % 60;
-                 $duration = sprintf('%dh%02d', $hours, $minutes);
+                $logon_dt = new DateTime($entry['logon_time']);
+                $logoff_dt = new DateTime($entry['logoff_time']);
+                $interval = $logon_dt->diff($logoff_dt);
+                $total_minutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
+                $effective_minutes = $total_minutes - ($entry['break_minutes'] ?? 0);
+                if ($effective_minutes < 0) $effective_minutes = 0;
+                $hours = floor($effective_minutes / 60);
+                $minutes = $effective_minutes % 60;
+                $duration = sprintf('%dh%02d', $hours, $minutes);
             }
 
-            $distance_display = '--';
-            if ($entry['logon_distance_meters'] !== null) {
-                $distance_val = $entry['logon_distance_meters'];
-                $distance_display = $distance_val > 1000
-                    ? round($distance_val / 1000, 2) . ' km'
-                    : $distance_val . ' m';
-            }
+            $format_dist = function($dist) {
+                if ($dist === null) return '--';
+                return $dist > 1000 ? round($dist / 1000, 2) . ' km' : $dist . ' m';
+            };
 
             $formatted_history[] = [
-                'id' => $entry['timesheet_id'],
                 'date' => (new DateTime($entry['entry_date']))->format('d/m/Y'),
-                'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time'], $paris_tz))->format('H:i') : '--:--',
-                'distance' => $distance_display,
-                'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time'], $paris_tz))->format('H:i') : '--:--',
-                'break_minutes' => $break_minutes_val,
+                'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time']))->format('H:i') : '--:--',
+                'logon_distance' => $format_dist($entry['logon_distance_meters']),
+                'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time']))->format('H:i') : '--:--',
+                'logoff_distance' => $format_dist($entry['logoff_distance_meters']),
+                'break_minutes' => $entry['break_minutes'] ?? 0,
                 'duration' => $duration
             ];
         }
         respondWithSuccess('History retrieved successfully', $formatted_history);
-    } catch(Exception $e) {
+    } catch (Exception $e) {
         respondWithError('Processing error: ' . $e->getMessage());
     }
 }
-
-// --- Other functions (addBreak, getLatestEntryStatus, respondWithSuccess, respondWithError) ---
+// Other functions (addBreak, getLatestEntryStatus, respondWithSuccess, respondWithError) remain the same
+// but are included here for completeness.
 
 function addBreak($user_id) {
     global $conn;
@@ -252,9 +214,7 @@ function addBreak($user_id) {
         $stmt->execute([$user_id, $current_date_for_sql]);
         $existing_entry = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$existing_entry) {
-            $conn->rollBack();
-            respondWithError("Impossible d'ajouter une pause. Aucun pointage d'entrée actif trouvé pour aujourd'hui.");
-            return;
+            $conn->rollBack(); respondWithError("Impossible d'ajouter une pause. Aucun pointage d'entrée actif trouvé."); return;
         }
         $stmt = $conn->prepare("UPDATE Timesheet SET break_minutes = ? WHERE timesheet_id = ?");
         $stmt->execute([$break_minutes, $existing_entry['timesheet_id']]);
@@ -284,14 +244,9 @@ function getLatestEntryStatus($user_id) {
 }
 
 function respondWithSuccess($message, $data = []) {
-    header('Content-Type: application/json');
-    echo json_encode(['status' => 'success', 'message' => $message, 'data' => $data]);
-    exit;
+    header('Content-Type: application/json'); echo json_encode(['status' => 'success', 'message' => $message, 'data' => $data]); exit;
 }
-
 function respondWithError($message) {
-    header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => $message]);
-    exit;
+    header('Content-Type: application/json'); echo json_encode(['status' => 'error', 'message' => $message]); exit;
 }
 ?>
