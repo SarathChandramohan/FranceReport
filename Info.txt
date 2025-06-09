@@ -47,6 +47,7 @@ ALTER TABLE Timesheet
 ADD logon_location_name NVARCHAR(255) NULL,
     logoff_location_name NVARCHAR(255) NULL;
 ADD logoff_distance_meters INT NULL;
+ADD logon_distance_meters INT NULL;
 
 -----------------------------------------------------------
 
