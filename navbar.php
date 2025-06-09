@@ -71,6 +71,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .navbar-toggler {
         /*border-color: rgba(255,255,255,0.5);
         background-color: rgba(0,0,0,0.5);  Added background to make it visible */
+        text-align:left;
     }
 
     /* Making the navbar collapse from left side */
