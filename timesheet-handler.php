@@ -10,7 +10,7 @@ $user = getCurrentUser();
 $user_id = $user['user_id'];
 
 define('APP_TIMEZONE', 'Europe/Paris');
-define('MAX_DISTANCE_METERS', 100); // Define the 100-meter threshold
+define('MAX_DISTANCE_METERS', 100);
 
 $action = isset($_POST['action']) ? $_POST['action'] : '';
 
@@ -102,7 +102,6 @@ function recordTimeEntry($user_id, $type) {
         return;
     }
 
-    // Security Check: Validate distance before any database operation
     $nearest = findNearestWorkLocation($latitude, $longitude);
     if ($nearest === null) {
         respondWithError("Aucun site de travail configuré. Impossible de pointer.");
@@ -112,7 +111,9 @@ function recordTimeEntry($user_id, $type) {
         respondWithError("Pointage refusé. Vous n'êtes pas sur un site de travail autorisé (à {$nearest['distance']}m).");
         return;
     }
+    
     $distance_meters = $nearest['distance'];
+    $location_name = $nearest['name'];
 
     try {
         $conn->beginTransaction();
@@ -126,8 +127,8 @@ function recordTimeEntry($user_id, $type) {
                 respondWithError("Une entrée a déjà été enregistrée pour aujourd'hui.");
                 return;
             }
-            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters]);
+            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters, logon_location_name) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters, $location_name]);
             $message = "Entrée enregistrée avec succès.";
         } else if ($type === 'logoff') {
             if (!$existing_entry || $existing_entry['logon_time'] === null) {
@@ -140,8 +141,8 @@ function recordTimeEntry($user_id, $type) {
                 respondWithError("Une sortie a déjà été enregistrée pour aujourd'hui.");
                 return;
             }
-            $stmt = $conn->prepare("UPDATE Timesheet SET logoff_time = ?, logoff_distance_meters = ? WHERE timesheet_id = ?");
-            $stmt->execute([$current_time_for_sql, $distance_meters, $existing_entry['timesheet_id']]);
+            $stmt = $conn->prepare("UPDATE Timesheet SET logoff_time = ?, logoff_distance_meters = ?, logoff_location_name = ? WHERE timesheet_id = ?");
+            $stmt->execute([$current_time_for_sql, $distance_meters, $location_name, $existing_entry['timesheet_id']]);
             $message = "Sortie enregistrée avec succès.";
         }
         $conn->commit();
@@ -156,8 +157,8 @@ function getTimesheetHistory($user_id) {
     global $conn;
     try {
         $stmt = $conn->prepare("SELECT
-                                    timesheet_id, entry_date, logon_time, logon_distance_meters,
-                                    logoff_time, logoff_distance_meters, break_minutes
+                                    timesheet_id, entry_date, logon_time, logon_location_name,
+                                    logoff_time, logoff_location_name, break_minutes
                                 FROM Timesheet WHERE user_id = ? ORDER BY entry_date DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
         $stmt->execute([$user_id]);
         $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -177,17 +178,12 @@ function getTimesheetHistory($user_id) {
                 $duration = sprintf('%dh%02d', $hours, $minutes);
             }
 
-            $format_dist = function($dist) {
-                if ($dist === null) return '--';
-                return $dist > 1000 ? round($dist / 1000, 2) . ' km' : $dist . ' m';
-            };
-
             $formatted_history[] = [
                 'date' => (new DateTime($entry['entry_date']))->format('d/m/Y'),
                 'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time']))->format('H:i') : '--:--',
-                'logon_distance' => $format_dist($entry['logon_distance_meters']),
+                'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
                 'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time']))->format('H:i') : '--:--',
-                'logoff_distance' => $format_dist($entry['logoff_distance_meters']),
+                'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
                 'break_minutes' => $entry['break_minutes'] ?? 0,
                 'duration' => $duration
             ];
@@ -197,25 +193,18 @@ function getTimesheetHistory($user_id) {
         respondWithError('Processing error: ' . $e->getMessage());
     }
 }
-// Other functions (addBreak, getLatestEntryStatus, respondWithSuccess, respondWithError) remain the same
-// but are included here for completeness.
 
 function addBreak($user_id) {
     global $conn;
     $current_date_for_sql = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('Y-m-d');
     $break_minutes = isset($_POST['break_minutes']) ? intval($_POST['break_minutes']) : 0;
-    if (!in_array($break_minutes, [30, 60])) {
-        respondWithError('Invalid break duration specified.');
-        return;
-    }
+    if (!in_array($break_minutes, [30, 60])) { respondWithError('Invalid break duration specified.'); return; }
     try {
         $conn->beginTransaction();
         $stmt = $conn->prepare("SELECT timesheet_id FROM Timesheet WHERE user_id = ? AND entry_date = ? AND logon_time IS NOT NULL AND logoff_time IS NULL");
         $stmt->execute([$user_id, $current_date_for_sql]);
         $existing_entry = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$existing_entry) {
-            $conn->rollBack(); respondWithError("Impossible d'ajouter une pause. Aucun pointage d'entrée actif trouvé."); return;
-        }
+        if (!$existing_entry) { $conn->rollBack(); respondWithError("Impossible d'ajouter une pause. Aucun pointage d'entrée actif trouvé."); return; }
         $stmt = $conn->prepare("UPDATE Timesheet SET break_minutes = ? WHERE timesheet_id = ?");
         $stmt->execute([$break_minutes, $existing_entry['timesheet_id']]);
         $conn->commit();
