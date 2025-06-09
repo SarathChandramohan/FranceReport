@@ -80,9 +80,9 @@ $user = getCurrentUser();
                             <tr>
                                 <th>Date</th>
                                 <th>Entrée</th>
-                                <th>Distance (Entrée)</th>
+                                <th>Lieu (Entrée)</th>
                                 <th>Sortie</th>
-                                <th>Distance (Sortie)</th>
+                                <th>Lieu (Sortie)</th>
                                 <th>Pause</th>
                                 <th>Total</th>
                             </tr>
@@ -213,13 +213,12 @@ $user = getCurrentUser();
                 tableBody.innerHTML = '';
                 response.data.forEach(entry => {
                     const row = document.createElement('tr');
-                    const distColor = (dist) => (dist.includes('km') || parseInt(dist) > 100) ? 'color:red;' : 'color:green;';
                     row.innerHTML = `
                         <td>${entry.date}</td>
                         <td>${entry.logon_time}</td>
-                        <td style="${distColor(entry.logon_distance)}">${entry.logon_distance}</td>
+                        <td>${entry.logon_location_name}</td>
                         <td>${entry.logoff_time}</td>
-                        <td style="${distColor(entry.logoff_distance)}">${entry.logoff_distance}</td>
+                        <td>${entry.logoff_location_name}</td>
                         <td>${entry.break_minutes > 0 ? entry.break_minutes + ' min' : '--'}</td>
                         <td><strong>${entry.duration || '--'}</strong></td>
                     `;
@@ -235,9 +234,9 @@ $user = getCurrentUser();
             if (!error && response.status === 'success' && response.data) {
                 timeSheetStatus = response.data;
             } else {
-                timeSheetStatus = { has_entry: false, has_exit: false }; // Default on error
+                timeSheetStatus = { has_entry: false, has_exit: false };
             }
-            checkLocationAndSetButtons(); // This will call updateButtonStates after location check
+            checkLocationAndSetButtons();
         });
     }
 
@@ -249,19 +248,14 @@ $user = getCurrentUser();
         const hasEntry = timeSheetStatus.has_entry;
         const hasExit = timeSheetStatus.has_exit;
 
-        // An entry is possible if user is in range AND has not made an entry yet today
         btnEntree.disabled = !isInRange || hasEntry;
-
-        // An exit is possible if user is in range AND has made an entry AND has not made an exit yet
         btnSortie.disabled = !isInRange || !hasEntry || hasExit;
-        
-        // A break is possible if an entry is made but no exit yet. Not dependent on location.
         btnBreak.disabled = !hasEntry || hasExit;
     }
 
     document.addEventListener('DOMContentLoaded', function() {
         loadTimesheetHistory();
-        setInterval(checkLocationAndSetButtons, 30000); // Check location every 30 seconds
+        setInterval(checkLocationAndSetButtons, 30000);
 
         const breakDropdown = document.getElementById('break-dropdown');
         const btnBreak = document.getElementById('btn-break');
