@@ -34,6 +34,16 @@ CREATE TABLE Timesheet (
     ON DELETE CASCADE -- Optional: Define behavior on user deletion (e.g., CASCADE, NO ACTION)
 );
 
+
+------------------------------------------------------
+ALTER TABLE Timesheet
+DROP COLUMN logon_latitude,
+            logon_longitude,
+            logon_address,
+            logoff_latitude,
+            logoff_longitude,
+            logoff_address;
+
 -----------------------------------------------------------
 
 CREATE INDEX IX_Timesheet_EntryDate
@@ -188,4 +198,12 @@ GO
 
 ALTER TABLE Planning_Assignments ADD location NVARCHAR(255) NULL;
 GO
+------------------------------------------------------------------------------------------------------------------
+CREATE TABLE WorkLocations (
+    location_id INT IDENTITY(1,1) PRIMARY KEY,
+    location_name NVARCHAR(255) NOT NULL,
+    latitude DECIMAL(9, 6) NOT NULL,
+    longitude DECIMAL(9, 6) NOT NULL,
+    is_active BIT NOT NULL DEFAULT 1 -- To easily enable/disable a location
+);
 ------------------------------------------------------------------------------------------------------------------
