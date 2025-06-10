@@ -147,9 +147,6 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tableau de bord - Gestion des Ouvriers</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-     crossorigin=""/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         /* Basic Reset and Font */
@@ -595,10 +592,14 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
                 <table id="activities-table">
                     <thead>
                         <tr>
-                            <th>Employé</th>
-                            <th>Action</th>
-                            <th>Date</th>
-                            <th>Heure</th>
+                           <th>Employé</th>
+        <th>Date</th>
+        <th>Entrée</th>
+        <th>Lieu (Entrée)</th>
+        <th>Sortie</th>
+        <th>Lieu (Sortie)</th>
+        <th>Pause prise</th>
+        <th>Durée</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -836,25 +837,6 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
         </div>
     </div>
 
-     <div id="mapModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="mapModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="map-modal-title-main">Localisation Pointage</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div id="map-modal-content-container-main" style="height: 350px; width: 100%; margin-bottom: 15px;"></div>
-                    <div id="map-modal-details-main" class="mt-2"></div>
-                </div>
-                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
 
     <?php
@@ -863,9 +845,7 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
         }
     ?>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-     crossorigin=""></script>
+
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -1318,114 +1298,75 @@ $initial_employee_list = getInitialEmployeeList($conn); // For the integrated em
         }
 
         // Renamed function for clarity, specific to dashboard's main map modal
-        function showTimesheetMapInDashboardModal(employeeName, entryDate, latEntreeStr, lonEntreeStr, addrEntree, timeEntree, latSortieStr, lonSortieStr, addrSortie, timeSortie) {
-            try {
-                const modal = $('#mapModal');
-                const mapContainer = document.getElementById('map-modal-content-container-main'); // Use new ID
-                const mapTitleElem = document.getElementById('map-modal-title-main'); // Use new ID
-                const mapDetailsElem = document.getElementById('map-modal-details-main'); // Use new ID
+        function loadTimesheetDataForModal() {
+    try {
+        const employeeFilter = $('#timesheetEmployeeFilterModal');
+        const monthFilter = $('#timesheetMonthFilterModal');
+        const dayFilter = $('#timesheetDayFilterModal');
+        const tbody = $('#timesheetTableBodyModal');
 
+        if (!employeeFilter.length || !monthFilter.length || !dayFilter.length || !tbody.length) {
+            console.error("Modal filter or table body elements not found for Timesheet modal.");
+            if(tbody.length) tbody.html('<tr><td colspan="8" style="text-align:center; color:red;">Erreur: Composants du modal non trouvés.</td></tr>');
+            return;
+        }
+        const employeeId = employeeFilter.val();
+        const monthYearInput = monthFilter.val();
+        const specificDay = dayFilter.val();
+        tbody.html('<tr><td colspan="8" style="text-align:center;">Chargement...</td></tr>');
 
-                if(!mapContainer || !mapTitleElem || !mapDetailsElem) {
-                    console.error("Main map modal elements not found in dashboard."); return;
-                }
+        let ajaxData = {
+            action: 'get_monthly_timesheet',
+            employee_id: employeeId
+        };
 
-                mapTitleElem.textContent = 'Localisation pour ' + escapeHtml(employeeName) + ' - ' + escapeHtml(entryDate);
-
-                currentMapMarkers.forEach(marker => marker.remove());
-                currentMapMarkers = [];
-                if (map) { map.remove(); map = null; } // Use the global 'map' variable for this modal
-
-                mapContainer.innerHTML = '';
-
-                if (typeof L === 'undefined') {
-                    mapContainer.innerHTML = "Erreur: La bibliothèque de cartographie (Leaflet) n'a pas pu être chargée.";
-                    modal.modal('show');
-                    return;
-                }
-
-                map = L.map(mapContainer); // Initialize the global 'map' variable
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(map);
-
-                let latEntree = parseFloat(latEntreeStr);
-                let lonEntree = parseFloat(lonEntreeStr);
-                let latSortie = parseFloat(latSortieStr);
-                let lonSortie = parseFloat(lonSortieStr);
-
-                const validEntryCoords = !isNaN(latEntree) && !isNaN(lonEntree) && (latEntree !== 0 || lonEntree !== 0);
-                const validExitCoords = !isNaN(latSortie) && !isNaN(lonSortie) && (latSortie !== 0 || lonSortie !== 0);
-                let bounds = [];
-                let detailsHTML = "";
-
-                if (validEntryCoords) {
-                    const entryMarker = L.marker([latEntree, lonEntree]).addTo(map)
-                        .bindPopup('<b>Entrée:</b> ' + (escapeHtml(String(timeEntree)) || 'N/A') + '<br>' + (escapeHtml(String(addrEntree)) || 'Adresse non enregistrée'));
-                    currentMapMarkers.push(entryMarker);
-                    bounds.push([latEntree, lonEntree]);
-                    detailsHTML += '<p><strong>Entrée ('+(escapeHtml(String(timeEntree)) || 'N/A')+'):</strong> ' + (escapeHtml(String(addrEntree)) || 'Lat: ' + latEntree.toFixed(5) + ', Lon: ' + lonEntree.toFixed(5)) + '</p>';
-                } else {
-                     detailsHTML += '<p><strong>Entrée ('+(escapeHtml(String(timeEntree)) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
-                }
-
-                if (validExitCoords) {
-                    const exitMarker = L.marker([latSortie, lonSortie]).addTo(map)
-                        .bindPopup('<b>Sortie:</b> ' + (escapeHtml(String(timeSortie)) || 'N/A') + '<br>' + (escapeHtml(String(addrSortie)) || 'Adresse non enregistrée'));
-                    currentMapMarkers.push(exitMarker);
-                    bounds.push([latSortie, lonSortie]);
-                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(String(timeSortie)) || 'N/A')+'):</strong> ' + (escapeHtml(String(addrSortie)) || 'Lat: ' + latSortie.toFixed(5) + ', Lon: ' + lonSortie.toFixed(5)) + '</p>';
-                } else {
-                    detailsHTML += '<p><strong>Sortie ('+(escapeHtml(String(timeSortie)) || 'N/A')+'):</strong> Localisation non enregistrée.</p>';
-                }
-
-                mapDetailsElem.innerHTML = detailsHTML;
-
-                if (validEntryCoords && validExitCoords && !(latEntree === latSortie && lonEntree === lonSortie)) {
-                    L.polyline(bounds, {color: 'blue'}).addTo(map);
-                }
-
-                if (bounds.length > 0) {
-                    if (bounds.length === 1) {
-                        map.setView(bounds[0], 13);
-                    } else {
-                        map.fitBounds(bounds, { padding: [50, 50] });
-                    }
-                } else {
-                    map.setView([48.8566, 2.3522], 5); // Default to Paris if no coords
-                    mapDetailsElem.innerHTML = "<p>Aucune localisation GPS enregistrée pour cette entrée.</p>";
-                }
-
-                modal.modal('show');
-                modal.on('shown.bs.modal', function () {
-                    if (map) {
-                        map.invalidateSize();
-                    }
-                });
-
-            } catch (e) {
-                console.error("Error in showTimesheetMapInDashboardModal:", e);
-                 if(document.getElementById('map-modal-details-main')) document.getElementById('map-modal-details-main').innerHTML = "<p>Erreur lors de l'affichage de la carte.</p>";
-                 $('#mapModal').modal('show');
-            }
+        if (specificDay && specificDay !== '') {
+            ajaxData.specific_day = specificDay;
+        } else if (monthYearInput && monthYearInput !== '') {
+            ajaxData.month_year = monthYearInput;
+        } else {
+             tbody.html('<tr><td colspan="8" style="text-align:center; color:red;">Veuillez sélectionner un mois ou un jour.</td></tr>');
+             return;
         }
 
-
-        function cleanupMapResources() { // For the main map modal
-             try {
-                if (currentMapMarkers && currentMapMarkers.length > 0) {
-                    currentMapMarkers.forEach(marker => marker.remove());
-                    currentMapMarkers = [];
+        $.ajax({
+            url: 'dashboard-handler.php',
+            type: 'GET',
+            data: ajaxData,
+            dataType: 'json',
+            success: function(response) {
+                tbody.empty();
+                if (response.status === 'success' && response.data && response.data.timesheet && response.data.timesheet.length > 0) {
+                    response.data.timesheet.forEach(function(entry) {
+                        // **FIXED**: This no longer creates a map button. It creates a simple row with the location names.
+                        let rowHTML = '<tr>' +
+                            '<td>' + escapeHtml(String(entry.employee_name)) + '</td>' +
+                            '<td>' + escapeHtml(String(entry.entry_date)) + '</td>' +
+                            '<td>' + (escapeHtml(String(entry.logon_time || '--'))) + '</td>' +
+                            '<td>' + (escapeHtml(String(entry.logon_location_name || 'N/A'))) + '</td>' +
+                            '<td>' + (escapeHtml(String(entry.logoff_time || '--'))) + '</td>' +
+                            '<td>' + (escapeHtml(String(entry.logoff_location_name || 'N/A'))) + '</td>' +
+                            '<td>' + (escapeHtml(String(entry.break_minutes || '0'))) + ' min</td>' +
+                            '<td>' + (escapeHtml(String(entry.duration || '--'))) + '</td>' +
+                        '</tr>';
+                        tbody.append(rowHTML);
+                    });
+                } else if (response.status === 'success') {
+                    tbody.html('<tr><td colspan="8" style="text-align:center;">Aucune donnée pour cette sélection.</td></tr>');
+                } else {
+                    tbody.html('<tr><td colspan="8" style="text-align:center; color:red;">Erreur: ' + escapeHtml(response.message || 'Impossible de charger les données.') + '</td></tr>');
                 }
-                if (map) { // Use the global 'map' variable
-                    map.off();
-                    map.remove();
-                    map = null;
-                }
-            } catch(e) {
-                console.error("Error during map resource cleanup:", e);
+            },
+            error: function(xhr) {
+                console.error("AJAX error loading timesheet for modal:", xhr.responseText);
+                tbody.html('<tr><td colspan="8" style="text-align:center; color:red;">Erreur de communication.</td></tr>');
             }
-        }
+        });
+    } catch (e) {
+        console.error("Error in loadTimesheetDataForModal:", e);
+         $('#timesheetTableBodyModal').html('<tr><td colspan="8" style="text-align:center; color:red;">Erreur interne du script.</td></tr>');
+    }
+}
 
         function exportTableToCSV(tableId, filename) {
             try {
