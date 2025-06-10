@@ -149,6 +149,7 @@ function getRecentActivities($conn) {
     }
 }
 
+   'logoff_longitude' => $entry['logoff_longitude'],
 function getMonthlyTimesheetData() {
     global $conn;
     $employeeId = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
@@ -169,33 +170,25 @@ function getMonthlyTimesheetData() {
     }
 
     try {
-        // MODIFIED: Added break_minutes to SELECT
-        $sql = "SELECT 
-                    t.entry_date, 
-                    t.logon_time, 
+        // **FIXED SQL**: Selects location_name columns instead of the old latitude/longitude columns.
+        $sql = "SELECT
+                    t.entry_date,
+                    t.logon_time,
                     t.logoff_time,
-                    t.logon_latitude, t.logon_longitude, t.logon_address,
-                    t.logoff_latitude, t.logoff_longitude, t.logoff_address,
-                    t.break_minutes, -- Added this line
-                    u.prenom + ' ' + u.nom AS employee_name,
-                    CASE 
-                        WHEN t.logon_time IS NOT NULL AND t.logoff_time IS NOT NULL AND DATEDIFF(MINUTE, t.logon_time, t.logoff_time) >= 0
-                        THEN 
-                            -- Calculate duration subtracting break_minutes
-                            CAST( (DATEDIFF(MINUTE, t.logon_time, t.logoff_time) - ISNULL(t.break_minutes, 0) ) / 60 AS VARCHAR) + 'h ' + 
-                            RIGHT('0' + CAST( (DATEDIFF(MINUTE, t.logon_time, t.logoff_time) - ISNULL(t.break_minutes, 0) ) % 60 AS VARCHAR), 2)
-                        ELSE NULL 
-                    END AS duration
+                    t.logon_location_name,
+                    t.logoff_location_name,
+                    t.break_minutes,
+                    u.prenom + ' ' + u.nom AS employee_name
                 FROM Timesheet t
                 JOIN Users u ON t.user_id = u.user_id
                 WHERE 1=1";
-        
+
         $params = [];
 
         if ($specificDay) {
             $sql .= " AND t.entry_date = :specific_day";
             $params[':specific_day'] = $specificDay;
-        } elseif ($monthYear) { 
+        } elseif ($monthYear) {
             list($year, $month) = explode('-', $monthYear);
             $sql .= " AND MONTH(t.entry_date) = :month_val AND YEAR(t.entry_date) = :year_val";
             $params[':month_val'] = $month;
@@ -215,8 +208,7 @@ function getMonthlyTimesheetData() {
         $formattedData = [];
         if ($timesheetData) {
             foreach($timesheetData as $entry) {
-                $durationDisplay = $entry['duration'];
-                // Ensure duration is not negative if break is longer than work
+                $durationDisplay = '--';
                 if ($entry['logon_time'] && $entry['logoff_time']) {
                     $logon = new DateTime($entry['logon_time']);
                     $logoff = new DateTime($entry['logoff_time']);
@@ -228,23 +220,19 @@ function getMonthlyTimesheetData() {
                     }
                     $hours = floor($effectiveMinutes / 60);
                     $minutes = $effectiveMinutes % 60;
-                    $durationDisplay = $hours . 'h ' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
+                    $durationDisplay = $hours . 'h' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
                 }
 
-
+                // **FIXED DATA**: Returns the location names and removes the old coordinate fields.
                 $formattedData[] = [
                     'employee_name' => $entry['employee_name'],
                     'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
                     'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
                     'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
                     'duration' => $durationDisplay,
-                    'logon_latitude' => $entry['logon_latitude'],
-                    'logon_longitude' => $entry['logon_longitude'],
-                    'logon_address' => $entry['logon_address'],
-                    'logoff_latitude' => $entry['logoff_latitude'],
-                    'logoff_longitude' => $entry['logoff_longitude'],
-                    'logoff_address' => $entry['logoff_address'],
-                    'break_minutes' => $entry['break_minutes'] // Added this line
+                    'logon_location_name' => $entry['logon_location_name'],
+                    'logoff_location_name' => $entry['logoff_location_name'],
+                    'break_minutes' => $entry['break_minutes']
                 ];
             }
         }
