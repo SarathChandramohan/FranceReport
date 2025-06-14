@@ -234,4 +234,30 @@ GO
 CREATE INDEX IDX_Messages_Sender ON Messages (sender_user_id);
 CREATE INDEX IDX_Messages_Recipient ON Messages (recipient_type);
 GO
------
+---------------------------------------------------------------------------------
+ALTER TABLE Messages
+DROP COLUMN status, read_at;
+GO
+
+-- Step 2: Update the recipient_type column to allow for the new recipient types.
+-- This will ensure 'all_users' and 'individual' can be stored.
+ALTER TABLE Messages
+ALTER COLUMN recipient_type VARCHAR(50) NOT NULL;
+GO
+
+-- Step 3: Create the new 'Message_Recipients' table.
+-- This table will link messages to their individual recipients and track read status.
+CREATE TABLE Message_Recipients (
+    message_id INT NOT NULL,
+    recipient_user_id INT NOT NULL,
+    is_read BIT NOT NULL DEFAULT 0,
+    read_at DATETIME NULL,
+    PRIMARY KEY (message_id, recipient_user_id),
+    CONSTRAINT FK_MessageRecipients_Message FOREIGN KEY (message_id) REFERENCES Messages(message_id) ON DELETE CASCADE,
+    CONSTRAINT FK_MessageRecipients_User FOREIGN KEY (recipient_user_id) REFERENCES Users(user_id) ON DELETE NO ACTION
+);
+GO
+
+-- Step 4: Add indexes for better performance on the new table.
+CREATE INDEX IDX_MessageRecipients_Recipient ON Message_Recipients (recipient_user_id);
+GO
