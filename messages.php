@@ -44,7 +44,7 @@ try {
     <?php include 'navbar.php'; ?>
     <div class="container-fluid mt-4">
         <h2>Messages</h2>
-        <div id="status-message" style="display: none;"></div>
+        <div id="status-message" class="alert" style="display: none;"></div>
 
         <div class="tabs-nav">
             <button class="tab-button active" onclick="openTab('new-message')">Nouveau Message</button>
@@ -79,6 +79,14 @@ try {
                         <label for="subject">Sujet</label>
                         <input type="text" id="subject" name="subject" class="form-control" required>
                     </div>
+                    <div class="form-group">
+                        <label for="priority">Priorité</label>
+                        <select id="priority" name="priority" class="form-control">
+                            <option value="normale">Normale</option>
+                            <option value="importante">Importante</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
                     <div class="form-group"><label for="content">Message</label><textarea id="content" name="content" class="form-control" rows="5" required></textarea></div>
                     <button type="submit" class="btn btn-primary">Envoyer</button>
                 </form>
@@ -94,6 +102,7 @@ try {
         </div>
     </div>
     
+    <!-- Modal for viewing messages -->
     <div class="modal fade" id="messageDetailModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Détails du Message</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button></div></div></div></div>
 
     <?php include('footer.php'); ?>
