@@ -215,3 +215,23 @@ CREATE TABLE WorkLocations (
 INSERT INTO WorkLocations (location_name, latitude, longitude)
 VALUES ('Main Office', 48.8584, 2.2945);
 ------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------
+CREATE TABLE Messages (
+    message_id INT IDENTITY(1,1) PRIMARY KEY,
+    sender_user_id INT NOT NULL,
+    recipient_type VARCHAR(50) NOT NULL, -- e.g., 'rh', 'direction', 'superviseur'
+    subject NVARCHAR(255) NOT NULL,
+    content NVARCHAR(MAX) NOT NULL,
+    priority VARCHAR(50) NOT NULL DEFAULT 'normale',
+    attachment_path NVARCHAR(255) NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'sent', -- e.g., 'sent', 'read', 'answered'
+    sent_at DATETIME NOT NULL DEFAULT GETDATE(),
+    read_at DATETIME NULL,
+    CONSTRAINT FK_Messages_SenderUser FOREIGN KEY (sender_user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+GO
+
+CREATE INDEX IDX_Messages_Sender ON Messages (sender_user_id);
+CREATE INDEX IDX_Messages_Recipient ON Messages (recipient_type);
+GO
+-----
