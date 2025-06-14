@@ -31,7 +31,7 @@ try {
     }
 } catch (Exception $e) {
     error_log("Messages handler error: " . $e->getMessage());
-    echo json_encode(['status' => 'error', 'message' => 'Une erreur interne est survenue.']);
+    echo json_encode(['status' => 'error', 'message' => 'Une erreur interne est survenue: ' . $e->getMessage()]);
 }
 
 function sendMessage($conn, $user) {
@@ -41,17 +41,11 @@ function sendMessage($conn, $user) {
             throw new Exception('Tous les champs sont requis.');
         }
 
-        $recipientType = $_POST['recipient_type'];
-        $individualRecipients = isset($_POST['individual_recipients']) ? $_POST['individual_recipients'] : [];
-        $priority = isset($_POST['priority']) && !empty($_POST['priority']) ? $_POST['priority'] : 'normale';
-
-
-        if ($recipientType === 'individual' && empty($individualRecipients)) {
-            throw new Exception('Veuillez sélectionner au moins un destinataire individuel.');
-        }
-
         $attachmentPath = null;
         if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] == 0) {
+            if ($_FILES['attachment']['size'] > 2 * 1024 * 1024) { // 2 MB
+                throw new Exception('Le fichier est trop volumineux. La taille maximale est de 2 Mo.');
+            }
             $uploadDir = 'uploads/messages/';
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
             $fileName = uniqid() . '-' . basename($_FILES['attachment']['name']);
@@ -64,34 +58,28 @@ function sendMessage($conn, $user) {
 
         $sql = "INSERT INTO Messages (sender_user_id, recipient_type, subject, content, priority, attachment_path, sent_at) 
                 VALUES (?, ?, ?, ?, ?, ?, GETDATE())";
-        $params = [
-            $user['user_id'], $recipientType, $_POST['subject'],
-            $_POST['content'], $priority, $attachmentPath
-        ];
+        $params = [$user['user_id'], $_POST['recipient_type'], $_POST['subject'], $_POST['content'], $_POST['priority'], $attachmentPath];
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
         $messageId = $conn->lastInsertId();
 
-        // Populate recipients table
         $recipientIds = [];
-        if ($recipientType === 'individual') {
-            $recipientIds = $individualRecipients;
-        } elseif ($recipientType === 'all_users') {
-            $stmtUsers = $conn->query("SELECT user_id FROM Users WHERE status = 'Active'");
-            $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN, 0);
-        } elseif ($recipientType === 'rh' || $recipientType === 'direction') {
-            $role = 'admin'; // Assuming admin role for both for now
+        if ($_POST['recipient_type'] === 'individual') {
+            $recipientIds = isset($_POST['individual_recipients']) ? $_POST['individual_recipients'] : [];
+        } elseif ($_POST['recipient_type'] === 'all_users') {
+            $recipientIds = $conn->query("SELECT user_id FROM Users WHERE status = 'Active'")->fetchAll(PDO::FETCH_COLUMN);
+        } elseif (in_array($_POST['recipient_type'], ['rh', 'direction'])) {
+            $role = 'admin'; // Assuming admin for both
             $stmtUsers = $conn->prepare("SELECT user_id FROM Users WHERE role = ? AND status = 'Active'");
             $stmtUsers->execute([$role]);
-            $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN, 0);
+            $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN);
         }
         
         if (!empty($recipientIds)) {
             $sqlRecipient = "INSERT INTO Message_Recipients (message_id, recipient_user_id) VALUES (?, ?)";
             $stmtRecipient = $conn->prepare($sqlRecipient);
-            foreach ($recipientIds as $recipientId) {
-                // Avoid sending to self if not intended
-                if ($recipientId != $user['user_id']) {
+            foreach (array_unique($recipientIds) as $recipientId) {
+                 if ($recipientId != $user['user_id']) { // Do not send to self
                     $stmtRecipient->execute([$messageId, $recipientId]);
                 }
             }
@@ -102,38 +90,41 @@ function sendMessage($conn, $user) {
 
     } catch (Exception $e) {
         $conn->rollBack();
-        error_log("Send Message Error: " . $e->getMessage());
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
 }
 
 function getSentMessages($conn, $userId) {
-    $sql = "SELECT message_id, subject, recipient_type, priority, FORMAT(sent_at, 'dd/MM/yyyy HH:mm') as sent_at FROM Messages 
-            WHERE sender_user_id = ? ORDER BY sent_at DESC";
+    $sql = "SELECT 
+                m.message_id, m.subject, m.recipient_type, m.priority, FORMAT(m.sent_at, 'dd/MM/yyyy HH:mm') as sent_at,
+                COUNT(r.recipient_user_id) as total_recipients,
+                SUM(CASE WHEN r.is_read = 1 THEN 1 ELSE 0 END) as read_recipients
+            FROM Messages m
+            LEFT JOIN Message_Recipients r ON m.message_id = r.message_id
+            WHERE m.sender_user_id = ? 
+            GROUP BY m.message_id, m.subject, m.recipient_type, m.priority, m.sent_at
+            ORDER BY m.sent_at DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$userId]);
     $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach($messages as &$msg) {
         $msg['recipient_display'] = getRecipientDisplayName($msg['recipient_type']);
-        $msg['status'] = 'Envoyé';
+        $total = (int)$msg['total_recipients'];
+        $read = (int)$msg['read_recipients'];
+        $msg['read_status'] = "Lu par $read / $total";
+        $msg['read_percentage'] = ($total > 0) ? ($read / $total) * 100 : 0;
     }
 
     echo json_encode(['status' => 'success', 'data' => $messages]);
 }
 
 function getReceivedMessages($conn, $userId) {
-    $sql = "SELECT 
-                m.message_id, m.subject, m.priority,
-                u.prenom + ' ' + u.nom as sender_name,
-                FORMAT(m.sent_at, 'dd/MM/yyyy HH:mm') as sent_at,
-                r.is_read
+    $sql = "SELECT m.message_id, m.subject, u.prenom + ' ' + u.nom as sender_name, FORMAT(m.sent_at, 'dd/MM/yyyy HH:mm') as sent_at, r.is_read
             FROM Message_Recipients r
             JOIN Messages m ON r.message_id = m.message_id
             JOIN Users u ON m.sender_user_id = u.user_id
-            WHERE r.recipient_user_id = ?
-            ORDER BY m.sent_at DESC";
-
+            WHERE r.recipient_user_id = ? ORDER BY m.sent_at DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$userId]);
     $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -142,35 +133,45 @@ function getReceivedMessages($conn, $userId) {
 
 function getMessageDetails($conn, $userId) {
     $messageId = isset($_POST['message_id']) ? intval($_POST['message_id']) : 0;
-    if ($messageId <= 0) {
-        echo json_encode(['status' => 'error', 'message' => 'ID de message invalide.']);
-        return;
-    }
+    if ($messageId <= 0) { throw new Exception('ID de message invalide.'); }
 
-    $stmtCheck = $conn->prepare("SELECT COUNT(*) FROM Message_Recipients WHERE message_id = ? AND recipient_user_id = ?");
-    $stmtCheck->execute([$messageId, $userId]);
-    if ($stmtCheck->fetchColumn() == 0) {
-        // Also check if the user is the sender
-         $stmtSenderCheck = $conn->prepare("SELECT COUNT(*) FROM Messages WHERE message_id = ? AND sender_user_id = ?");
-         $stmtSenderCheck->execute([$messageId, $userId]);
-         if($stmtSenderCheck->fetchColumn() == 0){
-            echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé à ce message.']);
-            return;
-         }
+    // Check if user is either sender or recipient
+    $stmtCheck = $conn->prepare("
+        SELECT 
+            (CASE WHEN m.sender_user_id = ? THEN 1 ELSE 0 END) as is_sender,
+            (SELECT COUNT(*) FROM Message_Recipients mr WHERE mr.message_id = m.message_id AND mr.recipient_user_id = ?) as is_recipient
+        FROM Messages m WHERE m.message_id = ?
+    ");
+    $stmtCheck->execute([$userId, $userId, $messageId]);
+    $auth = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+    if (!$auth || ($auth['is_sender'] == 0 && $auth['is_recipient'] == 0)) {
+        throw new Exception('Accès non autorisé à ce message.');
     }
 
     // Mark as read if user is a recipient
-    $stmtRead = $conn->prepare("UPDATE Message_Recipients SET is_read = 1, read_at = GETDATE() WHERE message_id = ? AND recipient_user_id = ? AND is_read = 0");
-    $stmtRead->execute([$messageId, $userId]);
+    if($auth['is_recipient'] > 0) {
+        $stmtRead = $conn->prepare("UPDATE Message_Recipients SET is_read = 1, read_at = GETDATE() WHERE message_id = ? AND recipient_user_id = ? AND is_read = 0");
+        $stmtRead->execute([$messageId, $userId]);
+    }
     
-    // Fetch details
-    $sql = "SELECT m.subject, m.content, m.attachment_path, m.priority, u.prenom + ' ' + u.nom as sender_name, FORMAT(m.sent_at, 'dd/MM/yyyy HH:mm') as sent_at
-            FROM Messages m
-            JOIN Users u ON m.sender_user_id = u.user_id
+    // Fetch main message details
+    $sqlDetails = "SELECT m.subject, m.content, m.attachment_path, u.prenom + ' ' + u.nom as sender_name, FORMAT(m.sent_at, 'dd/MM/yyyy HH:mm') as sent_at
+            FROM Messages m JOIN Users u ON m.sender_user_id = u.user_id
             WHERE m.message_id = ?";
-    $stmtDetails = $conn->prepare($sql);
+    $stmtDetails = $conn->prepare($sqlDetails);
     $stmtDetails->execute([$messageId]);
     $details = $stmtDetails->fetch(PDO::FETCH_ASSOC);
+
+    // Fetch read receipts if the user is the sender
+    if($auth['is_sender'] == 1) {
+        $sqlReceipts = "SELECT u.prenom + ' ' + u.nom as recipient_name, r.is_read, FORMAT(r.read_at, 'dd/MM/yyyy HH:mm') as read_at
+                        FROM Message_Recipients r JOIN Users u ON r.recipient_user_id = u.user_id
+                        WHERE r.message_id = ? ORDER BY u.nom";
+        $stmtReceipts = $conn->prepare($sqlReceipts);
+        $stmtReceipts->execute([$messageId]);
+        $details['receipts'] = $stmtReceipts->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     echo json_encode(['status' => 'success', 'data' => $details]);
 }
