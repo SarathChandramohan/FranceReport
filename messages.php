@@ -2,6 +2,16 @@
 require_once 'session-management.php';
 requireLogin();
 $user = getCurrentUser();
+
+// Fetch users for the recipient list
+require_once 'db-connection.php';
+$usersList = [];
+try {
+    $stmt = $conn->query("SELECT user_id, nom, prenom FROM Users WHERE status = 'Active' ORDER BY nom, prenom");
+    $usersList = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching users for messages page: " . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -12,55 +22,34 @@ $user = getCurrentUser();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
-        :root {
-            --primary-color: #007aff;
-            --primary-hover: #0056b3;
-            --background-light: #f5f5f7;
-            --card-bg: #ffffff;
-            --text-dark: #1d1d1f;
-            --text-light: #555;
-            --border-color: #e5e5e5;
+        :root { /* CSS variables for easy theme changes */
+            --primary-color: #007aff; --primary-hover: #0056b3; --background-light: #f5f5f7;
+            --card-bg: #ffffff; --text-dark: #1d1d1f; --text-light: #555; --border-color: #e5e5e5;
         }
         body { background-color: var(--background-light); color: var(--text-dark); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         .card { background-color: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 25px; margin-bottom: 25px; border: 1px solid var(--border-color); }
         h2 { margin-bottom: 25px; font-size: 28px; font-weight: 600; }
-        .btn-primary { background-color: var(--primary-color); color: white; border: none; }
-        .btn-primary:hover { background-color: var(--primary-hover); }
         .tabs-nav { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
-        .tab-button { padding: 12px 24px; background-color: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 500; font-size: 14px; color: #6e6e73; transition: all 0.3s ease; }
+        .tab-button { padding: 12px 24px; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 500; font-size: 14px; color: #6e6e73; transition: all 0.3s ease; }
         .tab-button.active { border-bottom-color: var(--primary-color); color: var(--primary-color); font-weight: 600; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .form-group label { font-weight: 500; font-size: 14px; }
-        .form-control, .form-control:focus { background-color: var(--card-bg); border: 1px solid #d2d2d7; border-radius: 8px; }
-        .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2); }
-        .table-container { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 15px; }
-        table { width: 100%; min-width: 650px; }
-        th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        th { background-color: #f9f9f9; font-weight: 600; }
-        .status-tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-        .status-sent { background-color: #ffcc00; color: #664d00; }
-        .status-read { background-color: #34c759; color: white; }
-        .status-answered { background-color: #007aff; color: white; }
-        .priority-normale { color: #555; }
-        .priority-importante { color: #ff9500; font-weight: bold; }
-        .priority-urgente { color: #ff3b30; font-weight: bold; }
-        .alert { text-align: center; }
-        .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }
-        .file-input-wrapper input[type="file"] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; }
-        .file-name { display: inline-block; margin-left: 10px; font-size: 14px; color: #666; }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        .form-group label { font-weight: 500; }
+        .table-container { overflow-x: auto; }
+        tr.unread { font-weight: bold; background-color: #f0f8ff; }
+        .modal-body p { margin-bottom: 0.5rem; } .modal-body strong { color: #333; }
+        #individual-recipient-group { display: none; }
     </style>
 </head>
 <body>
     <?php include 'navbar.php'; ?>
     <div class="container-fluid mt-4">
-        <h2>Messages RH/Direction</h2>
+        <h2>Messages</h2>
         <div id="status-message" style="display: none;"></div>
 
         <div class="tabs-nav">
             <button class="tab-button active" onclick="openTab('new-message')">Nouveau Message</button>
+            <button class="tab-button" onclick="openTab('received-messages')">Boîte de Réception</button>
             <button class="tab-button" onclick="openTab('sent-messages')">Messages Envoyés</button>
-            <button class="tab-button" onclick="openTab('received-messages')">Messages Reçus</button>
         </div>
 
         <div id="new-message" class="tab-content active">
@@ -68,175 +57,147 @@ $user = getCurrentUser();
                 <h3>Envoyer un message</h3>
                 <form id="message-form" enctype="multipart/form-data">
                     <div class="form-group">
-                        <label for="recipient">Destinataire</label>
-                        <select id="recipient" name="recipient_type" class="form-control" required>
-                            <option value="">Sélectionner...</option>
+                        <label for="recipient_type">Destinataire</label>
+                        <select id="recipient_type" name="recipient_type" class="form-control" required>
+                            <option value="">Sélectionner un groupe ou individuel...</option>
+                            <option value="all_users">Tous les utilisateurs</option>
                             <option value="rh">Service RH</option>
                             <option value="direction">Direction</option>
+                            <option value="individual">Individuel(s)</option>
                         </select>
+                    </div>
+                    <div class="form-group" id="individual-recipient-group">
+                        <label for="individual_recipients">Choisir le(s) destinataire(s)</label>
+                        <select id="individual_recipients" name="individual_recipients[]" class="form-control" multiple>
+                             <?php foreach ($usersList as $u): ?>
+                                <option value="<?= $u['user_id']; ?>"><?= htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="form-text text-muted">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small>
                     </div>
                     <div class="form-group">
                         <label for="subject">Sujet</label>
                         <input type="text" id="subject" name="subject" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label for="priority">Priorité</label>
-                        <select id="priority" name="priority" class="form-control">
-                            <option value="normale">Normale</option>
-                            <option value="importante">Importante</option>
-                            <option value="urgente">Urgente</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="content">Message</label>
-                        <textarea id="content" name="content" class="form-control" rows="5" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="attachment">Pièce jointe (optionnel)</label>
-                         <div class="file-input-wrapper">
-                            <button type="button" class="btn btn-secondary">Choisir un fichier</button>
-                            <input type="file" id="attachment" name="attachment">
-                        </div>
-                        <span id="file-name" class="file-name"></span>
-                    </div>
+                    <div class="form-group"><label for="content">Message</label><textarea id="content" name="content" class="form-control" rows="5" required></textarea></div>
                     <button type="submit" class="btn btn-primary">Envoyer</button>
                 </form>
             </div>
         </div>
 
-        <div id="sent-messages" class="tab-content">
-            <div class="card">
-                <h3>Messages Envoyés</h3>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th><th>Destinataire</th><th>Sujet</th><th>Priorité</th><th>Statut</th><th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sent-messages-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        
         <div id="received-messages" class="tab-content">
-             <div class="card">
-                <h3>Messages Reçus</h3>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th><th>Expéditeur</th><th>Sujet</th><th>Priorité</th><th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="received-messages-body"></tbody>
-                    </table>
-                </div>
-            </div>
+            <div class="card"><h3>Boîte de Réception</h3><div class="table-container"><table class="table table-hover"><thead><tr><th>De</th><th>Sujet</th><th>Date</th><th>Actions</th></tr></thead><tbody id="received-messages-body"></tbody></table></div></div>
+        </div>
+
+        <div id="sent-messages" class="tab-content">
+            <div class="card"><h3>Messages Envoyés</h3><div class="table-container"><table class="table"><thead><tr><th>Date</th><th>Destinataire</th><th>Sujet</th><th>Statut</th></tr></thead><tbody id="sent-messages-body"></tbody></table></div></div>
         </div>
     </div>
     
+    <div class="modal fade" id="messageDetailModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Détails du Message</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button></div></div></div></div>
+
     <?php include('footer.php'); ?>
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function openTab(tabId) {
-            $('.tab-content').removeClass('active');
+            $('.tab-content, .tab-button').removeClass('active');
             $('#' + tabId).addClass('active');
-            $('.tab-button').removeClass('active');
             $(`button[onclick="openTab('${tabId}')"]`).addClass('active');
-            
             if(tabId === 'sent-messages') loadSentMessages();
             if(tabId === 'received-messages') loadReceivedMessages();
         }
 
         function showStatusMessage(message, type) {
             const statusDiv = $('#status-message');
-            statusDiv.text(message).removeClass('alert-success alert-error').addClass(`alert alert-${type}`).show();
+            statusDiv.text(message).removeClass('alert-success alert-danger').addClass(`alert alert-${type}`).show();
             setTimeout(() => statusDiv.fadeOut(), 5000);
         }
 
-        function makeAjaxRequest(action, formData, callback, hasFile = false) {
-            const ajaxOptions = {
-                url: 'messages-handler.php',
-                type: 'POST',
-                data: formData,
-                dataType: 'json',
+        function makeAjaxRequest(formData, callback) {
+            $.ajax({
+                url: 'messages-handler.php', type: 'POST', data: formData, dataType: 'json',
+                processData: false, contentType: false,
                 success: response => callback(null, response),
                 error: (xhr, status, error) => callback(`Erreur: ${status} - ${error}`)
-            };
-            if(hasFile) {
-                ajaxOptions.processData = false;
-                ajaxOptions.contentType = false;
-            }
-            formData.append('action', action);
-            $.ajax(ajaxOptions);
+            });
         }
+        
+        $('#recipient_type').change(function(){
+            $('#individual-recipient-group').toggle($(this).val() === 'individual');
+        });
 
         $('#message-form').on('submit', function(e){
             e.preventDefault();
             const formData = new FormData(this);
-            const hasFile = $('#attachment')[0].files.length > 0;
-            
+            formData.append('action', 'send_message');
             $('button[type="submit"]').prop('disabled', true).text('Envoi...');
-
-            makeAjaxRequest('send_message', formData, (err, res) => {
-                 $('button[type="submit"]').prop('disabled', false).text('Envoyer');
-                if(err || res.status !== 'success') {
-                    showStatusMessage(err || res.message, 'error');
-                } else {
+            makeAjaxRequest(formData, (err, res) => {
+                $('button[type="submit"]').prop('disabled', false).text('Envoyer');
+                if(err || res.status !== 'success') showStatusMessage(err || res.message, 'error');
+                else {
                     showStatusMessage(res.message, 'success');
                     $('#message-form')[0].reset();
-                    $('#file-name').text('');
+                    $('#individual-recipient-group').hide();
                     openTab('sent-messages');
                 }
-            }, hasFile);
-        });
-
-        $('#attachment').on('change', function(){
-            const fileName = this.files[0] ? this.files[0].name : '';
-            $('#file-name').text(fileName);
+            });
         });
 
         function loadSentMessages() {
-            const tbody = $('#sent-messages-body').html('<tr><td colspan="6" class="text-center">Chargement...</td></tr>');
-            makeAjaxRequest('get_sent_messages', new FormData(), (err, res) => {
+            const tbody = $('#sent-messages-body').html('<tr><td colspan="4" class="text-center">Chargement...</td></tr>');
+            const formData = new FormData();
+            formData.append('action', 'get_sent_messages');
+            makeAjaxRequest(formData, (err, res) => {
                 tbody.empty();
                 if(err || res.status !== 'success' || !res.data) {
-                    tbody.html(`<tr><td colspan="6" class="text-center text-danger">${err || res.message}</td></tr>`);
-                    return;
+                    tbody.html(`<tr><td colspan="4" class="text-center text-danger">${err || (res ? res.message : 'Erreur')}</td></tr>`); return;
                 }
-                if(res.data.length === 0) {
-                     tbody.html('<tr><td colspan="6" class="text-center">Aucun message envoyé.</td></tr>');
-                     return;
-                }
+                if(res.data.length === 0) { tbody.html('<tr><td colspan="4" class="text-center">Aucun message envoyé.</td></tr>'); return; }
                 res.data.forEach(msg => {
-                    tbody.append(`
-                        <tr>
-                            <td>${msg.sent_at}</td>
-                            <td>${msg.recipient_display}</td>
-                            <td>${msg.subject}</td>
-                            <td><span class="priority-${msg.priority}">${msg.priority}</span></td>
-                            <td><span class="status-tag status-${msg.status}">${msg.status}</span></td>
-                            <td><button class="btn btn-sm btn-info">Voir</button></td>
-                        </tr>
-                    `);
+                    tbody.append(`<tr><td>${msg.sent_at}</td><td>${msg.recipient_display}</td><td>${msg.subject}</td><td><span class="status-tag status-sent">${msg.status}</span></td></tr>`);
                 });
             });
         }
         
         function loadReceivedMessages() {
-            const tbody = $('#received-messages-body').html('<tr><td colspan="5" class="text-center">Chargement...</td></tr>');
-            // This part requires backend logic to determine which messages a user can see
-            // (e.g., if user role is 'rh' or 'direction')
-            // For now, it will show a placeholder.
-            tbody.html('<tr><td colspan="5" class="text-center">La réception des messages est en cours de développement.</td></tr>');
+            const tbody = $('#received-messages-body').html('<tr><td colspan="4" class="text-center">Chargement...</td></tr>');
+            const formData = new FormData();
+            formData.append('action', 'get_received_messages');
+             makeAjaxRequest(formData, (err, res) => {
+                tbody.empty();
+                if(err || res.status !== 'success' || !res.data) {
+                    tbody.html(`<tr><td colspan="4" class="text-center text-danger">${err || (res ? res.message : 'Erreur')}</td></tr>`); return;
+                }
+                if(res.data.length === 0) { tbody.html('<tr><td colspan="4" class="text-center">Aucun message reçu.</td></tr>'); return; }
+                res.data.forEach(msg => {
+                    tbody.append(`<tr class="${!msg.is_read ? 'unread' : ''}"><td>${msg.sender_name}</td><td>${msg.subject}</td><td>${msg.sent_at}</td><td><button class="btn btn-sm btn-info" onclick="viewMessage(${msg.message_id})">Voir</button></td></tr>`);
+                });
+            });
+        }
+        
+        function viewMessage(messageId) {
+            const formData = new FormData();
+            formData.append('action', 'get_message_details');
+            formData.append('message_id', messageId);
+            makeAjaxRequest(formData, (err, res) => {
+                if(err || res.status !== 'success') { showStatusMessage(err || res.message, 'error'); return; }
+                const details = res.data;
+                const modalBody = $('#messageDetailModal .modal-body');
+                modalBody.html(`
+                    <p><strong>De:</strong> ${details.sender_name}</p>
+                    <p><strong>Date:</strong> ${details.sent_at}</p>
+                    <p><strong>Sujet:</strong> ${details.subject}</p>
+                    <hr>
+                    <div>${details.content.replace(/\n/g, '<br>')}</div>
+                    ${details.attachment_path ? `<hr><p><strong>Pièce jointe:</strong> <a href="${details.attachment_path}" target="_blank">Télécharger</a></p>` : ''}
+                `);
+                $('#messageDetailModal').modal('show');
+                loadReceivedMessages(); // Refresh list to show as read
+            });
         }
 
-        $(document).ready(function() {
-            // Initial load
-        });
+        $(document).ready(() => openTab('new-message'));
     </script>
 </body>
 </html>
