@@ -12,7 +12,6 @@ if (!isLoggedIn()) {
 $currentUser = getCurrentUser();
 $action = isset($_POST['action']) ? $_POST['action'] : (isset($_GET['action']) ? $_GET['action'] : '');
 
-
 try {
     switch ($action) {
         case 'send_message':
@@ -25,7 +24,6 @@ try {
             getReceivedMessages($conn, $currentUser['user_id']);
             break;
         case 'get_message_details':
-            // Use GET for message_id to simplify AJAX calls
             $messageId = isset($_GET['message_id']) ? $_GET['message_id'] : (isset($_POST['message_id']) ? $_POST['message_id'] : null);
             getMessageDetails($conn, $currentUser['user_id'], $messageId);
             break;
@@ -34,23 +32,67 @@ try {
     }
 } catch (Exception $e) {
     error_log("Messages handler error: " . $e->getMessage());
-    echo json_encode(['status' => 'error', 'message' => 'Une erreur interne est survenue: ' . $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
 }
 
 function sendMessage($conn, $user) {
     $conn->beginTransaction();
     try {
-        if (empty($_POST['recipient_type']) || empty($_POST['subject']) || empty($_POST['content'])) {
-            throw new Exception('Tous les champs sont requis.');
+        $parentMessageId = isset($_POST['parent_message_id']) && !empty($_POST['parent_message_id']) ? intval($_POST['parent_message_id']) : null;
+
+        if (empty($_POST['subject']) || empty($_POST['content'])) {
+            throw new Exception('Le sujet et le contenu du message sont requis.');
         }
 
-        $parentMessageId = isset($_POST['parent_message_id']) && !empty($_POST['parent_message_id']) ? intval($_POST['parent_message_id']) : null;
-        $priority = isset($_POST['priority']) && !empty($_POST['priority']) ? $_POST['priority'] : 'normale';
+        $recipientIds = [];
         $recipientType = $_POST['recipient_type'];
 
+        if ($parentMessageId) {
+            // This is a reply. Recipient is the sender of the parent message.
+            $stmtSender = $conn->prepare("SELECT sender_user_id FROM Messages WHERE message_id = ?");
+            $stmtSender->execute([$parentMessageId]);
+            $originalSenderId = $stmtSender->fetchColumn();
+            if (!$originalSenderId) {
+                throw new Exception("Message original non trouvé pour la réponse.");
+            }
+            $recipientIds[] = $originalSenderId;
+            $recipientType = 'individual'; // Force type for replies
+        } else {
+            // This is a new message. Validate recipients from the form.
+            if (empty($recipientType)) {
+                throw new Exception('Veuillez sélectionner un type de destinataire.');
+            }
+            if ($recipientType === 'individual') {
+                if (empty($_POST['individual_recipients'])) {
+                    throw new Exception('Veuillez sélectionner au moins un destinataire individuel.');
+                }
+                $recipientIds = $_POST['individual_recipients'];
+            } elseif ($recipientType === 'all_users') {
+                $stmtUsers = $conn->prepare("SELECT user_id FROM Users WHERE status = 'Active' AND user_id != ?");
+                $stmtUsers->execute([$user['user_id']]);
+                $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN);
+            } elseif (in_array($recipientType, ['rh', 'direction'])) {
+                $role = 'admin';
+                $stmtUsers = $conn->prepare("SELECT user_id FROM Users WHERE role = ? AND status = 'Active' AND user_id != ?");
+                $stmtUsers->execute([$role, $user['user_id']]);
+                $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN);
+            }
+        }
+        
+        if (empty($recipientIds)) {
+            throw new Exception("Aucun destinataire valide trouvé.");
+        }
+        
+        $priority = isset($_POST['priority']) && !empty($_POST['priority']) ? $_POST['priority'] : 'normale';
         $attachmentPath = null;
         if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] == 0) {
-            // Attachment handling logic... (same as before)
+            if ($_FILES['attachment']['size'] > 2 * 1024 * 1024) { throw new Exception('Le fichier est trop volumineux. La taille maximale est de 2 Mo.'); }
+            $uploadDir = 'uploads/messages/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+            $fileName = uniqid() . '-' . basename($_FILES['attachment']['name']);
+            $targetFile = $uploadDir . $fileName;
+            if (!move_uploaded_file($_FILES['attachment']['tmp_name'], $targetFile)) { throw new Exception('Erreur lors du téléchargement du fichier.'); }
+            $attachmentPath = $targetFile;
         }
 
         $sql = "INSERT INTO Messages (sender_user_id, recipient_type, subject, content, priority, attachment_path, parent_message_id, sent_at) 
@@ -59,22 +101,11 @@ function sendMessage($conn, $user) {
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
         $messageId = $conn->lastInsertId();
-
-        $recipientIds = [];
-        if ($recipientType === 'individual') {
-            $recipientIds = isset($_POST['individual_recipients']) ? $_POST['individual_recipients'] : [];
-        } else {
-            // Logic for 'all_users', 'rh', 'direction' (same as before)
-        }
         
-        if (!empty($recipientIds)) {
-            $sqlRecipient = "INSERT INTO Message_Recipients (message_id, recipient_user_id) VALUES (?, ?)";
-            $stmtRecipient = $conn->prepare($sqlRecipient);
-            foreach (array_unique($recipientIds) as $recipientId) {
-                 if ($recipientId != $user['user_id']) {
-                    $stmtRecipient->execute([$messageId, $recipientId]);
-                }
-            }
+        $sqlRecipient = "INSERT INTO Message_Recipients (message_id, recipient_user_id) VALUES (?, ?)";
+        $stmtRecipient = $conn->prepare($sqlRecipient);
+        foreach (array_unique($recipientIds) as $recipientId) {
+            $stmtRecipient->execute([$messageId, $recipientId]);
         }
         
         $conn->commit();
@@ -104,7 +135,6 @@ function getSentMessages($conn, $userId) {
         $read = (int)$msg['read_recipients'];
         $msg['read_percentage'] = ($total > 0) ? round(($read / $total) * 100) : 0;
     }
-
     echo json_encode(['status' => 'success', 'data' => $messages]);
 }
 
@@ -160,7 +190,12 @@ function getMessageDetails($conn, $userId, $messageId) {
 }
 
 function getRecipientDisplayName($type) {
-    // Same as before
-    return $type;
+    switch($type) {
+        case 'rh': return 'Service RH';
+        case 'direction': return 'Direction';
+        case 'all_users': return 'Tous les utilisateurs';
+        case 'individual': return 'Individuel';
+        default: return ucfirst($type);
+    }
 }
 ?>
