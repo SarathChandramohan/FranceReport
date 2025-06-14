@@ -39,7 +39,7 @@ try {
         .table-container { overflow-x: auto; }
         tr.unread { font-weight: bold; background-color: #f0f8ff; }
         .modal-body p { margin-bottom: 0.5rem; } .modal-body strong { color: #333; }
-        #individual-recipient-group, .file-input-wrapper { display: none; }
+        #individual-recipient-group { display: none; }
         .file-input-wrapper { margin-top: 10px; }
         .status-tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; color: white; }
         .status-read-by-all { background-color: #34c759; }
@@ -83,6 +83,14 @@ try {
                         </select>
                     </div>
                     <div class="form-group"><label for="subject">Sujet</label><input type="text" id="subject" name="subject" class="form-control" required></div>
+                    <div class="form-group">
+                        <label for="priority">Priorité</label>
+                        <select id="priority" name="priority" class="form-control">
+                            <option value="normale">Normale</option>
+                            <option value="importante">Importante</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
                     <div class="form-group"><label for="content">Message</label><textarea id="content" name="content" class="form-control" rows="5" required></textarea></div>
                     <div class="form-group">
                         <label for="attachment">Pièce jointe (Max 2MB)</label><br>
@@ -219,7 +227,7 @@ try {
 
         function viewReadReceipts(messageId) {
              const formData = new FormData();
-            formData.append('action', 'get_message_details'); // This now also returns receipts
+            formData.append('action', 'get_message_details');
             formData.append('message_id', messageId);
             makeAjaxRequest(formData, (err, res) => {
                 if(err || res.status !== 'success' || !res.data) { showStatusMessage(err || res.message, 'error'); return; }
