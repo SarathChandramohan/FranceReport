@@ -54,8 +54,7 @@ try {
     <?php include 'navbar.php'; ?>
     <div class="container-fluid mt-4">
         <h2>Messages</h2>
-        <div id="status-message" class="alert" style="display: none;"></div>
-
+        
         <div class="tabs-nav">
             <button class="tab-button active" onclick="openTab('new-message')">Nouveau Message</button>
             <button class="tab-button" onclick="openTab('received-messages')">Boîte de Réception<span id="inbox-notification" class="notification-dot"></span></button>
@@ -111,24 +110,45 @@ try {
     
     <div class="modal fade" id="messageDetailModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Détails du Message</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button></div></div></div></div>
     
+    <div class="modal fade" id="statusModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="statusModalTitle"></h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body" id="statusModalBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php include('footer.php'); ?>
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
+        function showPopupMessage(message, type) {
+            const modal = $('#statusModal');
+            const title = $('#statusModalTitle');
+            const body = $('#statusModalBody');
+            
+            title.text(type === 'success' ? 'Succès' : 'Erreur');
+            title.removeClass('text-success text-danger').addClass(type === 'success' ? 'text-success' : 'text-danger');
+            body.text(message);
+            
+            modal.modal('show');
+        }
+
         function openTab(tabId) {
             $('.tab-content, .tab-button').removeClass('active');
             $('#' + tabId).addClass('active');
             $(`button[onclick="openTab('${tabId}')"]`).addClass('active');
-            if(tabId === 'sent-messages') loadSentMessages();
-            if(tabId === 'received-messages') loadReceivedMessages();
-        }
-
-        function showStatusMessage(message, type) {
-            const statusDiv = $('#status-message');
-            statusDiv.text(message).removeClass('alert-success alert-danger').addClass(`alert alert-${type}`).show();
-            setTimeout(() => statusDiv.fadeOut(), 5000);
+            if (tabId === 'sent-messages') loadSentMessages();
+            if (tabId === 'received-messages') loadReceivedMessages();
         }
 
         function makeAjaxRequest(formData, callback) {
@@ -140,6 +160,11 @@ try {
             if(formData instanceof FormData) {
                 ajaxOptions.processData = false;
                 ajaxOptions.contentType = false;
+            } else {
+                // If not FormData, it's a query string, so use GET
+                ajaxOptions.type = 'GET';
+                ajaxOptions.url += '?' + formData;
+                ajaxOptions.data = null;
             }
             $.ajax(ajaxOptions);
         }
@@ -152,30 +177,40 @@ try {
             e.preventDefault();
             const fileInput = $('#attachment')[0];
             if(fileInput.files.length > 0 && fileInput.files[0].size > MAX_FILE_SIZE) {
-                showStatusMessage('Le fichier est trop volumineux. La taille maximale est de 2 Mo.', 'error');
+                showPopupMessage('Le fichier est trop volumineux. La taille maximale est de 2 Mo.', 'danger');
                 return;
             }
             const formData = new FormData(this);
+            // Re-enable disabled fields for submission if it's a reply
+            if ($('#parent_message_id').val()) {
+                $('#recipient_type').prop('disabled', false);
+                formData.set('recipient_type', 'individual');
+                 // You may need to manually add the recipient if it's disabled
+                formData.append('individual_recipients[]', $('#individual_recipients').val());
+            }
+            
             formData.append('action', 'send_message');
             makeAjaxRequest(formData, (err, res) => {
+                 // Re-disable the field after submission
+                if ($('#parent_message_id').val()) {
+                    $('#recipient_type').prop('disabled', true);
+                }
                 if(err || res.status !== 'success') {
-                    showStatusMessage(err || res.message, 'danger');
+                    showPopupMessage(err || res.message, 'danger');
                 } else {
-                    showStatusMessage(res.message, 'success');
-                    cancelReply(); // Also resets the form
+                    showPopupMessage(res.message, 'success');
+                    cancelReply();
                     openTab('sent-messages');
                 }
             });
         });
 
         function loadReceivedMessages() {
-            const tbody = $('#received-messages-body').html('<tr><td colspan="5" class="text-center">Chargement...</td></tr>');
             makeAjaxRequest("action=get_received_messages", (err, res) => {
+                const tbody = $('#received-messages-body');
                 tbody.empty();
-                if(err || res.status !== 'success' || !res.data) {
-                    tbody.html(`<tr><td colspan="5" class="text-center text-danger">${err || (res ? res.message : 'Erreur')}</td></tr>`); return;
-                }
-                if(res.data.length === 0) { tbody.html('<tr><td colspan="5" class="text-center">Aucun message reçu.</td></tr>'); return; }
+                if(err || res.status !== 'success') { showPopupMessage(err || (res ? res.message : 'Erreur de chargement.'), 'danger'); return; }
+                if(!res.data || res.data.length === 0) { tbody.html('<tr><td colspan="5" class="text-center">Aucun message reçu.</td></tr>'); return; }
                 let unreadCount = 0;
                 res.data.forEach(msg => {
                     if(!msg.is_read) unreadCount++;
@@ -192,13 +227,11 @@ try {
         }
         
         function loadSentMessages() {
-            const tbody = $('#sent-messages-body').html('<tr><td colspan="5" class="text-center">Chargement...</td></tr>');
             makeAjaxRequest("action=get_sent_messages", (err, res) => {
+                const tbody = $('#sent-messages-body');
                 tbody.empty();
-                 if(err || res.status !== 'success' || !res.data) {
-                    tbody.html(`<tr><td colspan="5" class="text-center text-danger">${err || (res ? res.message : 'Erreur')}</td></tr>`); return;
-                }
-                if(res.data.length === 0) { tbody.html('<tr><td colspan="5" class="text-center">Aucun message envoyé.</td></tr>'); return; }
+                 if(err || res.status !== 'success') { showPopupMessage(err || (res ? res.message : 'Erreur de chargement.'), 'danger'); return; }
+                if(!res.data || res.data.length === 0) { tbody.html('<tr><td colspan="5" class="text-center">Aucun message envoyé.</td></tr>'); return; }
                 res.data.forEach(msg => {
                     let statusClass = 'status-unread';
                     let statusText = `Lu par ${msg.read_recipients} / ${msg.total_recipients}`;
@@ -212,7 +245,7 @@ try {
 
         function viewMessage(messageId, isSentMessage = false) {
             makeAjaxRequest(`action=get_message_details&message_id=${messageId}`, (err, res) => {
-                if(err || res.status !== 'success') { showStatusMessage(err || res.message, 'danger'); return; }
+                if(err || res.status !== 'success') { showPopupMessage(err || res.message, 'danger'); return; }
                 const details = res.data;
                 let modalBodyHtml = `<p><strong>De:</strong> ${details.sender_name}</p><p><strong>Sujet:</strong> ${details.subject}</p><hr><div>${details.content.replace(/\n/g, '<br>')}</div>`;
                 if(details.attachment_path) modalBodyHtml += `<hr><p><strong>Pièce jointe:</strong> <a href="${details.attachment_path}" target="_blank">Télécharger</a></p>`;
@@ -237,49 +270,37 @@ try {
 
         function replyToMessage(messageId) {
             makeAjaxRequest(`action=get_message_details&message_id=${messageId}`, (err, res) => {
-                if(err || res.status !== 'success') { showStatusMessage(err || res.message, 'danger'); return; }
+                if(err || res.status !== 'success') { showPopupMessage(err || res.message, 'danger'); return; }
                 const details = res.data;
                 
-                // Set hidden field for parent message ID
                 $('#parent_message_id').val(messageId);
-                
-                // Pre-fill subject and content for reply
                 $('#subject').val(`Re: ${details.subject}`);
                 const replyContent = `\n\n----- Message original -----\nDe: ${details.sender_name}\nSujet: ${details.subject}\n\n${details.content}`;
                 $('#content').val(replyContent).focus();
-
-                // Set recipient to the original sender and disable selection
+                
                 $('#recipient_type').val('individual').prop('disabled', true);
                 $('#individual-recipient-group').show();
-                $('#individual_recipients').val(details.sender_user_id);
-                $('label[for="individual_recipients"], #individual_recipients').hide(); // Hide the multi-select UI
+                $('#individual_recipients').val(details.sender_user_id).prop('disabled', true);
 
-                // Show reply info box
                 $('#reply-text').text(`Réponse à: ${details.sender_name}`);
                 $('#reply-info-box').show();
 
                 openTab('new-message');
-                window.scrollTo(0, 0); // Scroll to top
+                window.scrollTo(0, 0);
             });
         }
         
         function cancelReply() {
             $('#message-form')[0].reset();
             $('#parent_message_id').val('');
-            
-            // Re-enable recipient selection
             $('#recipient_type').prop('disabled', false);
-            $('label[for="individual_recipients"], #individual_recipients').show();
+            $('#individual_recipients').prop('disabled', false);
             $('#individual-recipient-group').hide();
-            
-            // Hide reply info box
             $('#reply-info-box').hide();
         }
 
         $(document).ready(() => {
-            loadReceivedMessages(); // Initial load
-            // Optional: Periodically check for new messages
-            // setInterval(loadReceivedMessages, 30000); // e.g., every 30 seconds
+            loadReceivedMessages();
         });
     </script>
 </body>
