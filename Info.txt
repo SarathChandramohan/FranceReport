@@ -216,37 +216,21 @@ INSERT INTO WorkLocations (location_name, latitude, longitude)
 VALUES ('Main Office', 48.8584, 2.2945);
 ------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------------------------------
+
 CREATE TABLE Messages (
     message_id INT IDENTITY(1,1) PRIMARY KEY,
     sender_user_id INT NOT NULL,
-    recipient_type VARCHAR(50) NOT NULL, -- e.g., 'rh', 'direction', 'superviseur'
+    recipient_type VARCHAR(50) NOT NULL, -- e.g., 'rh', 'direction', 'all_users', 'individual'
     subject NVARCHAR(255) NOT NULL,
     content NVARCHAR(MAX) NOT NULL,
     priority VARCHAR(50) NOT NULL DEFAULT 'normale',
     attachment_path NVARCHAR(255) NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'sent', -- e.g., 'sent', 'read', 'answered'
     sent_at DATETIME NOT NULL DEFAULT GETDATE(),
-    read_at DATETIME NULL,
     CONSTRAINT FK_Messages_SenderUser FOREIGN KEY (sender_user_id) REFERENCES Users(user_id) ON DELETE CASCADE
 );
 GO
 
-CREATE INDEX IDX_Messages_Sender ON Messages (sender_user_id);
-CREATE INDEX IDX_Messages_Recipient ON Messages (recipient_type);
-GO
----------------------------------------------------------------------------------
-ALTER TABLE Messages
-DROP COLUMN status, read_at;
-GO
-
--- Step 2: Update the recipient_type column to allow for the new recipient types.
--- This will ensure 'all_users' and 'individual' can be stored.
-ALTER TABLE Messages
-ALTER COLUMN recipient_type VARCHAR(50) NOT NULL;
-GO
-
--- Step 3: Create the new 'Message_Recipients' table.
--- This table will link messages to their individual recipients and track read status.
+-- Step 3: Create the 'Message_Recipients' table to track each recipient and their read status.
 CREATE TABLE Message_Recipients (
     message_id INT NOT NULL,
     recipient_user_id INT NOT NULL,
@@ -254,10 +238,11 @@ CREATE TABLE Message_Recipients (
     read_at DATETIME NULL,
     PRIMARY KEY (message_id, recipient_user_id),
     CONSTRAINT FK_MessageRecipients_Message FOREIGN KEY (message_id) REFERENCES Messages(message_id) ON DELETE CASCADE,
-    CONSTRAINT FK_MessageRecipients_User FOREIGN KEY (recipient_user_id) REFERENCES Users(user_id) ON DELETE NO ACTION
+    CONSTRAINT FK_MessageRecipients_User FOREIGN KEY (recipient_user_id) REFERENCES Users(user_id) ON DELETE NO ACTION -- To prevent issues if a user is deleted
 );
 GO
 
--- Step 4: Add indexes for better performance on the new table.
+-- Step 4: Add indexes for better performance.
+CREATE INDEX IDX_Messages_Sender ON Messages (sender_user_id);
 CREATE INDEX IDX_MessageRecipients_Recipient ON Message_Recipients (recipient_user_id);
-GO
+----------------------------------------------------------------------------------------------
