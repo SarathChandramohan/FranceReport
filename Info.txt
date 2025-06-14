@@ -245,4 +245,13 @@ GO
 -- Step 4: Add indexes for better performance.
 CREATE INDEX IDX_Messages_Sender ON Messages (sender_user_id);
 CREATE INDEX IDX_MessageRecipients_Recipient ON Message_Recipients (recipient_user_id);
+
+ALTER TABLE Messages
+ADD parent_message_id INT NULL;
+GO
+
+-- Optional: Add a foreign key constraint for data integrity.
+ALTER TABLE Messages
+ADD CONSTRAINT FK_Messages_ParentMessage FOREIGN KEY (parent_message_id) REFERENCES Messages(message_id);
+GO
 ----------------------------------------------------------------------------------------------
