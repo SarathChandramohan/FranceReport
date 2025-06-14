@@ -41,6 +41,9 @@ function sendMessage($conn, $user) {
             throw new Exception('Tous les champs sont requis.');
         }
 
+        // Add a check for priority and set a default value if not present
+        $priority = isset($_POST['priority']) && !empty($_POST['priority']) ? $_POST['priority'] : 'normale';
+
         $attachmentPath = null;
         if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] == 0) {
             if ($_FILES['attachment']['size'] > 2 * 1024 * 1024) { // 2 MB
@@ -58,7 +61,7 @@ function sendMessage($conn, $user) {
 
         $sql = "INSERT INTO Messages (sender_user_id, recipient_type, subject, content, priority, attachment_path, sent_at) 
                 VALUES (?, ?, ?, ?, ?, ?, GETDATE())";
-        $params = [$user['user_id'], $_POST['recipient_type'], $_POST['subject'], $_POST['content'], $_POST['priority'], $attachmentPath];
+        $params = [$user['user_id'], $_POST['recipient_type'], $_POST['subject'], $_POST['content'], $priority, $attachmentPath];
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
         $messageId = $conn->lastInsertId();
