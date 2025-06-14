@@ -43,6 +43,8 @@ function sendMessage($conn, $user) {
 
         $recipientType = $_POST['recipient_type'];
         $individualRecipients = isset($_POST['individual_recipients']) ? $_POST['individual_recipients'] : [];
+        $priority = isset($_POST['priority']) && !empty($_POST['priority']) ? $_POST['priority'] : 'normale';
+
 
         if ($recipientType === 'individual' && empty($individualRecipients)) {
             throw new Exception('Veuillez sélectionner au moins un destinataire individuel.');
@@ -64,7 +66,7 @@ function sendMessage($conn, $user) {
                 VALUES (?, ?, ?, ?, ?, ?, GETDATE())";
         $params = [
             $user['user_id'], $recipientType, $_POST['subject'],
-            $_POST['content'], $_POST['priority'], $attachmentPath
+            $_POST['content'], $priority, $attachmentPath
         ];
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
@@ -78,7 +80,7 @@ function sendMessage($conn, $user) {
             $stmtUsers = $conn->query("SELECT user_id FROM Users WHERE status = 'Active'");
             $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN, 0);
         } elseif ($recipientType === 'rh' || $recipientType === 'direction') {
-            $role = ($recipientType === 'rh') ? 'admin' : 'admin'; // Assuming admin role for both for now
+            $role = 'admin'; // Assuming admin role for both for now
             $stmtUsers = $conn->prepare("SELECT user_id FROM Users WHERE role = ? AND status = 'Active'");
             $stmtUsers->execute([$role]);
             $recipientIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -114,7 +116,6 @@ function getSentMessages($conn, $userId) {
 
     foreach($messages as &$msg) {
         $msg['recipient_display'] = getRecipientDisplayName($msg['recipient_type']);
-        // A more complex query could show read status, but this is simpler for now.
         $msg['status'] = 'Envoyé';
     }
 
@@ -146,15 +147,19 @@ function getMessageDetails($conn, $userId) {
         return;
     }
 
-    // Check if user is a recipient of this message
     $stmtCheck = $conn->prepare("SELECT COUNT(*) FROM Message_Recipients WHERE message_id = ? AND recipient_user_id = ?");
     $stmtCheck->execute([$messageId, $userId]);
     if ($stmtCheck->fetchColumn() == 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé à ce message.']);
-        return;
+        // Also check if the user is the sender
+         $stmtSenderCheck = $conn->prepare("SELECT COUNT(*) FROM Messages WHERE message_id = ? AND sender_user_id = ?");
+         $stmtSenderCheck->execute([$messageId, $userId]);
+         if($stmtSenderCheck->fetchColumn() == 0){
+            echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé à ce message.']);
+            return;
+         }
     }
 
-    // Mark as read
+    // Mark as read if user is a recipient
     $stmtRead = $conn->prepare("UPDATE Message_Recipients SET is_read = 1, read_at = GETDATE() WHERE message_id = ? AND recipient_user_id = ? AND is_read = 0");
     $stmtRead->execute([$messageId, $userId]);
     
