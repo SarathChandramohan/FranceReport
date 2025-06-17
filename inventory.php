@@ -380,7 +380,7 @@ $currentUser = getCurrentUser();
 
 <script>
 // --- CONFIGURATION ---
-const HANDLER_URL = 'inventory_handler.php';
+const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
 
 // --- GLOBAL STATE ---
