@@ -45,36 +45,26 @@ try {
 } catch (PDOException $e) {
     // Catch database-specific errors
     error_log("Database Error in inventory_handler.php: " . $e->getMessage());
-    respondWithError("Erreur de base de données. " . $e->getMessage(), 500);
+    respondWithError("Erreur de base de données.", 500);
 } catch (Exception $e) {
     // Catch general application errors
     error_log("General Error in inventory_handler.php: " . $e->getMessage());
     respondWithError($e->getMessage());
 }
 
-
 // --- Function Definitions ---
 
-/**
- * Responds with a JSON success message and data.
- */
 function respondWithSuccess($data = [], $message = "Opération réussie.") {
     echo json_encode(['status' => 'success', 'message' => $message] + $data);
     exit;
 }
 
-/**
- * Responds with a JSON error message.
- */
 function respondWithError($message, $code = 400) {
     http_response_code($code);
     echo json_encode(['status' => 'error', 'message' => $message]);
     exit;
 }
 
-/**
- * Fetches the entire inventory list.
- */
 function getInventory($conn) {
     $sql = "SELECT 
                 i.*, 
@@ -93,9 +83,6 @@ function getInventory($conn) {
     respondWithSuccess(['inventory' => $inventory]);
 }
 
-/**
- * Fetches all asset categories.
- */
 function getAssetCategories($conn) {
     $stmt = $conn->prepare("SELECT category_id, category_name, category_type FROM AssetCategories ORDER BY category_name");
     $stmt->execute();
@@ -103,9 +90,6 @@ function getAssetCategories($conn) {
     respondWithSuccess(['categories' => $categories]);
 }
 
-/**
- * Fetches all active users for assignment dropdowns.
- */
 function getUsers($conn) {
     $stmt = $conn->prepare("SELECT user_id, prenom, nom FROM Users WHERE status = 'Active' ORDER BY prenom, nom");
     $stmt->execute();
@@ -113,10 +97,6 @@ function getUsers($conn) {
     respondWithSuccess(['users' => $users]);
 }
 
-
-/**
- * Checks if a barcode already exists in the inventory.
- */
 function checkBarcodeExists($conn) {
     $barcode = isset($_GET['barcode']) ? trim($_GET['barcode']) : '';
     if (empty($barcode)) {
@@ -134,13 +114,9 @@ function checkBarcodeExists($conn) {
     }
 }
 
-/**
- * Adds a new asset to the inventory.
- */
 function addAsset($conn, $user) {
     $data = json_decode(file_get_contents('php://input'), true);
 
-    // --- Validation ---
     if (!$data || !isset($data['barcode'], $data['asset_name'], $data['asset_type'])) {
         throw new Exception("Données manquantes pour l'ajout de l'actif.");
     }
@@ -150,15 +126,14 @@ function addAsset($conn, $user) {
         throw new Exception("Le code-barres et le nom de l'actif sont obligatoires.");
     }
 
-    // Check for duplicate barcode
     $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Inventory WHERE barcode = ?");
     $stmt_check->execute([$barcode]);
     if ($stmt_check->fetchColumn() > 0) {
         throw new Exception("Ce code-barres existe déjà dans l'inventaire.");
     }
     
-    // --- Insertion ---
     $sql = "INSERT INTO Inventory (barcode, asset_type, category_id, asset_name, brand, serial_or_plate, position_or_info, status, fuel_level, date_added, last_modified) 
+            OUTPUT INSERTED.*
             VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, GETDATE(), GETDATE())";
             
     $params = [
@@ -174,19 +149,20 @@ function addAsset($conn, $user) {
     
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
-    $asset_id = $conn->lastInsertId();
+    $newAsset = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // --- Respond with new asset data ---
-    $stmt_new = $conn->prepare("SELECT i.*, ac.category_name FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id WHERE asset_id = ?");
-    $stmt_new->execute([$asset_id]);
-    $newAsset = $stmt_new->fetch(PDO::FETCH_ASSOC);
+    // Now, join to get category_name for the response
+    if ($newAsset && $newAsset['category_id']) {
+        $cat_stmt = $conn->prepare("SELECT category_name FROM AssetCategories WHERE category_id = ?");
+        $cat_stmt->execute([$newAsset['category_id']]);
+        $newAsset['category_name'] = $cat_stmt->fetchColumn();
+    } else if ($newAsset) {
+        $newAsset['category_name'] = null;
+    }
 
     respondWithSuccess(['asset' => $newAsset], "Actif ajouté avec succès.");
 }
 
-/**
- * Updates the status of an asset, including assignment.
- */
 function updateAssetStatus($conn, $user) {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -200,10 +176,7 @@ function updateAssetStatus($conn, $user) {
     $mission = ($status === 'in-use' && !empty($data['assigned_mission'])) ? trim($data['assigned_mission']) : null;
 
     $sql = "UPDATE Inventory 
-            SET status = ?, 
-                assigned_to_user_id = ?, 
-                assigned_mission = ?, 
-                last_modified = GETDATE()
+            SET status = ?, assigned_to_user_id = ?, assigned_mission = ?, last_modified = GETDATE()
             WHERE asset_id = ?";
             
     $stmt = $conn->prepare($sql);
@@ -211,11 +184,7 @@ function updateAssetStatus($conn, $user) {
 
     // Fetch the updated asset to send back to the client
     $stmt_updated = $conn->prepare("
-        SELECT 
-            i.*, 
-            ac.category_name,
-            u.prenom AS assigned_to_prenom, 
-            u.nom AS assigned_to_nom
+        SELECT i.*, ac.category_name, u.prenom AS assigned_to_prenom, u.nom AS assigned_to_nom
         FROM Inventory i
         LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id
         LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
@@ -226,9 +195,6 @@ function updateAssetStatus($conn, $user) {
     respondWithSuccess(['asset' => $updatedAsset], "Statut de l'actif mis à jour.");
 }
 
-/**
- * Deletes an asset from the inventory (Admin only).
- */
 function deleteAsset($conn, $user) {
     if ($user['role'] !== 'admin') {
         respondWithError("Accès non autorisé. Seuls les administrateurs peuvent supprimer des actifs.", 403);
