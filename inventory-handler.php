@@ -129,14 +129,15 @@ function addAsset($conn, $user) {
         throw new Exception("Le code-barres et le nom de l'actif sont obligatoires.");
     }
 
+    // Check for duplicate barcode
     $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Inventory WHERE barcode = ?");
     $stmt_check->execute([$barcode]);
     if ($stmt_check->fetchColumn() > 0) {
         throw new Exception("Ce code-barres existe déjà dans l'inventaire.");
     }
     
+    // 1. Modified SQL: Removed the "OUTPUT INSERTED.*" clause for better compatibility.
     $sql = "INSERT INTO Inventory (barcode, asset_type, category_id, asset_name, brand, serial_or_plate, position_or_info, status, fuel_level, date_added, last_modified) 
-            OUTPUT INSERTED.*
             VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, GETDATE(), GETDATE())";
             
     $params = [
@@ -152,17 +153,28 @@ function addAsset($conn, $user) {
     
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
-    $newAsset = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // 2. Fetch the newly added asset using the unique barcode.
+    // This replaces the need for the OUTPUT clause.
+    $select_stmt = $conn->prepare("
+        SELECT 
+            i.*, 
+            ac.category_name,
+            u.prenom AS assigned_to_prenom, 
+            u.nom AS assigned_to_nom
+        FROM Inventory i
+        LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id
+        LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
+        WHERE i.barcode = ?");
+    $select_stmt->execute([$barcode]);
+    $newAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($newAsset && $newAsset['category_id']) {
-        $cat_stmt = $conn->prepare("SELECT category_name FROM AssetCategories WHERE category_id = ?");
-        $cat_stmt->execute([$newAsset['category_id']]);
-        $newAsset['category_name'] = $cat_stmt->fetchColumn();
-    } else if ($newAsset) {
-        $newAsset['category_name'] = null;
+    // This final check ensures the asset was actually created and retrieved.
+    if ($newAsset) {
+         respondWithSuccess(['asset' => $newAsset], "Actif ajouté avec succès.");
+    } else {
+        throw new Exception("Échec de la création ou de la récupération de l'actif.");
     }
-
-    respondWithSuccess(['asset' => $newAsset], "Actif ajouté avec succès.");
 }
 
 function updateAssetStatus($conn, $user) {
