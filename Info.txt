@@ -255,3 +255,37 @@ ALTER TABLE Messages
 ADD CONSTRAINT FK_Messages_ParentMessage FOREIGN KEY (parent_message_id) REFERENCES Messages(message_id);
 GO
 ----------------------------------------------------------------------------------------------
+-- Table to store asset categories (Corrected Version)
+CREATE TABLE AssetCategories (
+    category_id INT IDENTITY(1,1) PRIMARY KEY,
+    category_name NVARCHAR(100) NOT NULL,
+    category_type VARCHAR(50) NOT NULL, -- 'tool' or 'vehicle'
+    parent_category_id INT NULL,
+    -- Corrected constraint: Changed ON DELETE CASCADE to ON DELETE NO ACTION
+    CONSTRAINT FK_AssetCategories_Parent FOREIGN KEY (parent_category_id) REFERENCES AssetCategories(category_id) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
+
+-- The main inventory table (no changes needed here)
+CREATE TABLE Inventory (
+    asset_id INT IDENTITY(1,1) PRIMARY KEY,
+    barcode VARCHAR(255) NOT NULL UNIQUE,
+    asset_type VARCHAR(50) NOT NULL,
+    category_id INT,
+    asset_name NVARCHAR(255) NOT NULL,
+    brand NVARCHAR(255),
+    serial_or_plate NVARCHAR(255),
+    position_or_info NVARCHAR(500),
+    status VARCHAR(50) DEFAULT 'available',
+    fuel_level VARCHAR(50),
+    assigned_to_user_id INT NULL,
+    assigned_mission NVARCHAR(500) NULL,
+    date_added DATETIME DEFAULT GETDATE(),
+    last_modified DATETIME DEFAULT GETDATE(),
+    CONSTRAINT FK_Inventory_Category FOREIGN KEY (category_id) REFERENCES AssetCategories(category_id) ON DELETE SET NULL,
+    CONSTRAINT FK_Inventory_AssignedUser FOREIGN KEY (assigned_to_user_id) REFERENCES Users(user_id) ON DELETE SET NULL
+);
+
+-- Indexes for better performance (no changes needed here)
+CREATE INDEX IDX_Inventory_AssetType ON Inventory (asset_type);
+CREATE INDEX IDX_Inventory_Status ON Inventory (status);
+CREATE INDEX IDX_Inventory_Barcode ON Inventory (barcode);
