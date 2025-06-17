@@ -39,6 +39,9 @@ try {
         case 'delete_asset':
             deleteAsset($conn, $currentUser);
             break;
+        case 'add_category': // New action
+            addCategory($conn, $currentUser);
+            break;
         default:
             throw new Exception("Action non valide ou non spécifiée.");
     }
@@ -151,7 +154,6 @@ function addAsset($conn, $user) {
     $stmt->execute($params);
     $newAsset = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Now, join to get category_name for the response
     if ($newAsset && $newAsset['category_id']) {
         $cat_stmt = $conn->prepare("SELECT category_name FROM AssetCategories WHERE category_id = ?");
         $cat_stmt->execute([$newAsset['category_id']]);
@@ -182,7 +184,6 @@ function updateAssetStatus($conn, $user) {
     $stmt = $conn->prepare($sql);
     $stmt->execute([$status, $assigned_to, $mission, $asset_id]);
 
-    // Fetch the updated asset to send back to the client
     $stmt_updated = $conn->prepare("
         SELECT i.*, ac.category_name, u.prenom AS assigned_to_prenom, u.nom AS assigned_to_nom
         FROM Inventory i
@@ -214,5 +215,45 @@ function deleteAsset($conn, $user) {
         respondWithSuccess([], "Actif supprimé avec succès.");
     } else {
         throw new Exception("L'actif à supprimer n'a pas été trouvé.");
+    }
+}
+
+// --- NEW FUNCTION ---
+function addCategory($conn, $user) {
+    // Optional: Restrict this action to admins if needed
+    // if ($user['role'] !== 'admin') {
+    //     respondWithError("Accès non autorisé.", 403);
+    // }
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    // Validation
+    if (!$data || empty(trim($data['category_name'])) || empty($data['category_type'])) {
+        throw new Exception("Le nom et le type de la catégorie sont obligatoires.");
+    }
+    $name = trim($data['category_name']);
+    $type = $data['category_type'];
+
+    if (!in_array($type, ['tool', 'vehicle'])) {
+        throw new Exception("Type de catégorie non valide.");
+    }
+
+    // Check for duplicates
+    $stmt_check = $conn->prepare("SELECT COUNT(*) FROM AssetCategories WHERE category_name = ? AND category_type = ?");
+    $stmt_check->execute([$name, $type]);
+    if ($stmt_check->fetchColumn() > 0) {
+        throw new Exception("Une catégorie avec ce nom et ce type existe déjà.");
+    }
+
+    // Insertion
+    $sql = "INSERT INTO AssetCategories (category_name, category_type) OUTPUT INSERTED.* VALUES (?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$name, $type]);
+    $newCategory = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($newCategory) {
+        respondWithSuccess(['category' => $newCategory], "Catégorie créée avec succès.");
+    } else {
+        throw new Exception("Échec de la création de la catégorie.");
     }
 }
