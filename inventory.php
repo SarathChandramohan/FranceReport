@@ -103,9 +103,23 @@ $currentUser = getCurrentUser();
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 20px;
         }
-        .stat-item { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; }
-        .stat-number { font-size: 2.5em; font-weight: bold; color: #007bff; margin-bottom: 5px; }
-        .stat-label { color: #6c757d; font-weight: 500; }
+        .stat-item {
+            text-align: center; padding: 20px; background: #f8f9fa;
+            border-radius: 10px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .stat-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .stat-item.active {
+            border-color: #007bff;
+            background-color: #e7f1ff;
+        }
+        .stat-number { font-size: 2.5em; font-weight: bold; color: #007bff; margin-bottom: 5px; pointer-events: none; }
+        .stat-label { color: #6c757d; font-weight: 500; pointer-events: none; }
         .notification {
             position: fixed; top: 80px; right: 20px;
             padding: 15px 25px; border-radius: 8px;
@@ -145,7 +159,6 @@ $currentUser = getCurrentUser();
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
             <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
-            <div class="tab" data-tab="stats"><i class="fas fa-chart-pie"></i> Statistiques</div>
         </div>
     </div>
 
@@ -156,7 +169,13 @@ $currentUser = getCurrentUser();
                     <span class="sr-only">Loading...</span>
                 </div>
             </div>
-            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+
+            <h3 class="mb-3">Aperçu de l'Inventaire</h3>
+            <div id="statsGrid" class="stats-grid mb-4">
+                </div>
+            <hr/>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 mt-3 flex-wrap">
                 <h3 class="mb-2">Liste des Actifs</h3>
                 <div class="form-inline">
                     <input type="text" class="form-control mr-sm-2 mb-2" id="searchInput" placeholder="Rechercher...">
@@ -266,12 +285,6 @@ $currentUser = getCurrentUser();
         </div>
     </div>
 
-    <div id="stats" class="tab-content">
-        <div class="card">
-             <h3 class="text-center mb-4">Statistiques de l'Inventaire</h3>
-             <div id="statsGrid" class="stats-grid"></div>
-        </div>
-    </div>
 </div>
 
 <div class="modal fade" id="statusModal" tabindex="-1" role="dialog">
@@ -317,8 +330,6 @@ $currentUser = getCurrentUser();
 
 <script>
 // --- CONFIGURATION ---
-// **CRITICAL FIX V3**: Using a simple relative path.
-// This assumes `inventory.php` and `inventory_handler.php` are in the same directory.
 const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
 
@@ -333,6 +344,7 @@ let currentStream = null;
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
 const emptyInventoryMessage = document.getElementById('empty-inventory-message');
+const statsGrid = document.getElementById('statsGrid');
 
 // --- HELPER FUNCTIONS ---
 function showNotification(message, type = 'success') {
@@ -367,9 +379,8 @@ async function apiCall(action, method = 'GET', body = null) {
 
     try {
         const response = await fetch(url, options);
-        // Check if the server responded with an error code
         if (!response.ok) {
-             throw new Error(`Le serveur a répondu avec une erreur ${response.status} (Not Found). Vérifiez que le fichier inventory_handler.php existe et est au bon endroit.`);
+             throw new Error(`Le serveur a répondu avec une erreur ${response.status}. Vérifiez le chemin du fichier handler.`);
         }
         const data = await response.json();
         if (data.status !== 'success') {
@@ -388,10 +399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadingOverlay.style.display = 'flex';
     await fetchInitialData();
     loadingOverlay.style.display = 'none';
-    renderInventory();
-    updateStatistics();
-    populateCategoryDropdown('tool');
-    populateUserDropdown();
+    renderAll();
 });
 
 async function fetchInitialData() {
@@ -404,7 +412,7 @@ async function fetchInitialData() {
         inventory = inventoryData.inventory || [];
         assetCategories = categoriesData.categories || [];
         userList = usersData.users || [];
-    } catch (error) { /* Error already handled by apiCall */ }
+    } catch (error) { /* Handled by apiCall */ }
 }
 
 function setupEventListeners() {
@@ -420,15 +428,24 @@ function setupEventListeners() {
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     $('#statusModal').on('change', '#newStatus', toggleAssignmentFieldsModal);
     document.getElementById('saveStatusChange').addEventListener('click', handleSaveStatusChange);
+    statsGrid.addEventListener('click', handleStatCardClick);
 }
 
 // --- UI & RENDERING ---
+
+function renderAll() {
+    renderInventory();
+    updateStatistics();
+    populateCategoryDropdown('tool');
+    populateUserDropdown();
+}
+
 function showTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
-    
+
     if (tabName !== 'scanner' && currentStream) stopScanning();
 }
 
@@ -526,12 +543,11 @@ async function handleAddAsset(e) {
     try {
         const data = await apiCall('add_asset', 'POST', assetData);
         inventory.push(data.asset);
-        renderInventory();
-        updateStatistics();
         showNotification('Actif ajouté avec succès!', 'success');
         e.target.reset();
         toggleAssetFields();
         showTab('inventory');
+        renderAll(); // Re-render everything after adding
     } catch (error) { /* Handled by apiCall */ }
 }
 
@@ -647,8 +663,7 @@ async function handleSaveStatusChange() {
         const data = await apiCall('update_asset_status', 'POST', updateData);
         const index = inventory.findIndex(a => a.asset_id == data.asset.asset_id);
         if (index > -1) inventory[index] = data.asset;
-        renderInventory();
-        updateStatistics();
+        renderAll();
         $('#statusModal').modal('hide');
         showNotification('Statut mis à jour avec succès!', 'success');
     } catch (error) { /* Handled by apiCall */ }
@@ -660,13 +675,31 @@ async function handleDeleteAsset(assetId, assetName) {
     try {
         await apiCall('delete_asset', 'POST', { asset_id: assetId });
         inventory = inventory.filter(a => a.asset_id != assetId);
-        renderInventory();
-        updateStatistics();
+        renderAll();
         showNotification('Actif supprimé avec succès!', 'success');
     } catch (error) { /* Handled by apiCall */ }
 }
 
-// --- STATISTICS ---
+// --- STATISTICS & CLICKABLE FILTERS ---
+function handleStatCardClick(event) {
+    const clickedCard = event.target.closest('.stat-item');
+    if (!clickedCard) return;
+
+    const filterType = clickedCard.dataset.filterType;
+    const filterStatus = clickedCard.dataset.filterStatus;
+
+    // Update the dropdown filters
+    document.getElementById('filterType').value = filterType;
+    document.getElementById('filterStatus').value = filterStatus;
+
+    // Update active class on cards
+    document.querySelectorAll('#statsGrid .stat-item').forEach(card => card.classList.remove('active'));
+    clickedCard.classList.add('active');
+
+    // Re-render the inventory list with the new filters
+    renderInventory();
+}
+
 function updateStatistics() {
     const stats = {
         total: inventory.length,
@@ -676,14 +709,26 @@ function updateStatistics() {
         inUse: inventory.filter(item => item.status === 'in-use').length,
         maintenance: inventory.filter(item => item.status === 'maintenance').length
     };
-    const grid = document.getElementById('statsGrid');
-    grid.innerHTML = `
-        <div class="stat-item"><div class="stat-number">${stats.total}</div><div class="stat-label">Actifs Totaux</div></div>
-        <div class="stat-item"><div class="stat-number">${stats.tools}</div><div class="stat-label">Outils</div></div>
-        <div class="stat-item"><div class="stat-number">${stats.vehicles}</div><div class="stat-label">Véhicules</div></div>
-        <div class="stat-item"><div class="stat-number">${stats.available}</div><div class="stat-label">Disponibles</div></div>
-        <div class="stat-item"><div class="stat-number">${stats.inUse}</div><div class="stat-label">En Utilisation</div></div>
-        <div class="stat-item"><div class="stat-number">${stats.maintenance}</div><div class="stat-label">En Maintenance</div></div>
+    
+    statsGrid.innerHTML = `
+        <div class="stat-item active" data-filter-type="all" data-filter-status="all">
+            <div class="stat-number">${stats.total}</div><div class="stat-label">Actifs Totaux</div>
+        </div>
+        <div class="stat-item" data-filter-type="tool" data-filter-status="all">
+            <div class="stat-number">${stats.tools}</div><div class="stat-label">Outils</div>
+        </div>
+        <div class="stat-item" data-filter-type="vehicle" data-filter-status="all">
+            <div class="stat-number">${stats.vehicles}</div><div class="stat-label">Véhicules</div>
+        </div>
+        <div class="stat-item" data-filter-type="all" data-filter-status="available">
+            <div class="stat-number">${stats.available}</div><div class="stat-label">Disponibles</div>
+        </div>
+        <div class="stat-item" data-filter-type="all" data-filter-status="in-use">
+            <div class="stat-number">${stats.inUse}</div><div class="stat-label">En Utilisation</div>
+        </div>
+        <div class="stat-item" data-filter-type="all" data-filter-status="maintenance">
+            <div class="stat-number">${stats.maintenance}</div><div class="stat-label">En Maintenance</div>
+        </div>
     `;
 }
 </script>
