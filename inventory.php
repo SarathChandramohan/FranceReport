@@ -143,6 +143,17 @@ $currentUser = getCurrentUser();
         #empty-inventory-message .fa-dolly {
             font-size: 4rem; margin-bottom: 20px;
         }
+        .category-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .category-list li {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -159,6 +170,7 @@ $currentUser = getCurrentUser();
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
             <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
+            <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
         </div>
     </div>
 
@@ -285,6 +297,44 @@ $currentUser = getCurrentUser();
         </div>
     </div>
 
+    <div id="manage_categories" class="tab-content">
+        <div class="row">
+            <div class="col-md-5">
+                <div class="card">
+                    <h3><i class="fas fa-plus-circle"></i> Créer une Catégorie</h3>
+                    <form id="addCategoryForm">
+                        <div class="form-group">
+                            <label for="new_category_name">Nom de la Catégorie *</label>
+                            <input type="text" class="form-control" id="new_category_name" placeholder="Ex: Perceuses, Fourgonnettes" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new_category_type">Type de Catégorie *</label>
+                            <select id="new_category_type" class="form-control" required>
+                                <option value="tool">Outil</option>
+                                <option value="vehicle">Véhicule</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Créer</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="card">
+                    <h3><i class="fas fa-tags"></i> Catégories Existantes</h3>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <h4>Outils</h4>
+                            <ul id="toolCategoriesList" class="category-list"></ul>
+                        </div>
+                        <div class="col-sm-6">
+                            <h4>Véhicules</h4>
+                            <ul id="vehicleCategoriesList" class="category-list"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="statusModal" tabindex="-1" role="dialog">
@@ -330,7 +380,7 @@ $currentUser = getCurrentUser();
 
 <script>
 // --- CONFIGURATION ---
-const HANDLER_URL = 'inventory-handler.php';
+const HANDLER_URL = 'inventory_handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
 
 // --- GLOBAL STATE ---
@@ -423,6 +473,7 @@ function setupEventListeners() {
     document.getElementById('filterType').addEventListener('change', renderInventory);
     document.getElementById('filterStatus').addEventListener('change', renderInventory);
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
+    document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('asset_type').addEventListener('change', toggleAssetFields);
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
@@ -438,6 +489,7 @@ function renderAll() {
     updateStatistics();
     populateCategoryDropdown('tool');
     populateUserDropdown();
+    renderCategoriesList();
 }
 
 function showTab(tabName) {
@@ -547,7 +599,7 @@ async function handleAddAsset(e) {
         e.target.reset();
         toggleAssetFields();
         showTab('inventory');
-        renderAll(); // Re-render everything after adding
+        renderAll();
     } catch (error) { /* Handled by apiCall */ }
 }
 
@@ -680,6 +732,53 @@ async function handleDeleteAsset(assetId, assetName) {
     } catch (error) { /* Handled by apiCall */ }
 }
 
+// --- CATEGORY MANAGEMENT ---
+function renderCategoriesList() {
+    const toolList = document.getElementById('toolCategoriesList');
+    const vehicleList = document.getElementById('vehicleCategoriesList');
+    toolList.innerHTML = '';
+    vehicleList.innerHTML = '';
+
+    assetCategories.forEach(cat => {
+        const li = document.createElement('li');
+        li.textContent = cat.category_name;
+        if (cat.category_type === 'tool') {
+            toolList.appendChild(li);
+        } else {
+            vehicleList.appendChild(li);
+        }
+    });
+
+    if (toolList.innerHTML === '') {
+        toolList.innerHTML = '<li>Aucune catégorie d\'outil.</li>';
+    }
+    if (vehicleList.innerHTML === '') {
+        vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
+    }
+}
+
+async function handleCreateCategory(e) {
+    e.preventDefault();
+    const form = e.target;
+    const categoryData = {
+        category_name: document.getElementById('new_category_name').value,
+        category_type: document.getElementById('new_category_type').value
+    };
+
+    try {
+        const data = await apiCall('add_category', 'POST', categoryData);
+        assetCategories.push(data.category); // Add new category to our global list
+        assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name)); // Keep it sorted
+
+        renderCategoriesList(); // Re-render the list in the tab
+        populateCategoryDropdown(document.getElementById('asset_type').value); // Re-populate dropdowns
+        
+        showNotification('Catégorie créée avec succès!', 'success');
+        form.reset();
+    } catch (error) { /* Handled by apiCall */ }
+}
+
+
 // --- STATISTICS & CLICKABLE FILTERS ---
 function handleStatCardClick(event) {
     const clickedCard = event.target.closest('.stat-item');
@@ -688,15 +787,12 @@ function handleStatCardClick(event) {
     const filterType = clickedCard.dataset.filterType;
     const filterStatus = clickedCard.dataset.filterStatus;
 
-    // Update the dropdown filters
     document.getElementById('filterType').value = filterType;
     document.getElementById('filterStatus').value = filterStatus;
 
-    // Update active class on cards
     document.querySelectorAll('#statsGrid .stat-item').forEach(card => card.classList.remove('active'));
     clickedCard.classList.add('active');
 
-    // Re-render the inventory list with the new filters
     renderInventory();
 }
 
