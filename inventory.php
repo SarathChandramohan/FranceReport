@@ -1,13 +1,8 @@
 <?php
 require_once 'session-management.php';
 requireLogin();
-$user = getCurrentUser();
-
-// This page is for administrators only. Redirect if the user is not an admin.
-if ($user['role'] !== 'admin') {
-    header('Location: dashboard.php'); // Or any other appropriate page
-    exit;
-}
+$currentUser = getCurrentUser();
+// You can use $currentUser['role'] to control access to specific elements on this page if needed.
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -15,245 +10,837 @@ if ($user['role'] !== 'admin') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion de l'Inventaire</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    
     <style>
-        /* UI/Theme inspired by the provided inventory.html and inventory2.html examples */
+        /* Combines and refines styles from both HTML files for a cohesive look */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            color: #333;
+            background-color: #f4f7f6; /* A calmer background */
         }
-        .main-header {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 25px;
-            text-align: center;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+        .container-fluid {
+            padding-top: 20px;
         }
-        .main-header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 700;
-        }
-        .main-header p { color: #666; font-size: 1.1em; }
-        .card-custom {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            border: none;
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            padding: 20px;
+
+        .card {
+            background-color: #ffffff;
             border-radius: 15px;
-            text-align: center;
-            border-left: 5px solid;
-            transition: all 0.3s ease;
-            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            border: none;
+            margin-bottom: 25px;
+            padding: 25px;
         }
-        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .stat-card.total { border-color: #6c757d; }
-        .stat-card.tools { border-color: #28a745; }
-        .stat-card.vehicles { border-color: #007bff; }
-        .stat-card.available { border-color: #17a2b8; }
-        .stat-card.in-use { border-color: #ffc107; }
-        .stat-card.maintenance { border-color: #dc3545; }
-        .stat-icon { font-size: 2em; margin-bottom: 10px; opacity: 0.8; }
-        .stat-number { font-size: 2em; font-weight: bold; }
-        .stat-label { color: #6c757d; font-weight: 500; font-size: 0.9em; }
+
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .tab {
+            padding: 12px 25px;
+            background: #e9ecef;
+            color: #495057;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tab.active {
+            background: #007bff;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .form-control:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+        }
+        
+        /* Scanner Styles */
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto 20px;
+            background: #2c3e50;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #video { width: 100%; height: auto; display: none; }
+        .scanner-placeholder {
+            width: 100%;
+            min-height: 300px;
+            background: #34495e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2em; text-align: center;
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%; max-width: 250px;
+            height: 60%; max-height: 150px;
+            border: 3px solid rgba(0, 255, 0, 0.8);
+            border-radius: 10px;
+            display: none;
+        }
+
+        /* Inventory Grid Styles */
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 25px;
+        }
         .asset-card {
             background: white;
             border-radius: 15px;
             padding: 20px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.07);
             transition: all 0.3s ease;
             position: relative;
             border-left: 5px solid;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .asset-card.tool { border-left-color: #28a745; }
         .asset-card.vehicle { border-left-color: #007bff; }
-        .asset-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.12); }
-        .asset-title { font-size: 1.2em; font-weight: bold; color: #2c3e50; }
-        .asset-status { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .asset-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1);
+        }
+        .asset-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; }
+        .asset-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px; font-weight: bold; text-transform: uppercase;
+        }
         .status-available { background: #d4edda; color: #155724; }
         .status-in-use { background: #fff3cd; color: #856404; }
         .status-maintenance { background: #f8d7da; color: #721c24; }
-        .btn-gradient {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
+        .asset-details { color: #6c757d; line-height: 1.6; margin-bottom: 20px; font-size: 0.9em; }
+        .asset-details strong { color: #495057; }
+        .asset-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+        .btn-small { padding: 5px 10px; font-size: 12px; }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
         }
-        .btn-gradient:hover {
-            color: white;
-            opacity: 0.9;
+        .stat-item { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; }
+        .stat-number { font-size: 2.5em; font-weight: bold; color: #007bff; margin-bottom: 5px; }
+        .stat-label { color: #6c757d; font-weight: 500; }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 80px; right: 20px;
+            padding: 15px 25px; border-radius: 8px;
+            color: white; font-weight: 600;
+            z-index: 9999;
+            transform: translateX(calc(100% + 30px));
+            transition: transform 0.4s ease-in-out;
+        }
+        .notification.success { background: #28a745; }
+        .notification.error { background: #dc3545; }
+        .notification.show { transform: translateX(0); }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            border-radius: 15px;
+        }
+        
+        #empty-inventory-message {
+            display: none;
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+        }
+
+        #empty-inventory-message .fa-dolly {
+            font-size: 4rem;
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
-    <?php include 'navbar.php'; ?>
 
-    <div class="container-fluid mt-4">
-        <div class="main-header">
-            <h1>📊 Tableau de Bord de l'Inventaire</h1>
-            <p>Supervisez et gérez vos outils et véhicules en temps réel</p>
+<?php include 'navbar.php'; ?>
+
+<div class="container-fluid">
+    <div class="card">
+        <h2 class="text-center">📦 Gestion de l'Inventaire</h2>
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('inventory')"><i class="fas fa-boxes"></i> Inventaire</div>
+            <div class="tab" onclick="showTab('add_asset')"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
+            <div class="tab" onclick="showTab('scanner')"><i class="fas fa-barcode"></i> Scanner</div>
+            <div class="tab" onclick="showTab('stats')"><i class="fas fa-chart-pie"></i> Statistiques</div>
         </div>
-
-        <!-- Statistics Overview -->
-        <div class="card-custom">
-            <div class="row text-center" id="stats-overview">
-                <!-- Stats loaded by JS -->
-            </div>
-        </div>
-
-        <!-- Main Content Area -->
-        <div class="card-custom">
-            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-                <h3 class="mb-2 mb-md-0">Liste des Actifs</h3>
-                <div>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#categoriesModal"><i class="fas fa-sitemap"></i> Gérer les Catégories</button>
-                    <button class="btn btn-gradient" onclick="prepareAssetModal()"><i class="fas fa-plus"></i> Ajouter un Actif</button>
+    </div>
+    
+    <div id="inventory" class="tab-content active">
+        <div class="card position-relative">
+             <div class="loading-overlay" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
                 </div>
             </div>
-            <div class="row mb-3">
-                <div class="col-md-8">
-                    <input type="text" id="searchInput" class="form-control" placeholder="Rechercher par nom, code-barres, marque, série/plaque...">
-                </div>
-                <div class="col-md-4">
-                    <select id="typeFilter" class="form-control">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                <h3 class="mb-0">Liste des Actifs</h3>
+                <div class="form-inline">
+                    <input type="text" class="form-control mr-2" id="searchInput" placeholder="Rechercher...">
+                    <select id="filterType" class="form-control mr-2">
                         <option value="all">Tous les types</option>
                         <option value="tool">Outils</option>
                         <option value="vehicle">Véhicules</option>
                     </select>
+                    <select id="filterStatus" class="form-control">
+                        <option value="all">Tous les statuts</option>
+                        <option value="available">Disponible</option>
+                        <option value="in-use">En cours d'utilisation</option>
+                        <option value="maintenance">En maintenance</option>
+                    </select>
                 </div>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="thead-light">
-                        <tr>
-                            <th>Type</th>
-                            <th>Nom & Code-barres</th>
-                            <th>Catégorie</th>
-                            <th>Statut</th>
-                            <th>Assigné à</th>
-                            <th class="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="assets-table-body">
-                        <!-- Asset rows are dynamically loaded here -->
-                    </tbody>
-                </table>
+            <div id="inventoryGrid" class="inventory-grid">
+                </div>
+            <div id="empty-inventory-message">
+                <i class="fas fa-dolly"></i>
+                <h3>L'inventaire est vide</h3>
+                <p>Commencez par ajouter un nouvel actif.</p>
             </div>
         </div>
     </div>
 
-    <!-- Asset Modal (Add/Edit) -->
-    <div class="modal fade" id="assetModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <form id="assetForm" novalidate>
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="assetModalLabel">Ajouter un Actif</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    <div id="add_asset" class="tab-content">
+        <div class="card">
+            <h3>Ajouter un Nouvel Actif Manuellement</h3>
+            <form id="addAssetForm">
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="asset_type">Type d'actif *</label>
+                        <select id="asset_type" class="form-control" required>
+                            <option value="tool" selected>🔧 Outil</option>
+                            <option value="vehicle">🚗 Véhicule</option>
+                        </select>
                     </div>
-                    <div class="modal-body">
-                        <input type="hidden" id="asset_id" name="asset_id">
-                        <div id="modal-alert" class="alert alert-danger" style="display:none;"></div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="asset_type">Type d'Actif *</label>
-                                <select id="asset_type" name="asset_type" class="form-control" required></select>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="category_id">Catégorie</label>
-                                <select id="category_id" name="category_id" class="form-control"></select>
-                            </div>
+                    <div class="form-group col-md-6">
+                        <label for="barcode">Code-barres / ID Unique *</label>
+                        <input type="text" class="form-control" id="barcode" placeholder="Ex: TOOL001, 123456789" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="asset_name">Nom de l'actif *</label>
+                    <input type="text" class="form-control" id="asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required>
+                </div>
+                 <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="brand">Marque</label>
+                        <input type="text" class="form-control" id="brand" placeholder="Ex: DeWalt, Renault">
+                    </div>
+                    <div class="form-group col-md-6" id="category_field">
+                        <label for="category_id">Catégorie</label>
+                        <select id="category_id" class="form-control"></select>
+                    </div>
+                </div>
+
+                <div id="tool_fields">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="serial_or_plate_tool">Numéro de série</label>
+                            <input type="text" class="form-control" id="serial_or_plate_tool" placeholder="Ex: SN12345678">
                         </div>
-                        <div class="form-group">
-                            <label for="asset_name">Nom de l'Actif *</label>
-                            <input type="text" id="asset_name" name="asset_name" class="form-control" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="barcode">Code-barres *</label>
-                                <input type="text" id="barcode" name="barcode" class="form-control" required>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="brand">Marque</label>
-                                <input type="text" id="brand" name="brand" class="form-control">
-                            </div>
-                        </div>
-                        
-                        <!-- Tool-specific fields -->
-                        <div id="tool-fields-modal" style="display:none;">
-                            <div class="form-row">
-                                <div class="form-group col-md-6">
-                                    <label for="serial_or_plate_tool">Numéro de Série</label>
-                                    <input type="text" id="serial_or_plate_tool" name="serial_or_plate_tool" class="form-control">
-                                </div>
-                                <div class="form-group col-md-6">
-                                    <label for="position_or_info_tool">Emplacement</label>
-                                    <input type="text" id="position_or_info_tool" name="position_or_info_tool" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Vehicle-specific fields -->
-                        <div id="vehicle-fields-modal" style="display:none;">
-                            <div class="form-row">
-                                <div class="form-group col-md-6">
-                                    <label for="serial_or_plate_vehicle">Plaque d'immatriculation</label>
-                                    <input type="text" id="serial_or_plate_vehicle" name="serial_or_plate_vehicle" class="form-control">
-                                </div>
-                                <div class="form-group col-md-6">
-                                    <label for="fuel_level">Niveau de Carburant</label>
-                                    <select id="fuel_level" name="fuel_level" class="form-control"></select>
-                                </div>
-                            </div>
+                        <div class="form-group col-md-6">
+                            <label for="position_or_info_tool">Position / Emplacement</label>
+                            <input type="text" class="form-control" id="position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3">
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
-                        <button type="submit" class="btn btn-gradient">Enregistrer</button>
+                </div>
+                <div id="vehicle_fields" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="serial_or_plate_vehicle">Plaque d'immatriculation</label>
+                            <input type="text" class="form-control" id="serial_or_plate_vehicle" placeholder="Ex: AA-123-BB">
+                        </div>
+                         <div class="form-group col-md-6">
+                            <label for="fuel_level">Niveau de carburant</label>
+                            <select id="fuel_level" class="form-control">
+                                <option value="">Non spécifié</option>
+                                <option value="full">Plein</option>
+                                <option value="three-quarter">3/4</option>
+                                <option value="half">Moitié</option>
+                                <option value="quarter">1/4</option>
+                                <option value="empty">Vide</option>
+                            </select>
+                        </div>
                     </div>
-                </form>
-            </div>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>
+            </form>
         </div>
     </div>
 
-    <!-- Categories Modal -->
-    <div class="modal fade" id="categoriesModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Gérer les Catégories</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                </div>
-                <div class="modal-body">
-                    <form id="categoryForm" class="form-inline mb-3">
-                        <input type="text" id="category_name" class="form-control mr-2 flex-grow-1" placeholder="Nom de la nouvelle catégorie" required>
-                        <select id="category_type" class="form-control mr-2"></select>
-                        <button type="submit" class="btn btn-success">Ajouter</button>
-                    </form>
-                    <div id="categories-list" class="list-group">
-                        <!-- Category list is loaded here -->
+    <div id="scanner" class="tab-content">
+        <div class="card">
+             <h3 class="text-center mb-4">Scanner un Code-barres</h3>
+             <div class="scanner-container">
+                <video id="video" autoplay playsinline></video>
+                <div id="scannerPlaceholder" class="scanner-placeholder">
+                    <div>
+                        <i class="fas fa-camera fa-3x mb-3"></i><br>
+                        La caméra est inactive
                     </div>
                 </div>
+                <div id="scanOverlay" class="scan-overlay"></div>
             </div>
+            <div class="text-center mt-3">
+                <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scanner</button>
+                <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter le Scanner</button>
+            </div>
+            <div id="scanResult" class="mt-4"></div>
         </div>
     </div>
+
+    <div id="stats" class="tab-content">
+        <div class="card">
+             <h3 class="text-center mb-4">Statistiques de l'Inventaire</h3>
+             <div id="statsGrid" class="stats-grid">
+                </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="statusModal" tabindex="-1" role="dialog" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="statusModalLabel">Changer le Statut de <span id="modalAssetName"></span></h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="statusChangeForm">
+            <input type="hidden" id="modalAssetId">
+            <div class="form-group">
+                <label for="newStatus">Nouveau Statut</label>
+                <select id="newStatus" class="form-control">
+                    <option value="available">Disponible</option>
+                    <option value="in-use">En cours d'utilisation</option>
+                    <option value="maintenance">En maintenance</option>
+                </select>
+            </div>
+            <div id="assignmentFields" style="display: none;">
+                 <div class="form-group">
+                    <label for="assigned_to_user_id">Assigner à</label>
+                    <select id="assigned_to_user_id" class="form-control">
+                        </select>
+                </div>
+                <div class="form-group">
+                    <label for="assigned_mission">Mission</label>
+                    <input type="text" id="assigned_mission" class="form-control" placeholder="Description de la mission">
+                </div>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="saveStatusChange">Sauvegarder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+
+
+<script>
+// --- GLOBAL VARIABLES ---
+let inventory = [];
+let assetCategories = [];
+let userList = [];
+let codeReader = null;
+let currentStream = null;
+
+// --- DOM ELEMENTS ---
+const inventoryGrid = document.getElementById('inventoryGrid');
+const loadingOverlay = document.querySelector('.loading-overlay');
+const emptyInventoryMessage = document.getElementById('empty-inventory-message');
+
+// --- HELPER FUNCTIONS ---
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.classList.add('show'), 10);
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => document.body.removeChild(notification), 500);
+    }, 4000);
+}
+
+function handleApiError(error) {
+    console.error('API Error:', error);
+    showNotification(error.message || 'Une erreur est survenue.', 'error');
+}
+
+// --- API COMMUNICATION ---
+async function apiCall(action, method = 'GET', body = null) {
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
     
-    <?php include('footer.php'); ?>
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="inventory.js"></script>
+    let url = `inventory_handler.php?action=${action}`;
+    if (method === 'GET' && body) {
+         url += '&' + new URLSearchParams(body).toString();
+    }
+
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Erreur HTTP: ' + response.status }));
+            throw new Error(errorData.message);
+        }
+        const data = await response.json();
+        if (data.status !== 'success') {
+            throw new Error(data.message);
+        }
+        return data;
+    } catch (error) {
+        handleApiError(error);
+        throw error; // Re-throw to stop promise chains
+    }
+}
+
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initial data fetch
+    await fetchInitialData();
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Initial render
+    renderInventory();
+    updateStatistics();
+    populateCategoryDropdown('tool');
+    populateUserDropdown();
+});
+
+async function fetchInitialData() {
+    loadingOverlay.style.display = 'flex';
+    try {
+        const [inventoryData, categoriesData, usersData] = await Promise.all([
+            apiCall('get_inventory'),
+            apiCall('get_categories'),
+            apiCall('get_users')
+        ]);
+        inventory = inventoryData.inventory || [];
+        assetCategories = categoriesData.categories || [];
+        userList = usersData.users || [];
+        
+    } catch (error) {
+        // Error already handled by apiCall
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+
+function setupEventListeners() {
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', (e) => showTab(e.currentTarget.getAttribute('onclick').match(/'([^']+)'/)[1]));
+    });
+
+    // Filtering and Searching
+    document.getElementById('searchInput').addEventListener('keyup', renderInventory);
+    document.getElementById('filterType').addEventListener('change', renderInventory);
+    document.getElementById('filterStatus').addEventListener('change', renderInventory);
+
+    // Add Asset Form
+    document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
+    document.getElementById('asset_type').addEventListener('change', toggleAssetFields);
+
+    // Scanner
+    document.getElementById('startScanBtn').addEventListener('click', startScanning);
+    document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
+
+    // Status Modal
+    $('#statusModal').on('change', '#newStatus', toggleAssignmentFieldsModal);
+    document.getElementById('saveStatusChange').addEventListener('click', handleSaveStatusChange);
+}
+
+
+// --- TAB MANAGEMENT ---
+function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.getElementById(tabName).classList.add('active');
+    document.querySelector(`.tab[onclick*="'${tabName}'"]`).classList.add('active');
+    
+    if (tabName === 'scanner' && !currentStream) {
+        // Optional: auto-start scanner when switching to tab
+        // startScanning(); 
+    } else if (tabName !== 'scanner' && currentStream) {
+        stopScanning();
+    }
+}
+
+// --- INVENTORY DISPLAY & FILTERING ---
+function renderInventory() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('filterType').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+
+    const filteredInventory = inventory.filter(asset => {
+        const matchesSearch = !searchTerm || Object.values(asset).some(val => 
+            String(val).toLowerCase().includes(searchTerm)
+        );
+        const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
+        const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
+        return matchesSearch && matchesType && matchesStatus;
+    });
+
+    inventoryGrid.innerHTML = '';
+    if (filteredInventory.length > 0) {
+        emptyInventoryMessage.style.display = 'none';
+        filteredInventory.forEach(asset => {
+            inventoryGrid.appendChild(createAssetCard(asset));
+        });
+    } else {
+        emptyInventoryMessage.style.display = 'block';
+    }
+}
+
+function createAssetCard(asset) {
+    const card = document.createElement('div');
+    card.className = `asset-card ${asset.asset_type}`;
+    card.dataset.id = asset.asset_id;
+
+    const assignedTo = asset.assigned_to_user_id ? 
+        `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br>
+         <strong>Mission:</strong> ${asset.assigned_mission || 'Non spécifiée'}<br>` : '';
+
+    const details = asset.asset_type === 'tool' ? `
+        <strong>Numéro de série:</strong> ${asset.serial_or_plate || 'N/A'}<br>
+        <strong>Position:</strong> ${asset.position_or_info || 'N/A'}<br>
+    ` : `
+        <strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br>
+        <strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>
+    `;
+
+    card.innerHTML = `
+        <div>
+            <div class="asset-header">
+                <span class="asset-title"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span>
+                <span class="asset-status status-${asset.status}">${asset.status.replace('-', ' ')}</span>
+            </div>
+            <div class="asset-details">
+                <strong>Code-barres:</strong> ${asset.barcode}<br>
+                <strong>Marque:</strong> ${asset.brand || 'N/A'}<br>
+                <strong>Catégorie:</strong> ${asset.category_name || 'N/A'}<br>
+                ${details}
+                ${assignedTo}
+                <strong>Ajouté le:</strong> ${new Date(asset.date_added).toLocaleDateString()}
+            </div>
+        </div>
+        <div class="asset-actions">
+            <button class="btn btn-primary btn-small" onclick="openStatusModal(${asset.asset_id})">Statut</button>
+            <?php if ($currentUser['role'] === 'admin'): ?>
+            <button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${asset.asset_name}')">Supprimer</button>
+            <?php endif; ?>
+        </div>
+    `;
+    return card;
+}
+
+// --- ADD ASSET ---
+function toggleAssetFields() {
+    const type = document.getElementById('asset_type').value;
+    document.getElementById('tool_fields').style.display = (type === 'tool') ? 'block' : 'none';
+    document.getElementById('vehicle_fields').style.display = (type === 'vehicle') ? 'block' : 'none';
+    populateCategoryDropdown(type);
+}
+
+function populateCategoryDropdown(assetType) {
+    const dropdown = document.getElementById('category_id');
+    dropdown.innerHTML = '<option value="">-- Sans catégorie --</option>';
+    assetCategories
+        .filter(cat => cat.category_type === assetType)
+        .forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.category_id;
+            option.textContent = cat.category_name;
+            dropdown.appendChild(option);
+        });
+}
+
+async function handleAddAsset(e) {
+    e.preventDefault();
+    const form = e.target;
+    const type = document.getElementById('asset_type').value;
+    const assetData = {
+        barcode: document.getElementById('barcode').value,
+        asset_type: type,
+        asset_name: document.getElementById('asset_name').value,
+        brand: document.getElementById('brand').value,
+        category_id: document.getElementById('category_id').value || null,
+        serial_or_plate: type === 'tool' ? document.getElementById('serial_or_plate_tool').value : document.getElementById('serial_or_plate_vehicle').value,
+        position_or_info: type === 'tool' ? document.getElementById('position_or_info_tool').value : null,
+        fuel_level: type === 'vehicle' ? document.getElementById('fuel_level').value : null,
+    };
+
+    try {
+        const data = await apiCall('add_asset', 'POST', assetData);
+        inventory.push(data.asset);
+        renderInventory();
+        updateStatistics();
+        showNotification('Actif ajouté avec succès!', 'success');
+        form.reset();
+        toggleAssetFields();
+        showTab('inventory');
+    } catch (error) {
+        // Error already handled
+    }
+}
+
+// --- SCANNER ---
+function startScanning() {
+    codeReader = new ZXing.BrowserMultiFormatReader();
+    document.getElementById('startScanBtn').style.display = 'none';
+    document.getElementById('stopScanBtn').style.display = 'inline-block';
+    document.getElementById('scannerPlaceholder').style.display = 'none';
+    document.getElementById('video').style.display = 'block';
+    document.getElementById('scanOverlay').style.display = 'block';
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+            currentStream = stream;
+            codeReader.decodeFromStream(stream, 'video', (result, err) => {
+                if (result) {
+                    processBarcode(result.text);
+                    stopScanning(); // Stop after a successful scan
+                }
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error(err);
+                    showNotification('Erreur de scan.', 'error');
+                }
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            showNotification("Erreur d'accès à la caméra.", 'error');
+            stopScanning();
+        });
+}
+
+function stopScanning() {
+    if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+    }
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+    }
+    document.getElementById('startScanBtn').style.display = 'inline-block';
+    document.getElementById('stopScanBtn').style.display = 'none';
+    document.getElementById('scannerPlaceholder').style.display = 'flex';
+    document.getElementById('video').style.display = 'none';
+    document.getElementById('scanOverlay').style.display = 'none';
+}
+
+async function processBarcode(barcode) {
+    showNotification(`Code-barres détecté : ${barcode}`);
+    stopScanning();
+    loadingOverlay.style.display = 'flex';
+    try {
+        const data = await apiCall('check_barcode', 'GET', { barcode });
+        if (data.exists) {
+            // Asset exists, highlight it in the inventory
+            showTab('inventory');
+            setTimeout(() => {
+                const card = document.querySelector(`.asset-card[data-id='${data.asset.asset_id}']`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.transform = 'scale(1.05)';
+                    card.style.boxShadow = '0 0 25px rgba(0, 123, 255, 0.5)';
+                    setTimeout(() => {
+                        card.style.transform = '';
+                        card.style.boxShadow = '';
+                    }, 2000);
+                }
+            }, 100);
+        } else {
+            // Asset does not exist, pre-fill the form
+            showTab('add_asset');
+            document.getElementById('barcode').value = barcode;
+            showNotification('Nouvel actif. Veuillez remplir les détails.', 'success');
+        }
+    } catch (error) {
+        // Error handled
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+
+// --- STATUS CHANGE ---
+function populateUserDropdown() {
+    const dropdown = document.getElementById('assigned_to_user_id');
+    dropdown.innerHTML = '<option value="">-- Personne --</option>'; // Default unassigned
+    userList.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.user_id;
+        option.textContent = `${user.prenom} ${user.nom}`;
+        dropdown.appendChild(option);
+    });
+}
+
+function openStatusModal(assetId) {
+    const asset = inventory.find(a => a.asset_id == assetId);
+    if (!asset) return;
+    
+    document.getElementById('modalAssetId').value = asset.asset_id;
+    document.getElementById('modalAssetName').textContent = asset.asset_name;
+    
+    const statusSelect = document.getElementById('newStatus');
+    statusSelect.value = asset.status;
+    
+    const assignmentFields = document.getElementById('assignmentFields');
+    const userSelect = document.getElementById('assigned_to_user_id');
+    const missionInput = document.getElementById('assigned_mission');
+
+    if (asset.status === 'in-use') {
+        assignmentFields.style.display = 'block';
+        userSelect.value = asset.assigned_to_user_id || '';
+        missionInput.value = asset.assigned_mission || '';
+    } else {
+        assignmentFields.style.display = 'none';
+        userSelect.value = '';
+        missionInput.value = '';
+    }
+    
+    $('#statusModal').modal('show');
+}
+
+function toggleAssignmentFieldsModal() {
+    const newStatus = document.getElementById('newStatus').value;
+    document.getElementById('assignmentFields').style.display = newStatus === 'in-use' ? 'block' : 'none';
+}
+
+async function handleSaveStatusChange() {
+    const assetId = document.getElementById('modalAssetId').value;
+    const newStatus = document.getElementById('newStatus').value;
+    
+    const updateData = {
+        asset_id: assetId,
+        status: newStatus,
+        assigned_to_user_id: null,
+        assigned_mission: null
+    };
+
+    if (newStatus === 'in-use') {
+        updateData.assigned_to_user_id = document.getElementById('assigned_to_user_id').value || null;
+        updateData.assigned_mission = document.getElementById('assigned_mission').value;
+    }
+    
+    try {
+        const data = await apiCall('update_asset_status', 'POST', updateData);
+        const index = inventory.findIndex(a => a.asset_id == assetId);
+        if (index > -1) {
+            inventory[index] = data.asset;
+        }
+        renderInventory();
+        updateStatistics();
+        $('#statusModal').modal('hide');
+        showNotification('Statut mis à jour avec succès!', 'success');
+    } catch (error) {
+        // Error already handled
+    }
+}
+
+// --- DELETE ASSET ---
+async function handleDeleteAsset(assetId, assetName) {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'actif "${assetName}" ? Cette action est irréversible.`)) {
+        return;
+    }
+
+    try {
+        await apiCall('delete_asset', 'POST', { asset_id: assetId });
+        inventory = inventory.filter(a => a.asset_id != assetId);
+        renderInventory();
+        updateStatistics();
+        showNotification('Actif supprimé avec succès!', 'success');
+    } catch (error) {
+        // Error already handled
+    }
+}
+
+
+// --- STATISTICS ---
+function updateStatistics() {
+    const stats = {
+        total: inventory.length,
+        tools: inventory.filter(item => item.asset_type === 'tool').length,
+        vehicles: inventory.filter(item => item.asset_type === 'vehicle').length,
+        available: inventory.filter(item => item.status === 'available').length,
+        inUse: inventory.filter(item => item.status === 'in-use').length,
+        maintenance: inventory.filter(item => item.status === 'maintenance').length
+    };
+
+    const statsGrid = document.getElementById('statsGrid');
+    statsGrid.innerHTML = `
+        <div class="stat-item"><div class="stat-number">${stats.total}</div><div class="stat-label">Actifs Totaux</div></div>
+        <div class="stat-item"><div class="stat-number">${stats.tools}</div><div class="stat-label">Outils</div></div>
+        <div class="stat-item"><div class="stat-number">${stats.vehicles}</div><div class="stat-label">Véhicules</div></div>
+        <div class="stat-item"><div class="stat-number">${stats.available}</div><div class="stat-label">Disponibles</div></div>
+        <div class="stat-item"><div class="stat-number">${stats.inUse}</div><div class="stat-label">En Utilisation</div></div>
+        <div class="stat-item"><div class="stat-number">${stats.maintenance}</div><div class="stat-label">En Maintenance</div></div>
+    `;
+}
+
+</script>
+
 </body>
 </html>
