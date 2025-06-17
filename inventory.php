@@ -319,7 +319,7 @@ $currentUser = getCurrentUser();
 // --- CONFIGURATION ---
 // **CRITICAL FIX V3**: Using a simple relative path.
 // This assumes `inventory.php` and `inventory_handler.php` are in the same directory.
-const HANDLER_URL = 'inventory_handler.php';
+const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
 
 // --- GLOBAL STATE ---
