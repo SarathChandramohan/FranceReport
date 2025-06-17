@@ -118,10 +118,25 @@ function checkBarcodeExists($conn) {
 }
 
 function addAsset($conn, $user) {
-    $data = json_decode(file_get_contents('php://input'), true);
+    // --- TEMPORARY DEBUGGING CODE ---
+    $raw_input = file_get_contents('php://input');
+    // This line writes the raw request data to your server's error log.
+    error_log("Inventory App Debug - Raw Input: " . $raw_input);
+
+    $data = json_decode($raw_input, true);
+
+    // This block checks if the JSON was parsed successfully.
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $json_error = json_last_error_msg();
+        // This line writes the specific JSON error to your server's error log.
+        error_log("Inventory App Debug - JSON Decode Error: " . $json_error);
+        // This will send a more specific error message back to the browser.
+        throw new Exception("Erreur de décodage JSON: " . $json_error);
+    }
+    // --- END DEBUGGING CODE ---
 
     if (!$data || !isset($data['barcode'], $data['asset_name'], $data['asset_type'])) {
-        throw new Exception("Données manquantes pour l'ajout de l'actif.");
+        throw new Exception("Données manquantes pour l'ajout de l'actif. L'entrée était vide ou malformée.");
     }
     $barcode = trim($data['barcode']);
     $asset_name = trim($data['asset_name']);
@@ -129,14 +144,12 @@ function addAsset($conn, $user) {
         throw new Exception("Le code-barres et le nom de l'actif sont obligatoires.");
     }
 
-    // Check for duplicate barcode
     $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Inventory WHERE barcode = ?");
     $stmt_check->execute([$barcode]);
     if ($stmt_check->fetchColumn() > 0) {
         throw new Exception("Ce code-barres existe déjà dans l'inventaire.");
     }
     
-    // 1. Modified SQL: Removed the "OUTPUT INSERTED.*" clause for better compatibility.
     $sql = "INSERT INTO Inventory (barcode, asset_type, category_id, asset_name, brand, serial_or_plate, position_or_info, status, fuel_level, date_added, last_modified) 
             VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, GETDATE(), GETDATE())";
             
@@ -154,8 +167,6 @@ function addAsset($conn, $user) {
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
     
-    // 2. Fetch the newly added asset using the unique barcode.
-    // This replaces the need for the OUTPUT clause.
     $select_stmt = $conn->prepare("
         SELECT 
             i.*, 
@@ -169,7 +180,6 @@ function addAsset($conn, $user) {
     $select_stmt->execute([$barcode]);
     $newAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
 
-    // This final check ensures the asset was actually created and retrieved.
     if ($newAsset) {
          respondWithSuccess(['asset' => $newAsset], "Actif ajouté avec succès.");
     } else {
