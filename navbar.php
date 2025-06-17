@@ -179,6 +179,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             
             <li class="nav-item"><a href="planning.php" class="nav-link <?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a></li>
             <li class="nav-item"><a href="events.php" class="nav-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>">Événements</a></li>
+            <li class="nav-item"><a href="inventory.php" class="nav-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventory</a></li>
             <li class="nav-item"><a href="messages.php" class="nav-link <?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages RH/Direction</a></li>
             <li class="nav-item"><a href="logout.php" class="nav-link <?php echo $current_page == 'logout.php' ? 'active' : ''; ?>">Déconnexion</a></li>
         </ul>
