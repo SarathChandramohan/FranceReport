@@ -3,13 +3,18 @@ require_once 'session-management.php';
 requireLogin();
 $currentUser = getCurrentUser();
 
-// **CRITICAL FIX**: Dynamically create the absolute URL to the handler.
-// This resolves the 404 errors by ensuring the path is always correct.
-$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
+// **CRITICAL FIX V2**: This protocol detection is more robust for environments
+// like Azure that use reverse proxies or load balancers.
+$protocol = 'http';
+// Check for standard HTTPS, then for the proxy-forwarded protocol header.
+if (isset($_SERVER['HTTPS']) && ($_SERVER['HTTPS'] == 'on' || $_SERVER['HTTPS'] == 1)) {
+    $protocol = 'https';
+} elseif (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
+    $protocol = 'https';
+}
+
 $host = $_SERVER['HTTP_HOST'];
-$base_path = dirname($_SERVER['PHP_SELF']);
-// Ensure base_path doesn't have a trailing slash if it's not the root
-$base_path = rtrim($base_path, '/');
+$base_path = rtrim(dirname($_SERVER['PHP_SELF']), '/');
 $handler_url = "$protocol://$host" . $base_path . '/inventory_handler.php';
 ?>
 <!DOCTYPE html>
