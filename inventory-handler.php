@@ -1,5 +1,5 @@
 <?php
-// inventory_handler.php
+// inventory-handler.php
 
 // Core dependencies
 require_once 'session-management.php';
@@ -47,11 +47,11 @@ try {
     }
 } catch (PDOException $e) {
     // Catch database-specific errors
-    error_log("Database Error in inventory_handler.php: " . $e->getMessage());
+    error_log("Database Error in inventory-handler.php: " . $e->getMessage());
     respondWithError("Erreur de base de données.", 500);
 } catch (Exception $e) {
     // Catch general application errors
-    error_log("General Error in inventory_handler.php: " . $e->getMessage());
+    error_log("General Error in inventory-handler.php: " . $e->getMessage());
     respondWithError($e->getMessage());
 }
 
