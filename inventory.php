@@ -2,20 +2,6 @@
 require_once 'session-management.php';
 requireLogin();
 $currentUser = getCurrentUser();
-
-// **CRITICAL FIX V2**: This protocol detection is more robust for environments
-// like Azure that use reverse proxies or load balancers.
-$protocol = 'http';
-// Check for standard HTTPS, then for the proxy-forwarded protocol header.
-if (isset($_SERVER['HTTPS']) && ($_SERVER['HTTPS'] == 'on' || $_SERVER['HTTPS'] == 1)) {
-    $protocol = 'https';
-} elseif (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
-    $protocol = 'https';
-}
-
-$host = $_SERVER['HTTP_HOST'];
-$base_path = rtrim(dirname($_SERVER['PHP_SELF']), '/');
-$handler_url = "$protocol://$host" . $base_path . '/inventory_handler.php';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -331,7 +317,9 @@ $handler_url = "$protocol://$host" . $base_path . '/inventory_handler.php';
 
 <script>
 // --- CONFIGURATION ---
-const HANDLER_URL = '<?php echo $handler_url; ?>';
+// **CRITICAL FIX V3**: Using a simple relative path.
+// This assumes `inventory.php` and `inventory_handler.php` are in the same directory.
+const HANDLER_URL = 'inventory_handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
 
 // --- GLOBAL STATE ---
@@ -371,7 +359,7 @@ async function apiCall(action, method = 'GET', body = null) {
     if (body && method !== 'GET') {
         options.body = JSON.stringify(body);
     }
-    
+
     let url = `${HANDLER_URL}?action=${action}`;
     if (method === 'GET' && body) {
          url += '&' + new URLSearchParams(body).toString();
@@ -379,9 +367,13 @@ async function apiCall(action, method = 'GET', body = null) {
 
     try {
         const response = await fetch(url, options);
+        // Check if the server responded with an error code
+        if (!response.ok) {
+             throw new Error(`Le serveur a répondu avec une erreur ${response.status} (Not Found). Vérifiez que le fichier inventory_handler.php existe et est au bon endroit.`);
+        }
         const data = await response.json();
-        if (!response.ok || data.status !== 'success') {
-            throw new Error(data.message || `Erreur HTTP ${response.status}`);
+        if (data.status !== 'success') {
+            throw new Error(data.message);
         }
         return data;
     } catch (error) {
@@ -467,7 +459,7 @@ function createAssetCard(asset) {
     card.className = `asset-card ${asset.asset_type}`;
     card.dataset.id = asset.asset_id;
 
-    const assignedTo = asset.assigned_to_user_id ? 
+    const assignedTo = asset.assigned_to_user_id ?
         `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br>
          <strong>Mission:</strong> ${asset.assigned_mission || 'Non spécifiée'}<br>` : '';
 
