@@ -116,6 +116,23 @@ $default_color = $predefined_colors[0];
             </div>
         </div>
     </div>
+    
+    <div class="modal fade" id="confirmationModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmation</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body" id="confirmationModalBody">
+                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-danger" id="confirmActionBtn">Confirmer</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="loadingOverlay"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div></div>
 
@@ -283,7 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
     $planningContainer.on('drop', '.day-content', handleDrop);
     
     $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
-    $planningContainer.on('click', '.remove-worker-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); if (!confirm("Retirer cet ouvrier?")) return; showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { worker_id: workerId, mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
     
     async function handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
@@ -358,8 +374,6 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const isTimeDisabled = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', isTimeDisabled); if (isTimeDisabled) $('#mission_start_time, #mission_end_time').val(''); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
-    // *** BUG FIX START ***
-    // Corrected handler for saving a mission
     $('#missionForm').on('submit', async function(e) {
         e.preventDefault();
         hideModalError();
@@ -372,54 +386,77 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        showLoading(true); // Show overlay for the API call
+        showLoading(true);
         try {
             await apiCall('save_mission', 'POST', formData);
-            $modal.modal('hide'); // Hide modal on success
-            await fetchInitialData(false); // Refresh data in the background
+            state.shouldRefreshOnModalClose = true;
+            $modal.modal('hide');
         } catch (error) {
-            // If there's an error, stay in the modal and show it
             showModalError(error.message);
         } finally {
-            // Always hide the overlay
             showLoading(false);
         }
     });
-
-    // Corrected handler for deleting a mission
-    $('#deleteMissionBtn').on('click', function() {
-        if (!confirm("Supprimer cette mission?")) {
-            return;
-        }
-
-        const missionId = $('#mission_id_form').val();
-
-        // 1. Tell the modal to hide
-        $modal.modal('hide');
-
-        // 2. Use a 'one-time' event listener to act only after the modal is fully hidden
-        $modal.one('hidden.bs.modal', async () => {
-            showLoading(true); // Show overlay for the background tasks
-            try {
-                // 3. Perform the deletion and data refresh
-                await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
-                await fetchInitialData(false); // Refresh the main view
-            } catch (error) {
-                // 4. If an error occurs, show a general alert since the modal is closed
-                alert(`Erreur lors de la suppression: ${error.message}`);
-            } finally {
-                // 5. Reliably hide the overlay
-                showLoading(false);
-            }
-        });
-    });
-    // *** BUG FIX END ***
     
     $modal.on('hidden.bs.modal', function () {
-        // This is now primarily for resetting the modal state after it closes,
-        // as the data refresh is handled directly by the submit/delete handlers.
         hideModalError();
+        if (state.shouldRefreshOnModalClose) {
+            fetchInitialData();
+            state.shouldRefreshOnModalClose = false;
+        }
     });
+
+    // --- *** CUSTOM CONFIRMATION LOGIC START *** ---
+    
+    // Trigger confirmation for removing a worker from a mission card
+    $planningContainer.on('click', '.remove-worker-btn', function(e) {
+        e.stopPropagation();
+        const missionId = $(this).closest('.mission-card').data('mission-id');
+        const workerId = $(this).data('worker-id');
+        
+        $('#confirmationModalBody').text("Êtes-vous sûr de vouloir retirer cet ouvrier ?");
+        $('#confirmActionBtn').data('action', 'remove-worker').data('mission-id', missionId).data('worker-id', workerId);
+        $('#confirmationModal').modal('show');
+    });
+
+    // Trigger confirmation for deleting a mission from the form modal
+    $('#deleteMissionBtn').on('click', function() {
+        const missionId = $('#mission_id_form').val();
+
+        $('#confirmationModalBody').text("Supprimer définitivement cette mission pour tous les ouvriers assignés ?");
+        $('#confirmActionBtn').data('action', 'delete-mission-group').data('mission-id', missionId);
+        
+        // Hide form modal, then show confirmation modal to prevent stacking issues
+        $modal.modal('hide');
+        $modal.one('hidden.bs.modal', () => {
+             $('#confirmationModal').modal('show');
+        });
+    });
+
+    // Handle the final "Confirm" click for all actions
+    $('#confirmActionBtn').on('click', async function() {
+        const action = $(this).data('action');
+        const missionId = $(this).data('mission-id');
+
+        $('#confirmationModal').modal('hide'); // Hide confirmation modal immediately
+        showLoading(true); // Show spinner for the async operation
+
+        try {
+            if (action === 'remove-worker') {
+                const workerId = $(this).data('worker-id');
+                await apiCall('remove_worker_from_mission', 'POST', { worker_id: workerId, mission_id: missionId });
+            } else if (action === 'delete-mission-group') {
+                await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
+            }
+            await fetchInitialData(false); // Refresh data without managing loading spinner
+        } catch (error) {
+            alert(`Erreur: ${error.message}`);
+        } finally {
+            showLoading(false); // Always hide spinner
+        }
+    });
+
+    // --- *** CUSTOM CONFIRMATION LOGIC END *** ---
 
     // --- Init ---
     fetchInitialData();
