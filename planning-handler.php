@@ -160,9 +160,9 @@ function saveMission($conn, $creator_id, $data) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         ");
         foreach ($assigned_users as $user_id) {
-            // Remove any other assignment the user might have on this day before adding a new one
-             $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
-             $stmt_delete_old->execute([$user_id, $mission_date]);
+            // REMOVED: The logic that deletes other assignments for the day.
+            // $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
+            // $stmt_delete_old->execute([$user_id, $mission_date]);
 
             // Insert the new assignment
             $stmt_insert->execute([
@@ -219,9 +219,9 @@ function assignWorkerToMission($conn, $creator_id, $data) {
     
     $conn->beginTransaction();
     
-    // First, remove any other assignment the worker has on this day
-    $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
-    $stmt_delete_old->execute([$worker_id, $mission_date]);
+    // REMOVED: The logic that deletes other assignments for the day.
+    // $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
+    // $stmt_delete_old->execute([$worker_id, $mission_date]);
 
     // Get the details of the mission to copy
     $stmt_orig = $conn->prepare("SELECT * FROM Planning_Assignments WHERE assignment_id = ?");
