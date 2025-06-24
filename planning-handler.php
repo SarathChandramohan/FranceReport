@@ -1,603 +1,523 @@
 <?php
-// planning-handler.php (Updated for Grouped Assignments in Calendar)
-
-// ini_set('display_errors', 1); // For debugging
-// error_reporting(E_ALL); // For debugging
-// ini_set('log_errors', 1);
-// ini_set('error_log', '/path/to/your/php-error.log'); // Ensure this path is writable
+// planning-handler.php (New Reworked Style)
 
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
-if (!function_exists('respondWithSuccess')) {
-    function respondWithSuccess($message, $data = []) {
-        if (headers_sent($file, $line)) {
-            error_log("Headers already sent in $file on line $line before respondWithSuccess for: $message. Output will be corrupted.");
-            return; 
-        }
-        if (!headers_sent()) { 
-            header('Content-Type: application/json');
-        }
-        echo json_encode(['status' => 'success', 'message' => $message, 'data' => $data]);
-        exit;
-    }
+// Helper functions for JSON responses
+function respondWithSuccess($message, $data = [], $statusCode = 200) {
+    http_response_code($statusCode);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'success', 'message' => $message, 'data' => $data]);
+    exit;
 }
 
-if (!function_exists('respondWithError')) {
-    function respondWithError($message, $statusCode = 200) { 
-        if (headers_sent($file, $line)) {
-             error_log("Headers already sent in $file on line $line before respondWithError for: $message. Output will be corrupted.");
-            return; 
-        }
-        if (!headers_sent()) { 
-            http_response_code($statusCode); 
-            header('Content-Type: application/json');
-        }
-        echo json_encode(['status' => 'error', 'message' => $message]);
-        exit;
-    }
+function respondWithError($message, $statusCode = 400) {
+    http_response_code($statusCode);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => $message]);
+    exit;
 }
 
+// Ensure user is logged in
 requireLogin();
 
 $currentUser = getCurrentUser();
-$user_id = $currentUser['user_id']; 
-$user_role = $currentUser['role']; 
+$user_id = $currentUser['user_id'];
+$user_role = $currentUser['role'];
+
+// Only allow admins to use this planning interface for now
+if ($user_role !== 'admin') {
+    respondWithError('Accès refusé. Cette section est réservée aux administrateurs.', 403);
+}
 
 global $conn;
 
-if (headers_sent($filename, $linenum)) {
-    error_log("Headers already sent in $filename on line $linenum before planning-handler.php main logic execution. JSON response might fail.");
-}
-
 try {
     $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
+    $input_data = json_decode(file_get_contents('php://input'), true);
 
     switch ($action) {
         case 'get_staff_users':
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
             $stmt = $conn->prepare("SELECT user_id, nom, prenom, email, role FROM Users WHERE status = 'Active' ORDER BY nom, prenom");
             $stmt->execute();
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             respondWithSuccess('Utilisateurs récupérés.', ['users' => $users]);
             break;
 
-        case 'get_teams':
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $stmt = $conn->prepare("
-                SELECT pt.team_id, pt.team_name, COUNT(ptm.user_id) as member_count
-                FROM Planning_Teams pt LEFT JOIN Planning_Team_Members ptm ON pt.team_id = ptm.team_id
-                GROUP BY pt.team_id, pt.team_name ORDER BY pt.team_name
-            ");
+        case 'get_all_assignments_for_workers':
+            // This fetches all assignments regardless of date for client-side worker status
+            $stmt = $conn->prepare("SELECT assignment_date, assigned_user_id, mission_text, shift_type FROM Planning_Assignments ORDER BY assignment_date DESC");
             $stmt->execute();
-            respondWithSuccess('Équipes récupérées.', ['teams' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            respondWithSuccess('Toutes les affectations récupérées pour les ouvriers.', ['assignments' => $assignments]);
             break;
 
-        case 'get_team_details':
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $team_id = isset($_REQUEST['team_id']) ? intval($_REQUEST['team_id']) : 0;
-            if ($team_id <= 0) {
-                respondWithError('ID d\'équipe invalide.');
-            }
-            
-            $stmt_team = $conn->prepare("SELECT team_id, team_name FROM Planning_Teams WHERE team_id = ?");
-            $stmt_team->execute([$team_id]);
-            $team = $stmt_team->fetch(PDO::FETCH_ASSOC);
-            if (!$team) {
-                respondWithError('Équipe non trouvée.');
-            }
-
-            $stmt_members = $conn->prepare("
-                SELECT u.user_id, u.nom, u.prenom, u.role FROM Planning_Team_Members ptm
-                JOIN Users u ON ptm.user_id = u.user_id WHERE ptm.team_id = ? ORDER BY u.nom, u.prenom
-            ");
-            $stmt_members->execute([$team_id]);
-            $team['members'] = $stmt_members->fetchAll(PDO::FETCH_ASSOC);
-            respondWithSuccess('Détails de l\'équipe récupérés.', ['team' => $team]);
-            break;
-
-        case 'save_team':
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
-            $team_name = isset($_POST['team_name']) ? trim($_POST['team_name']) : '';
-            $member_ids = isset($_POST['member_ids']) && is_array($_POST['member_ids']) ? $_POST['member_ids'] : [];
-            if (empty($team_name)) {
-                respondWithError('Le nom de l\'équipe est requis.');
-            }
-
-            $conn->beginTransaction();
-            try {
-                if ($team_id > 0) {
-                    $stmt = $conn->prepare("UPDATE Planning_Teams SET team_name = ? WHERE team_id = ?");
-                    $stmt->execute([$team_name, $team_id]);
-                    $stmt_delete_members = $conn->prepare("DELETE FROM Planning_Team_Members WHERE team_id = ?");
-                    $stmt_delete_members->execute([$team_id]);
-                } else {
-                    $stmt = $conn->prepare("INSERT INTO Planning_Teams (team_name, creator_user_id) VALUES (?, ?)");
-                    $stmt->execute([$team_name, $user_id]);
-                    $team_id = $conn->lastInsertId();
-                }
-                if ($team_id) {
-                    $stmt_add_member = $conn->prepare("INSERT INTO Planning_Team_Members (team_id, user_id) VALUES (?, ?)");
-                    foreach ($member_ids as $member_user_id) {
-                        if (intval($member_user_id) > 0) {
-                            $stmt_add_member->execute([$team_id, intval($member_user_id)]);
-                        }
-                    }
-                }
-                $conn->commit();
-                respondWithSuccess('Équipe enregistrée avec succès.', ['team_id' => $team_id]);
-            } catch (Exception $e) {
-                $conn->rollBack();
-                throw $e; 
-            }
-            break;
-
-        case 'delete_team':
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
-            if ($team_id <= 0) {
-                respondWithError('ID d\'équipe invalide.');
-            }
-            $conn->beginTransaction();
-             try {
-                $conn->prepare("DELETE FROM Planning_Team_Members WHERE team_id = ?")->execute([$team_id]);
-                $conn->prepare("DELETE FROM Planning_Teams WHERE team_id = ?")->execute([$team_id]);
-                $conn->commit();
-                respondWithSuccess('Équipe supprimée avec succès.');
-            } catch (Exception $e) {
-                $conn->rollBack();
-                throw $e;
-            }
-            break;
-
-        case 'get_assignments': // MODIFIED for Grouped Assignments
-            if ($user_role !== 'admin') { 
-                 respondWithError('Accès refusé pour cette vue du calendrier.', 403);
-            }
+        case 'get_assignments': // Fetches grouped missions for a date range
             $start_date_str = isset($_GET['start']) ? $_GET['start'] : date('Y-m-01');
             $end_date_str = isset($_GET['end']) ? $_GET['end'] : date('Y-m-t');
-            
-            // SQL Server Version using STRING_AGG.
-            // For MySQL:
-            // - Replace STRING_AGG(CONCAT(u.prenom, ' ', u.nom, CASE WHEN u.role = 'admin' THEN ' (Admin)' ELSE '' END), ', ') WITHIN GROUP (ORDER BY u.prenom, u.nom)
-            //   WITH GROUP_CONCAT(DISTINCT CONCAT(u.prenom, ' ', u.nom, CASE WHEN u.role = 'admin' THEN ' (Admin)' ELSE '' END) ORDER BY u.prenom, u.nom SEPARATOR ', ')
-            // - Replace STRING_AGG(CAST(pa.assigned_user_id AS VARCHAR(10)), ',') WITHIN GROUP (ORDER BY u.prenom, u.nom)
-            //   WITH GROUP_CONCAT(DISTINCT CAST(pa.assigned_user_id AS CHAR) ORDER BY u.prenom, u.nom SEPARATOR ',')
-            // - Ensure GROUP_CONCAT_MAX_LEN is sufficient in MySQL if many users are on the same mission.
-            // - The date conversion for grouping might be simpler in MySQL (just pa.assignment_date).
+
+            // SQL Server query to group assignments into logical "missions"
             $query_sql = "
-                SELECT 
-                       MIN(pa.assignment_id) as representative_assignment_id, 
-                       CONVERT(VARCHAR(10), pa.assignment_date, 120) as start_date_group, 
-                       ISNULL(pa.start_time, '') as start_time, -- Handle NULLs for grouping
-                       ISNULL(pa.end_time, '') as end_time,     -- Handle NULLs for grouping
-                       pa.shift_type, 
-                       ISNULL(pa.color, '#1877f2') as color,      -- Handle NULLs
-                       ISNULL(pa.mission_text, '') as mission_text, -- Handle NULLs
-                       ISNULL(pa.location, '') as location,       -- Handle NULLs
+                SELECT
+                       MIN(pa.assignment_id) as representative_assignment_id,
+                       CONVERT(VARCHAR(10), pa.assignment_date, 120) as start_date_group,
+                       ISNULL(pa.start_time, '') as start_time,
+                       ISNULL(pa.end_time, '') as end_time,
+                       pa.shift_type,
+                       ISNULL(pa.color, '#1877f2') as color,
+                       ISNULL(pa.mission_text, '') as title, -- Using 'title' as per React UI
+                       ISNULL(pa.location, '') as location,
+                       pa.is_validated,
                        COUNT(DISTINCT pa.assigned_user_id) as user_count,
-                       STRING_AGG(CONCAT(u.prenom, ' ', u.nom, CASE WHEN u.role = 'admin' THEN ' (Admin)' ELSE '' END), ', ') WITHIN GROUP (ORDER BY u.prenom, u.nom) as user_names_list,
-                       STRING_AGG(CAST(pa.assigned_user_id AS VARCHAR(10)), ',') WITHIN GROUP (ORDER BY u.prenom, u.nom) as user_ids_list
-                FROM Planning_Assignments pa JOIN Users u ON pa.assigned_user_id = u.user_id
+                       STRING_AGG(CONVERT(VARCHAR(10), pa.assigned_user_id), ',') WITHIN GROUP (ORDER BY u.prenom, u.nom) as user_ids_list,
+                       STRING_AGG(CONCAT(u.prenom, ' ', u.nom), ', ') WITHIN GROUP (ORDER BY u.prenom, u.nom) as user_names_list
+                FROM Planning_Assignments pa
+                JOIN Users u ON pa.assigned_user_id = u.user_id
                 WHERE pa.assignment_date BETWEEN :start_date AND :end_date
-                GROUP BY 
-                       CONVERT(VARCHAR(10), pa.assignment_date, 120), 
-                       ISNULL(pa.start_time, ''), 
-                       ISNULL(pa.end_time, ''), 
-                       pa.shift_type, 
+                GROUP BY
+                       CONVERT(VARCHAR(10), pa.assignment_date, 120),
+                       ISNULL(pa.start_time, ''),
+                       ISNULL(pa.end_time, ''),
+                       pa.shift_type,
                        ISNULL(pa.color, '#1877f2'),
-                       ISNULL(pa.mission_text, ''), 
-                       ISNULL(pa.location, '')
-                ORDER BY start_date_group, start_time
+                       ISNULL(pa.mission_text, ''),
+                       ISNULL(pa.location, ''),
+                       pa.is_validated
+                ORDER BY start_date_group, start_time;
             ";
-            
-            $params = [':start_date' => $start_date_str, ':end_date' => $end_date_str];
-            
+
             $stmt = $conn->prepare($query_sql);
-            $stmt->execute($params);
-            $raw_grouped_assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $fc_events = [];
+            $stmt->bindParam(':start_date', $start_date_str, PDO::PARAM_STR);
+            $stmt->bindParam(':end_date', $end_date_str, PDO::PARAM_STR);
+            $stmt->execute();
+            $missions_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach ($raw_grouped_assignments as $g_idx => $g) {
-                // Create a more robust unique ID for the group for FullCalendar
-                $group_event_id = "group_" . md5(
-                    $g['start_date_group'] .
-                    $g['start_time'] . $g['end_time'] .
-                    $g['shift_type'] . $g['mission_text'] . $g['location']
-                ); // Using md5 hash of defining characteristics
-
-                $event_display_title = $g['mission_text'] ?: ucfirst($g['shift_type']);
-
-                $event_start = $g['start_date_group'];
-                $event_end = $g['start_date_group']; 
-                $all_day = true;
-
-                // Use empty strings for time if they were NULL and are now empty strings from ISNULL
-                $actual_start_time = ($g['start_time'] !== '') ? $g['start_time'] : null;
-                $actual_end_time = ($g['end_time'] !== '') ? $g['end_time'] : null;
-
-                if ($actual_start_time) {
-                    $event_start .= 'T' . $actual_start_time;
-                    $all_day = false;
-                     if ($actual_end_time) { 
-                        $event_end .= 'T' . $actual_end_time; 
-                    } else { 
-                        try {
-                            $dt = new DateTime($event_start);
-                            $dt->modify('+1 hour');
-                            $event_end = $dt->format('Y-m-d\TH:i:s');
-                        } catch (Exception $e) {
-                            $event_end = $event_start; 
-                            error_log("DateTime parsing error for event_start in get_assignments (group): " . $event_start . " - " . $e->getMessage());
-                        }
-                    }
-                }
-                
-                $fc_events[] = [
-                    'id' => $group_event_id, 
-                    'title' => $event_display_title, // Fallback title, eventContent will primarily be used
-                    'start' => $event_start, 'end' => $event_end,
-                    'color' => $g['color'], 'allDay' => $all_day,
-                    'extendedProps' => [
-                        'is_group' => true,
-                        'representative_assignment_id' => $g['representative_assignment_id'],
-                        'user_names_list' => $g['user_names_list'] ? explode(', ', $g['user_names_list']) : [],
-                        'user_ids_list' => $g['user_ids_list'] ? explode(',', $g['user_ids_list']) : [],
-                        'user_count' => intval($g['user_count']),
-                        'shift_type' => $g['shift_type'], 
-                        'mission_text' => $g['mission_text'] ?: '', // Ensure it's a string
-                        'raw_start_time' => $actual_start_time, 
-                        'raw_end_time' => $actual_end_time,
-                        'raw_assignment_date' => $g['start_date_group'], 
-                        'location' => $g['location'] ?: '' // Ensure it's a string
-                    ]
-                ];
-            }
-            
-            if (!headers_sent()) { header('Content-Type: application/json'); }
-            echo json_encode($fc_events);
-            exit;
+            respondWithSuccess('Missions récupérées.', ['missions' => $missions_data]);
             break;
 
-        case 'get_assignment_details': // This will fetch details for a SINGLE assignment ID
-            $assignment_id_param = isset($_GET['assignment_id']) ? intval($_GET['assignment_id']) : 0;
-            if ($assignment_id_param <= 0) {
-                respondWithError('ID d\'affectation invalide.');
-            }
-            $query_detail = "SELECT pa.*, u.nom, u.prenom, u.role as assigned_user_role FROM Planning_Assignments pa JOIN Users u ON pa.assigned_user_id = u.user_id WHERE pa.assignment_id = ?";
-            $params_detail_arr = [$assignment_id_param];
-            
-            if ($user_role !== 'admin') { 
-                $query_detail .= " AND pa.assigned_user_id = ?";
-                $params_detail_arr[] = $user_id;
-            }
-            $stmt_detail = $conn->prepare($query_detail);
-            $stmt_detail->execute($params_detail_arr);
-            $details = $stmt_detail->fetch(PDO::FETCH_ASSOC);
+        case 'get_mission_details_for_edit': // Get details for a specific mission group to populate form
+            $mission_date = $input_data['mission_date'] ?? $_GET['mission_date'];
+            $original_mission_id = $input_data['original_mission_id'] ?? $_GET['original_mission_id'];
 
-            if (!$details) {
-                respondWithError('Affectation non trouvée ou accès refusé.');
+            if (empty($mission_date) || empty($original_mission_id)) {
+                respondWithError('Date de mission et ID original requis.');
             }
-            $details['location'] = isset($details['location']) ? $details['location'] : null;
-            $details['user_name_display'] = htmlspecialchars($details['prenom'] . ' ' . $details['nom'] . ($details['assigned_user_role'] === 'admin' ? ' (Admin)' : ''));
-            respondWithSuccess('Détails de l\'affectation récupérés.', ['assignment' => $details]);
+
+            // Fetch one assignment from the group to get common mission details
+            $stmt = $conn->prepare("
+                SELECT pa.title, pa.start_time, pa.end_time, pa.location, pa.mission_text, pa.shift_type, pa.color, pa.is_validated
+                FROM Planning_Assignments pa
+                WHERE pa.assignment_id = :original_mission_id AND pa.assignment_date = :mission_date
+            ");
+            $stmt->bindParam(':original_mission_id', $original_mission_id, PDO::PARAM_INT);
+            $stmt->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+            $stmt->execute();
+            $mission = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$mission) {
+                respondWithError('Mission non trouvée pour l\'édition.');
+            }
+
+            respondWithSuccess('Détails de mission récupérés.', ['mission' => $mission]);
             break;
 
-        case 'save_assignment':
-            // IMPORTANT: This action currently saves/updates a SINGLE assignment.
-            // If you intend to edit a "group" from the calendar, this backend logic
-            // would need to be significantly changed to identify all assignments
-            // in the group and update them. The current `assignment_id` would
-            // refer to the `representative_assignment_id` of the group.
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $assignment_id_post = isset($_POST['assignment_id']) ? intval($_POST['assignment_id']) : 0;
-            $assigned_user_ids_post = isset($_POST['assigned_user_ids']) ? (array)$_POST['assigned_user_ids'] : [];
-            $assigned_team_id_post = isset($_POST['assigned_team_id']) ? intval($_POST['assigned_team_id']) : 0;
-            $assignment_dates_post = isset($_POST['assignment_dates']) && is_array($_POST['assignment_dates']) ? $_POST['assignment_dates'] : [];
+        case 'save_assignment': // Create or update mission groups
+            $mission_date = $input_data['mission_date'];
+            $title = $input_data['title'];
+            $start_time = $input_data['start_time'];
+            $end_time = $input_data['end_time'];
+            $location = $input_data['location'];
+            $comment = $input_data['comment'];
+            $shift_type = $input_data['shift_type'];
+            $color = $input_data['color'];
+            $original_mission_id = $input_data['original_mission_id'] ?? null;
+            $is_group_edit = isset($input_data['is_group_edit']) ? (bool)$input_data['is_group_edit'] : false;
+            $assigned_user_ids = $input_data['assigned_user_ids'] ?? []; // For new missions only
 
-            $start_time_post = (isset($_POST['start_time']) && !empty($_POST['start_time'])) ? $_POST['start_time'] : null;
-            $end_time_post = (isset($_POST['end_time']) && !empty($_POST['end_time'])) ? $_POST['end_time'] : null;
-            $shift_type_post = isset($_POST['shift_type']) ? trim($_POST['shift_type']) : null;
-            $mission_text_post = isset($_POST['mission_text']) ? trim($_POST['mission_text']) : null;
-            $color_post = isset($_POST['color']) ? trim($_POST['color']) : '#1877f2';
-            $location_post = isset($_POST['location']) ? trim($_POST['location']) : null;
-
-            if (empty($assignment_dates_post)) {
-                respondWithError('Date(s) requise(s).');
+            if (empty($mission_date) || empty($title) || empty($shift_type)) {
+                respondWithError('Date, titre et type de service sont obligatoires.');
             }
-            foreach($assignment_dates_post as $d_val) {
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d_val) || !strtotime($d_val)) {
-                     respondWithError("Format de date invalide: ".htmlspecialchars($d_val).". Utilisez<y_bin_46>-MM-DD.");
-                }
-            }
-
-            if (empty($assigned_user_ids_post) && $assigned_team_id_post <= 0) {
-                respondWithError('Employé(s)/Admin(s) ou équipe requis.');
-            }
-            if (empty($shift_type_post)) {
-                respondWithError('Type de service requis.');
-            }
-             
-            if ($shift_type_post !== 'repos' && (empty($start_time_post) || empty($end_time_post))) {
-                 respondWithError('Heures de début et de fin requises pour ce type de service.');
-            }
-            if ($shift_type_post === 'repos') {
-                $start_time_post = null; $end_time_post = null;
-            }
-
-            $final_user_ids_to_assign = [];
-            if ($assigned_team_id_post > 0) {
-                $stmt_members_team = $conn->prepare("SELECT user_id FROM Planning_Team_Members WHERE team_id = ?");
-                $stmt_members_team->execute([$assigned_team_id_post]);
-                foreach ($stmt_members_team->fetchAll(PDO::FETCH_ASSOC) as $row_member) {
-                    $final_user_ids_to_assign[] = $row_member['user_id'];
-                }
-            } else {
-                foreach ($assigned_user_ids_post as $uid_post) {
-                    if (intval($uid_post) > 0) {
-                        $final_user_ids_to_assign[] = intval($uid_post);
-                    }
-                }
-            }
-            $final_user_ids_to_assign = array_unique($final_user_ids_to_assign);
-            if (empty($final_user_ids_to_assign)) {
-                respondWithError('Aucun utilisateur valide sélectionné pour l\'affectation.');
+            if ($shift_type !== 'repos' && (empty($start_time) || empty($end_time))) {
+                respondWithError('Heure de début et de fin sont obligatoires pour ce type de service.');
             }
 
             $conn->beginTransaction();
             try {
-                if ($assignment_id_post > 0) {
-                    // This updates a SINGLE assignment. If this ID is a representative_assignment_id of a group,
-                    // only that one specific original assignment record gets updated.
-                    // True group editing requires more logic here.
-                    if (count($final_user_ids_to_assign) === 1 && count($assignment_dates_post) === 1) {
-                        $stmt_update = $conn->prepare("UPDATE Planning_Assignments SET assigned_user_id = ?, assignment_date = ?, start_time = ?, end_time = ?, shift_type = ?, mission_text = ?, color = ?, location = ? WHERE assignment_id = ?");
-                        $stmt_update->execute([$final_user_ids_to_assign[0], $assignment_dates_post[0], $start_time_post, $end_time_post, $shift_type_post, $mission_text_post, $color_post, $location_post, $assignment_id_post]);
-                    } else {
-                        $conn->rollBack(); 
-                        respondWithError('La modification d\'affectations multiples ou pour plusieurs dates à la fois via ce formulaire est limitée. Pour affecter plusieurs personnes ou dates, créez une nouvelle affectation groupée.');
+                if ($original_mission_id && $is_group_edit) {
+                    // Editing an existing mission group
+                    // First, get the unique defining characteristics of the original mission
+                    $stmt_original = $conn->prepare("
+                        SELECT title, start_time, end_time, location, mission_text, shift_type, color
+                        FROM Planning_Assignments
+                        WHERE assignment_id = :original_mission_id AND assignment_date = :mission_date
+                    ");
+                    $stmt_original->bindParam(':original_mission_id', $original_mission_id, PDO::PARAM_INT);
+                    $stmt_original->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+                    $stmt_original->execute();
+                    $original_mission_details = $stmt_original->fetch(PDO::FETCH_ASSOC);
+
+                    if (!$original_mission_details) {
+                        $conn->rollBack();
+                        respondWithError('Mission originale non trouvée pour la mise à jour.');
                     }
-                } else { // Creating new assignments
-                    $insert_stmt_new = $conn->prepare("INSERT INTO Planning_Assignments (assigned_user_id, creator_user_id, assignment_date, start_time, end_time, shift_type, mission_text, color, location, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())");
-                    foreach ($assignment_dates_post as $date_str_loop) {
-                        foreach ($final_user_ids_to_assign as $loop_user_id_assign) {
-                            $insert_stmt_new->execute([$loop_user_id_assign, $user_id, $date_str_loop, $start_time_post, $end_time_post, $shift_type_post, $mission_text_post, $color_post, $location_post]);
-                        }
+
+                    // Update all assignments that match the original mission's characteristics on this date
+                    $update_query = "
+                        UPDATE Planning_Assignments
+                        SET title = :new_title,
+                            start_time = :new_start_time,
+                            end_time = :new_end_time,
+                            location = :new_location,
+                            mission_text = :new_mission_text,
+                            shift_type = :new_shift_type,
+                            color = :new_color
+                        WHERE assignment_date = :mission_date
+                          AND title = :original_title
+                          AND ISNULL(start_time, '') = ISNULL(:original_start_time, '')
+                          AND ISNULL(end_time, '') = ISNULL(:original_end_time, '')
+                          AND ISNULL(location, '') = ISNULL(:original_location, '')
+                          AND ISNULL(mission_text, '') = ISNULL(:original_mission_text, '')
+                          AND shift_type = :original_shift_type
+                          AND ISNULL(color, '') = ISNULL(:original_color, '');
+                    ";
+                    $stmt_update = $conn->prepare($update_query);
+                    $stmt_update->execute([
+                        ':new_title' => $title,
+                        ':new_start_time' => $start_time,
+                        ':new_end_time' => $end_time,
+                        ':new_location' => $location,
+                        ':new_mission_text' => $comment,
+                        ':new_shift_type' => $shift_type,
+                        ':new_color' => $color,
+                        ':mission_date' => $mission_date,
+                        ':original_title' => $original_mission_details['title'],
+                        ':original_start_time' => $original_mission_details['start_time'],
+                        ':original_end_time' => $original_mission_details['end_time'],
+                        ':original_location' => $original_mission_details['location'],
+                        ':original_mission_text' => $original_mission_details['mission_text'],
+                        ':original_shift_type' => $original_mission_details['shift_type'],
+                        ':original_color' => $original_mission_details['color']
+                    ]);
+                    respondWithSuccess('Mission mise à jour avec succès pour tous les ouvriers affectés.');
+
+                } else {
+                    // Creating a new mission (template for future assignments via drag-drop)
+                    // It must be assigned to at least one user to satisfy NOT NULL constraint.
+                    // If no specific users are provided by frontend, assign to the admin creating it.
+                    if (empty($assigned_user_ids)) {
+                        $assigned_user_ids = [$user_id]; // Assign to admin by default
                     }
+
+                    $insert_query = "
+                        INSERT INTO Planning_Assignments (assigned_user_id, creator_user_id, assignment_date, start_time, end_time, shift_type, mission_text, color, location, title, date_creation, is_validated)
+                        VALUES (:assigned_user_id, :creator_user_id, :assignment_date, :start_time, :end_time, :shift_type, :mission_text, :color, :location, :title, GETDATE(), 0);
+                    ";
+                    $stmt_insert = $conn->prepare($insert_query);
+
+                    foreach ($assigned_user_ids as $assigned_uid) {
+                        $stmt_insert->execute([
+                            ':assigned_user_id' => $assigned_uid,
+                            ':creator_user_id' => $user_id,
+                            ':assignment_date' => $mission_date,
+                            ':start_time' => $start_time,
+                            ':end_time' => $end_time,
+                            ':shift_type' => $shift_type,
+                            ':mission_text' => $comment,
+                            ':color' => $color,
+                            ':location' => $location,
+                            ':title' => $title
+                        ]);
+                    }
+                    respondWithSuccess('Mission créée avec succès.');
                 }
                 $conn->commit();
-                respondWithSuccess('Affectation(s) enregistrée(s).');
-            } catch (Exception $e) {
+            } catch (PDOException $e) {
                 $conn->rollBack();
-                throw $e;
+                error_log("DB Error on save_assignment: " . $e->getMessage());
+                respondWithError('Erreur de base de données lors de l\'enregistrement de la mission.');
             }
             break;
 
-        case 'delete_assignment':
-            // IMPORTANT: This action currently deletes a SINGLE assignment by its ID.
-            // If `assignment_id` is a `representative_assignment_id` of a group,
-            // only that specific record is deleted. True group deletion needs more logic.
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $assignment_id_del = isset($_POST['assignment_id']) ? intval($_POST['assignment_id']) : 0;
-            if ($assignment_id_del <= 0) {
-                respondWithError('ID d\'affectation invalide.');
-            }
-            $stmt_del = $conn->prepare("DELETE FROM Planning_Assignments WHERE assignment_id = ?");
-            $stmt_del->execute([$assignment_id_del]);
-            if ($stmt_del->rowCount() > 0) {
-                respondWithSuccess('Affectation supprimée.');
-            } else {
-                respondWithError('Affectation non trouvée ou accès refusé.');
-            }
-            break;
+        case 'delete_assignment': // Delete a mission group or a single assignment
+            $mission_date = $input_data['mission_date'];
+            $original_mission_id = $input_data['original_mission_id'];
+            $is_group_delete = (bool)$input_data['is_group_delete'];
 
-        case 'update_assignment_date_time':
-            // This action updates a SINGLE assignment. If a grouped event is dragged/resized,
-            // this would update the `representative_assignment_id`.
-            // True group update would require backend changes.
-            if ($user_role !== 'admin') {
-                respondWithError('Accès refusé.', 403);
-            }
-            $assignment_id_drag_param = isset($_POST['id']) ? $_POST['id'] : null; // Can be group_X or just X
-            
-            // If it's a group ID, we need to extract the representative_assignment_id
-            // Or decide how to handle the drag/resize for a group.
-            // For now, we'll assume the frontend sends a representative_assignment_id if it's a group.
-            // This part needs careful implementation on how group drag/resize translates to individual assignments.
-            // The current eventDrop/eventResize in JS just sends event.id. If event.id is "group_...", this won't work.
-            // The JS side should send the 'representative_assignment_id' for grouped events.
-            
-            $assignment_id_drag = 0;
-            if (strpos($assignment_id_drag_param, 'group_') === 0) {
-                 // This is tricky. The client needs to send the representative_assignment_id or
-                 // the backend needs to query all assignments in the group based on the group's defining features.
-                 // For simplicity, we'll assume the client sends the representative ID or this won't correctly update groups.
-                 // This is a placeholder for what should be a more complex group update.
-                 // The current FullCalendar event.id is the group_md5(...) string.
-                 // It's better to not allow drag/drop for groups or implement full group update logic.
-                 // For now, this will likely fail for groups or update only one assignment if representative_assignment_id is used.
-                 respondWithError('La modification par glisser-déposer des groupes n\'est pas encore entièrement prise en charge de cette manière.', 501);
-                 // $assignment_id_drag = intval(substr($assignment_id_drag_param, strlen('group_'))); // Not robust
-            } else {
-                $assignment_id_drag = intval($assignment_id_drag_param);
+            if (empty($mission_date) || empty($original_mission_id)) {
+                respondWithError('Date de mission et ID original requis pour la suppression.');
             }
 
-
-            $new_start_datetime_str_drag = isset($_POST['start']) ? $_POST['start'] : null;
-            $new_end_datetime_str_drag = isset($_POST['end']) ? $_POST['end'] : null;
-
-            if ($assignment_id_drag <= 0) {
-                respondWithError('ID d\'affectation invalide pour glisser-déposer.');
-            }
-            if (!$new_start_datetime_str_drag) {
-                respondWithError('Nouvelle date/heure de début requise.');
-            }
-
+            $conn->beginTransaction();
             try {
-                $start_dt_drag = new DateTime($new_start_datetime_str_drag);
-                $new_assignment_date_drag = $start_dt_drag->format('Y-m-d');
-                $new_start_time_drag = $start_dt_drag->format('H:i:s');
-                $new_end_time_drag = null;
+                if ($is_group_delete) {
+                    // Get defining characteristics of the mission group
+                    $stmt_original = $conn->prepare("
+                        SELECT title, start_time, end_time, location, mission_text, shift_type, color
+                        FROM Planning_Assignments
+                        WHERE assignment_id = :original_mission_id AND assignment_date = :mission_date
+                    ");
+                    $stmt_original->bindParam(':original_mission_id', $original_mission_id, PDO::PARAM_INT);
+                    $stmt_original->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+                    $stmt_original->execute();
+                    $original_mission_details = $stmt_original->fetch(PDO::FETCH_ASSOC);
 
-                if ($new_end_datetime_str_drag) {
-                    $end_dt_drag = new DateTime($new_end_datetime_str_drag);
-                    $new_end_time_drag = $end_dt_drag->format('H:i:s');
+                    if (!$original_mission_details) {
+                        $conn->rollBack();
+                        respondWithError('Mission originale non trouvée pour la suppression.');
+                    }
+
+                    // Delete all assignments that match the original mission's characteristics on this date
+                    $delete_query = "
+                        DELETE FROM Planning_Assignments
+                        WHERE assignment_date = :mission_date
+                          AND title = :original_title
+                          AND ISNULL(start_time, '') = ISNULL(:original_start_time, '')
+                          AND ISNULL(end_time, '') = ISNULL(:original_end_time, '')
+                          AND ISNULL(location, '') = ISNULL(:original_location, '')
+                          AND ISNULL(mission_text, '') = ISNULL(:original_mission_text, '')
+                          AND shift_type = :original_shift_type
+                          AND ISNULL(color, '') = ISNULL(:original_color, '');
+                    ";
+                    $stmt_delete = $conn->prepare($delete_query);
+                    $stmt_delete->execute([
+                        ':mission_date' => $mission_date,
+                        ':original_title' => $original_mission_details['title'],
+                        ':original_start_time' => $original_mission_details['start_time'],
+                        ':original_end_time' => $original_mission_details['end_time'],
+                        ':original_location' => $original_mission_details['location'],
+                        ':original_mission_text' => $original_mission_details['mission_text'],
+                        ':original_shift_type' => $original_mission_details['shift_type'],
+                        ':original_color' => $original_mission_details['color']
+                    ]);
+                    respondWithSuccess('Mission et toutes ses affectations associées supprimées avec succès.');
+
+                } else {
+                    // Deleting a single assignment (this case might be less used with the new UI)
+                    $stmt_delete = $conn->prepare("DELETE FROM Planning_Assignments WHERE assignment_id = :assignment_id");
+                    $stmt_delete->bindParam(':assignment_id', $original_mission_id, PDO::PARAM_INT); // Original_mission_id acts as single assignment_id here
+                    $stmt_delete->execute();
+                    respondWithSuccess('Affectation individuelle supprimée avec succès.');
                 }
-                if ($new_start_time_drag == '00:00:00' && !$new_end_datetime_str_drag) { 
-                    $new_start_time_drag = null;
-                    $new_end_time_drag = null;
-                }
-            } catch (Exception $e) {
-                respondWithError('Format date/heure invalide pour la mise à jour: ' . $e->getMessage());
-            }
-            
-            $stmt_check_shift = $conn->prepare("SELECT shift_type FROM Planning_Assignments WHERE assignment_id = ?");
-            $stmt_check_shift->execute([$assignment_id_drag]);
-            $original_assignment = $stmt_check_shift->fetch(PDO::FETCH_ASSOC);
-
-            if (!$original_assignment) {
-                 respondWithError('Affectation originale non trouvée pour glisser-déposer.');
-            }
-
-            if ($original_assignment['shift_type'] === 'repos') {
-                $stmt_drag_update = $conn->prepare("UPDATE Planning_Assignments SET assignment_date = ? WHERE assignment_id = ?");
-                $stmt_drag_update->execute([$new_assignment_date_drag, $assignment_id_drag]);
-            } else {
-                 $stmt_drag_update = $conn->prepare("UPDATE Planning_Assignments SET assignment_date = ?, start_time = ?, end_time = ? WHERE assignment_id = ?");
-                 $stmt_drag_update->execute([$new_assignment_date_drag, $new_start_time_drag, $new_end_time_drag, $assignment_id_drag]);
-            }
-
-            if ($stmt_drag_update->rowCount() > 0) {
-                respondWithSuccess('Affectation mise à jour.');
-            } else {
-                 respondWithSuccess('Aucune modification détectée ou affectation déjà à jour.');
+                $conn->commit();
+            } catch (PDOException $e) {
+                $conn->rollBack();
+                error_log("DB Error on delete_assignment: " . $e->getMessage());
+                respondWithError('Erreur de base de données lors de la suppression de la mission.');
             }
             break;
 
-        case 'get_staff_dashboard_data': 
-            $today = date('Y-m-d');
-            $upcoming_limit = 3;
+        case 'remove_worker_from_assignment': // Used when clicking 'X' on a worker in a mission card
+            $worker_id = $input_data['worker_id'];
+            $mission_date = $input_data['mission_date'];
+            $original_mission_id = $input_data['original_mission_id'];
 
-            $stmt_today_sql = "
-                SELECT TOP 1 pa.*, u.nom, u.prenom, u.role as assigned_user_role
-                FROM Planning_Assignments pa
-                JOIN Users u ON pa.assigned_user_id = u.user_id
-                WHERE pa.assigned_user_id = :user_id AND pa.assignment_date = :today
-                ORDER BY pa.start_time
-            ";
-            $stmt_today = $conn->prepare($stmt_today_sql);
-            $stmt_today->bindParam(':user_id', $user_id, PDO::PARAM_INT); 
-            $stmt_today->bindParam(':today', $today, PDO::PARAM_STR);
-            $stmt_today->execute();
-            $today_assignment = $stmt_today->fetch(PDO::FETCH_ASSOC);
-            if ($today_assignment) {
-                $today_assignment['location'] = $today_assignment['location'] ?? null;
+            if (empty($worker_id) || empty($mission_date) || empty($original_mission_id)) {
+                respondWithError('Données manquantes pour retirer l\'ouvrier.');
             }
 
-            $stmt_upcoming_sql = "
-                SELECT pa.*, u.nom, u.prenom, u.role as assigned_user_role
-                FROM Planning_Assignments pa
-                JOIN Users u ON pa.assigned_user_id = u.user_id
-                WHERE pa.assigned_user_id = :user_id AND pa.assignment_date > :today
-                ORDER BY pa.assignment_date ASC, pa.start_time ASC
-                OFFSET 0 ROWS FETCH NEXT :limit ROWS ONLY
-            "; 
-            $stmt_upcoming = $conn->prepare($stmt_upcoming_sql);
-            $stmt_upcoming->bindParam(':user_id', $user_id, PDO::PARAM_INT); 
-            $stmt_upcoming->bindParam(':today', $today, PDO::PARAM_STR);
-            $stmt_upcoming->bindParam(':limit', $upcoming_limit, PDO::PARAM_INT);
-            $stmt_upcoming->execute();
-            $upcoming_assignments_raw = $stmt_upcoming->fetchAll(PDO::FETCH_ASSOC);
-            $upcoming_assignments = [];
-            foreach($upcoming_assignments_raw as $ua_raw){
-                $ua_raw['location'] = $ua_raw['location'] ?? null;
-                $upcoming_assignments[] = $ua_raw;
-            }
+            $conn->beginTransaction();
+            try {
+                // Get the mission's defining characteristics
+                $stmt_mission = $conn->prepare("
+                    SELECT title, start_time, end_time, location, mission_text, shift_type, color
+                    FROM Planning_Assignments
+                    WHERE assignment_id = :original_mission_id AND assignment_date = :mission_date
+                ");
+                $stmt_mission->bindParam(':original_mission_id', $original_mission_id, PDO::PARAM_INT);
+                $stmt_mission->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+                $stmt_mission->execute();
+                $mission_details = $stmt_mission->fetch(PDO::FETCH_ASSOC);
 
-            respondWithSuccess('Données du tableau de bord personnel récupérées.', [
-                'today_assignment' => $today_assignment,
-                'upcoming_assignments' => $upcoming_assignments
-            ]);
+                if (!$mission_details) {
+                    $conn->rollBack();
+                    respondWithError('Mission non trouvée.');
+                }
+
+                // Delete the specific assignment for this worker that matches this mission group
+                $delete_query = "
+                    DELETE FROM Planning_Assignments
+                    WHERE assigned_user_id = :worker_id
+                      AND assignment_date = :mission_date
+                      AND title = :mission_title
+                      AND ISNULL(start_time, '') = ISNULL(:start_time, '')
+                      AND ISNULL(end_time, '') = ISNULL(:end_time, '')
+                      AND ISNULL(location, '') = ISNULL(:location, '')
+                      AND ISNULL(mission_text, '') = ISNULL(:mission_text, '')
+                      AND shift_type = :shift_type
+                      AND ISNULL(color, '') = ISNULL(:color, '');
+                ";
+                $stmt_delete = $conn->prepare($delete_query);
+                $stmt_delete->execute([
+                    ':worker_id' => $worker_id,
+                    ':mission_date' => $mission_date,
+                    ':mission_title' => $mission_details['title'],
+                    ':start_time' => $mission_details['start_time'],
+                    ':end_time' => $mission_details['end_time'],
+                    ':location' => $mission_details['location'],
+                    ':mission_text' => $mission_details['mission_text'],
+                    ':shift_type' => $mission_details['shift_type'],
+                    ':color' => $mission_details['color']
+                ]);
+
+                if ($stmt_delete->rowCount() === 0) {
+                     $conn->rollBack();
+                     respondWithError('Aucune affectation correspondante trouvée pour cet ouvrier et cette mission.');
+                }
+
+                $conn->commit();
+                respondWithSuccess('Ouvrier retiré de la mission avec succès.');
+            } catch (PDOException $e) {
+                $conn->rollBack();
+                error_log("DB Error on remove_worker_from_assignment: " . $e->getMessage());
+                respondWithError('Erreur de base de données lors du retrait de l\'ouvrier.');
+            }
             break;
 
-        case 'get_staff_list_assignments': 
-            if (!isset($_GET['user_id']) || !isset($_GET['period'])) {
-                respondWithError('ID utilisateur et période sont requis.');
+        case 'toggle_mission_validation':
+            $mission_date = $input_data['mission_date'];
+            $original_mission_id = $input_data['original_mission_id'];
+
+            if (empty($mission_date) || empty($original_mission_id)) {
+                respondWithError('Date de mission et ID original requis pour la validation.');
             }
-            $list_view_user_id = intval($_GET['user_id']);
-            $period = strtolower(trim($_GET['period']));
-            $today_date = date('Y-m-d');
-    
-            if ($currentUser['user_id'] != $list_view_user_id && $currentUser['role'] !== 'admin') {
-                respondWithError('Accès refusé pour consulter ces données de planning.', 403);
+
+            $conn->beginTransaction();
+            try {
+                // Get current validation status and defining characteristics
+                $stmt_mission = $conn->prepare("
+                    SELECT title, start_time, end_time, location, mission_text, shift_type, color, is_validated
+                    FROM Planning_Assignments
+                    WHERE assignment_id = :original_mission_id AND assignment_date = :mission_date
+                ");
+                $stmt_mission->bindParam(':original_mission_id', $original_mission_id, PDO::PARAM_INT);
+                $stmt_mission->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+                $stmt_mission->execute();
+                $mission_details = $stmt_mission->fetch(PDO::FETCH_ASSOC);
+
+                if (!$mission_details) {
+                    $conn->rollBack();
+                    respondWithError('Mission non trouvée.');
+                }
+
+                $new_validation_status = !$mission_details['is_validated']; // Toggle status
+
+                // Update all assignments that match the mission's characteristics on this date
+                $update_query = "
+                    UPDATE Planning_Assignments
+                    SET is_validated = :new_status
+                    WHERE assignment_date = :mission_date
+                      AND title = :mission_title
+                      AND ISNULL(start_time, '') = ISNULL(:start_time, '')
+                      AND ISNULL(end_time, '') = ISNULL(:end_time, '')
+                      AND ISNULL(location, '') = ISNULL(:location, '')
+                      AND ISNULL(mission_text, '') = ISNULL(:mission_text, '')
+                      AND shift_type = :shift_type
+                      AND ISNULL(color, '') = ISNULL(:color, '');
+                ";
+                $stmt_update = $conn->prepare($update_query);
+                $stmt_update->execute([
+                    ':new_status' => $new_validation_status,
+                    ':mission_date' => $mission_date,
+                    ':mission_title' => $mission_details['title'],
+                    ':start_time' => $mission_details['start_time'],
+                    ':end_time' => $mission_details['end_time'],
+                    ':location' => $mission_details['location'],
+                    ':mission_text' => $mission_details['mission_text'],
+                    ':shift_type' => $mission_details['shift_type'],
+                    ':color' => $mission_details['color']
+                ]);
+
+                $conn->commit();
+                respondWithSuccess('Statut de validation de la mission mis à jour.');
+            } catch (PDOException $e) {
+                $conn->rollBack();
+                error_log("DB Error on toggle_mission_validation: " . $e->getMessage());
+                respondWithError('Erreur de base de données lors de la mise à jour du statut de validation.');
             }
-    
-            $sql_list_view = "
-                SELECT pa.assignment_id, pa.assignment_date, pa.start_time, pa.end_time,
-                       pa.shift_type, pa.mission_text, pa.location, pa.color,
-                       u.nom, u.prenom, u.role as assigned_user_role
-                FROM Planning_Assignments pa
-                JOIN Users u ON pa.assigned_user_id = u.user_id
-                WHERE pa.assigned_user_id = :list_view_user_id";
-            
-            $params_list_view = [':list_view_user_id' => $list_view_user_id];
-    
-            switch ($period) {
-                case 'past':
-                    $sql_list_view .= " AND pa.assignment_date < :today_date ORDER BY pa.assignment_date DESC, pa.start_time DESC";
-                    $params_list_view[':today_date'] = $today_date;
-                    break;
-                case 'future':
-                    $sql_list_view .= " AND pa.assignment_date > :today_date ORDER BY pa.assignment_date ASC, pa.start_time ASC";
-                    $params_list_view[':today_date'] = $today_date;
-                    break;
-                case 'current':
-                default:
-                    $sql_list_view .= " AND pa.assignment_date >= :today_date ORDER BY pa.assignment_date ASC, pa.start_time ASC";
-                    $params_list_view[':today_date'] = $today_date;
-                    break;
+            break;
+
+        case 'assign_worker_to_mission': // Handle drag-drop assignment
+            $worker_id = $input_data['worker_id'];
+            $mission_date = $input_data['mission_date'];
+            $original_mission_id = $input_data['original_mission_id']; // This represents the mission group
+
+            if (empty($worker_id) || empty($mission_date) || empty($original_mission_id)) {
+                respondWithError('Données manquantes pour l\'affectation de l\'ouvrier à la mission.');
             }
-    
-            $stmt_list_view = $conn->prepare($sql_list_view);
-            $stmt_list_view->execute($params_list_view);
-            $assignments_list_raw = $stmt_list_view->fetchAll(PDO::FETCH_ASSOC);
-            
-            $output_assignments_list = [];
-            foreach($assignments_list_raw as $a_item) {
-                $a_item['location'] = $a_item['location'] ?? null;
-                $output_assignments_list[] = $a_item;
+
+            $conn->beginTransaction();
+            try {
+                // First, check if the worker is already assigned for this date
+                $stmt_check_existing = $conn->prepare("
+                    SELECT assignment_id FROM Planning_Assignments
+                    WHERE assigned_user_id = :worker_id AND assignment_date = :mission_date
+                ");
+                $stmt_check_existing->bindParam(':worker_id', $worker_id, PDO::PARAM_INT);
+                $stmt_check_existing->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+                $stmt_check_existing->execute();
+                $existing_assignment = $stmt_check_existing->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing_assignment) {
+                    // If already assigned, delete the old assignment to move to the new one
+                    $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assignment_id = :old_assignment_id");
+                    $stmt_delete_old->bindParam(':old_assignment_id', $existing_assignment['assignment_id'], PDO::PARAM_INT);
+                    $stmt_delete_old->execute();
+                }
+
+                // Get the mission's defining characteristics from the original_mission_id
+                $stmt_mission_details = $conn->prepare("
+                    SELECT title, start_time, end_time, location, mission_text, shift_type, color, is_validated
+                    FROM Planning_Assignments
+                    WHERE assignment_id = :original_mission_id AND assignment_date = :mission_date
+                ");
+                $stmt_mission_details->bindParam(':original_mission_id', $original_mission_id, PDO::PARAM_INT);
+                $stmt_mission_details->bindParam(':mission_date', $mission_date, PDO::PARAM_STR);
+                $stmt_mission_details->execute();
+                $mission_details = $stmt_mission_details->fetch(PDO::FETCH_ASSOC);
+
+                if (!$mission_details) {
+                    $conn->rollBack();
+                    respondWithError('Détails de la mission cible introuvables.');
+                }
+
+                // Create a new assignment for the dragged worker with the mission's details
+                $insert_query = "
+                    INSERT INTO Planning_Assignments (assigned_user_id, creator_user_id, assignment_date, start_time, end_time, shift_type, mission_text, color, location, title, date_creation, is_validated)
+                    VALUES (:assigned_user_id, :creator_user_id, :assignment_date, :start_time, :end_time, :shift_type, :mission_text, :color, :location, :title, GETDATE(), :is_validated);
+                ";
+                $stmt_insert = $conn->prepare($insert_query);
+                $stmt_insert->execute([
+                    ':assigned_user_id' => $worker_id,
+                    ':creator_user_id' => $user_id, // The admin performing the drag-drop
+                    ':assignment_date' => $mission_date,
+                    ':start_time' => $mission_details['start_time'],
+                    ':end_time' => $mission_details['end_time'],
+                    ':shift_type' => $mission_details['shift_type'],
+                    ':mission_text' => $mission_details['mission_text'],
+                    ':color' => $mission_details['color'],
+                    ':location' => $mission_details['location'],
+                    ':title' => $mission_details['title'],
+                    ':is_validated' => $mission_details['is_validated']
+                ]);
+
+                $conn->commit();
+                respondWithSuccess('Ouvrier affecté à la mission avec succès.');
+            } catch (PDOException $e) {
+                $conn->rollBack();
+                error_log("DB Error on assign_worker_to_mission: " . $e->getMessage());
+                respondWithError('Erreur de base de données lors de l\'affectation de l\'ouvrier.');
             }
-    
-            respondWithSuccess('Affectations de la liste du personnel récupérées.', ['assignments' => $output_assignments_list]);
             break;
 
         default:
-            respondWithError('Action invalide spécifiée.');
+            respondWithError('Action non valide spécifiée.');
     }
-} catch (PDOException $e) {
-    if ($conn && $conn->inTransaction()) {
+} catch (Exception $e) {
+    if ($conn->inTransaction()) {
         $conn->rollBack();
     }
-    error_log("DB Error (planning-handler): " . $e->getMessage() . " Query: " . (isset($stmt) && $stmt ? $stmt->queryString : "N/A") . " Params: " . (isset($params) ? json_encode($params) : (isset($params_list_view) ? json_encode($params_list_view) : "N/A" )));
-    respondWithError('Erreur de base de données. Veuillez réessayer plus tard.', 500);
-} catch (Exception $e) {
-    error_log("General Error (planning-handler): " . $e->getMessage());
-    respondWithError('Une erreur inattendue est survenue: ' . $e->getMessage(), 500);
+    error_log("General Error in planning-handler.php: " . $e->getMessage());
+    respondWithError('Une erreur interne du serveur est survenue: ' . $e->getMessage(), 500);
 }
-
 ?>
