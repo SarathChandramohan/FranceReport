@@ -1,5 +1,11 @@
 <?php
-// planning-handler.php (New Reworked Style)
+// planning-handler.php (Revised for Robustness)
+
+// Set error reporting to catch all errors and log them, but do not display to output
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/php-error.log'); // Ensure this path is writable and secure
+error_reporting(E_ALL);
 
 require_once 'db-connection.php';
 require_once 'session-management.php';
@@ -35,7 +41,20 @@ global $conn;
 
 try {
     $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
-    $input_data = json_decode(file_get_contents('php://input'), true);
+
+    // Attempt to get input data, handle cases where no JSON body is sent
+    $input_data_raw = file_get_contents('php://input');
+    $input_data = [];
+    if (!empty($input_data_raw)) {
+        $decoded_data = json_decode($input_data_raw, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            $input_data = $decoded_data;
+        } else {
+            // Log JSON decoding error but don't fail immediately,
+            // as some requests might be GET or not send JSON
+            error_log("JSON Decode Error: " . json_last_error_msg() . " for input: " . $input_data_raw);
+        }
+    }
 
     switch ($action) {
         case 'get_staff_users':
@@ -58,6 +77,7 @@ try {
             $end_date_str = isset($_GET['end']) ? $_GET['end'] : date('Y-m-t');
 
             // SQL Server query to group assignments into logical "missions"
+            // Using NULLIF for proper comparison of potentially empty string fields as NULL
             $query_sql = "
                 SELECT
                        MIN(pa.assignment_id) as representative_assignment_id,
@@ -66,7 +86,7 @@ try {
                        ISNULL(pa.end_time, '') as end_time,
                        pa.shift_type,
                        ISNULL(pa.color, '#1877f2') as color,
-                       ISNULL(pa.mission_text, '') as title, -- Using 'title' as per React UI
+                       ISNULL(pa.title, '') as title, -- Using 'title' as per React UI
                        ISNULL(pa.location, '') as location,
                        pa.is_validated,
                        COUNT(DISTINCT pa.assigned_user_id) as user_count,
@@ -81,7 +101,7 @@ try {
                        ISNULL(pa.end_time, ''),
                        pa.shift_type,
                        ISNULL(pa.color, '#1877f2'),
-                       ISNULL(pa.mission_text, ''),
+                       ISNULL(pa.title, ''),
                        ISNULL(pa.location, ''),
                        pa.is_validated
                 ORDER BY start_date_group, start_time;
@@ -92,6 +112,13 @@ try {
             $stmt->bindParam(':end_date', $end_date_str, PDO::PARAM_STR);
             $stmt->execute();
             $missions_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Convert string aggregates back to arrays for frontend JS
+            foreach ($missions_data as &$mission) {
+                $mission['user_ids_list'] = empty($mission['user_ids_list']) ? [] : explode(',', $mission['user_ids_list']);
+                $mission['user_names_list'] = empty($mission['user_names_list']) ? [] : explode(', ', $mission['user_names_list']);
+                $mission['is_validated'] = (bool)$mission['is_validated']; // Ensure boolean type
+            }
 
             respondWithSuccess('Missions récupérées.', ['missions' => $missions_data]);
             break;
@@ -119,18 +146,19 @@ try {
                 respondWithError('Mission non trouvée pour l\'édition.');
             }
 
+            $mission['is_validated'] = (bool)$mission['is_validated']; // Ensure boolean type
             respondWithSuccess('Détails de mission récupérés.', ['mission' => $mission]);
             break;
 
         case 'save_assignment': // Create or update mission groups
             $mission_date = $input_data['mission_date'];
             $title = $input_data['title'];
-            $start_time = $input_data['start_time'];
-            $end_time = $input_data['end_time'];
-            $location = $input_data['location'];
-            $comment = $input_data['comment'];
+            $start_time = empty($input_data['start_time']) ? null : $input_data['start_time'];
+            $end_time = empty($input_data['end_time']) ? null : $input_data['end_time'];
+            $location = empty($input_data['location']) ? null : $input_data['location'];
+            $comment = empty($input_data['comment']) ? null : $input_data['comment']; // mission_text
             $shift_type = $input_data['shift_type'];
-            $color = $input_data['color'];
+            $color = empty($input_data['color']) ? '#007bff' : $input_data['color']; // Default color
             $original_mission_id = $input_data['original_mission_id'] ?? null;
             $is_group_edit = isset($input_data['is_group_edit']) ? (bool)$input_data['is_group_edit'] : false;
             $assigned_user_ids = $input_data['assigned_user_ids'] ?? []; // For new missions only
@@ -162,6 +190,14 @@ try {
                         respondWithError('Mission originale non trouvée pour la mise à jour.');
                     }
 
+                    // Use NULLIF to handle empty strings as NULL for comparison
+                    $original_start_time_comp = NULLIF($original_mission_details['start_time'], '');
+                    $original_end_time_comp = NULLIF($original_mission_details['end_time'], '');
+                    $original_location_comp = NULLIF($original_mission_details['location'], '');
+                    $original_mission_text_comp = NULLIF($original_mission_details['mission_text'], '');
+                    $original_color_comp = NULLIF($original_mission_details['color'], '');
+
+
                     // Update all assignments that match the original mission's characteristics on this date
                     $update_query = "
                         UPDATE Planning_Assignments
@@ -174,12 +210,12 @@ try {
                             color = :new_color
                         WHERE assignment_date = :mission_date
                           AND title = :original_title
-                          AND ISNULL(start_time, '') = ISNULL(:original_start_time, '')
-                          AND ISNULL(end_time, '') = ISNULL(:original_end_time, '')
-                          AND ISNULL(location, '') = ISNULL(:original_location, '')
-                          AND ISNULL(mission_text, '') = ISNULL(:original_mission_text, '')
+                          AND (start_time = :original_start_time_comp OR (start_time IS NULL AND :original_start_time_comp IS NULL))
+                          AND (end_time = :original_end_time_comp OR (end_time IS NULL AND :original_end_time_comp IS NULL))
+                          AND (location = :original_location_comp OR (location IS NULL AND :original_location_comp IS NULL))
+                          AND (mission_text = :original_mission_text_comp OR (mission_text IS NULL AND :original_mission_text_comp IS NULL))
                           AND shift_type = :original_shift_type
-                          AND ISNULL(color, '') = ISNULL(:original_color, '');
+                          AND (color = :original_color_comp OR (color IS NULL AND :original_color_comp IS NULL));
                     ";
                     $stmt_update = $conn->prepare($update_query);
                     $stmt_update->execute([
@@ -192,19 +228,19 @@ try {
                         ':new_color' => $color,
                         ':mission_date' => $mission_date,
                         ':original_title' => $original_mission_details['title'],
-                        ':original_start_time' => $original_mission_details['start_time'],
-                        ':original_end_time' => $original_mission_details['end_time'],
-                        ':original_location' => $original_mission_details['location'],
-                        ':original_mission_text' => $original_mission_details['mission_text'],
+                        ':original_start_time_comp' => $original_start_time_comp,
+                        ':original_end_time_comp' => $original_end_time_comp,
+                        ':original_location_comp' => $original_location_comp,
+                        ':original_mission_text_comp' => $original_mission_text_comp,
                         ':original_shift_type' => $original_mission_details['shift_type'],
-                        ':original_color' => $original_mission_details['color']
+                        ':original_color_comp' => $original_color_comp
                     ]);
                     respondWithSuccess('Mission mise à jour avec succès pour tous les ouvriers affectés.');
 
                 } else {
-                    // Creating a new mission (template for future assignments via drag-drop)
-                    // It must be assigned to at least one user to satisfy NOT NULL constraint.
-                    // If no specific users are provided by frontend, assign to the admin creating it.
+                    // Creating a new mission
+                    // If no specific users are provided by frontend (e.g., from "Nouvelle Mission" button),
+                    // assign to the admin creating it as a default placeholder.
                     if (empty($assigned_user_ids)) {
                         $assigned_user_ids = [$user_id]; // Assign to admin by default
                     }
@@ -235,7 +271,7 @@ try {
             } catch (PDOException $e) {
                 $conn->rollBack();
                 error_log("DB Error on save_assignment: " . $e->getMessage());
-                respondWithError('Erreur de base de données lors de l\'enregistrement de la mission.');
+                respondWithError('Erreur de base de données lors de l\'enregistrement de la mission: ' . $e->getMessage());
             }
             break;
 
@@ -267,43 +303,48 @@ try {
                         respondWithError('Mission originale non trouvée pour la suppression.');
                     }
 
+                    // Use NULLIF for proper comparison of potentially empty string fields as NULL
+                    $original_start_time_comp = NULLIF($original_mission_details['start_time'], '');
+                    $original_end_time_comp = NULLIF($original_mission_details['end_time'], '');
+                    $original_location_comp = NULLIF($original_mission_details['location'], '');
+                    $original_mission_text_comp = NULLIF($original_mission_details['mission_text'], '');
+                    $original_color_comp = NULLIF($original_mission_details['color'], '');
+
+
                     // Delete all assignments that match the original mission's characteristics on this date
                     $delete_query = "
                         DELETE FROM Planning_Assignments
                         WHERE assignment_date = :mission_date
                           AND title = :original_title
-                          AND ISNULL(start_time, '') = ISNULL(:original_start_time, '')
-                          AND ISNULL(end_time, '') = ISNULL(:original_end_time, '')
-                          AND ISNULL(location, '') = ISNULL(:original_location, '')
-                          AND ISNULL(mission_text, '') = ISNULL(:original_mission_text, '')
+                          AND (start_time = :original_start_time_comp OR (start_time IS NULL AND :original_start_time_comp IS NULL))
+                          AND (end_time = :original_end_time_comp OR (end_time IS NULL AND :original_end_time_comp IS NULL))
+                          AND (location = :original_location_comp OR (location IS NULL AND :original_location_comp IS NULL))
+                          AND (mission_text = :original_mission_text_comp OR (mission_text IS NULL AND :original_mission_text_comp IS NULL))
                           AND shift_type = :original_shift_type
-                          AND ISNULL(color, '') = ISNULL(:original_color, '');
+                          AND (color = :original_color_comp OR (color IS NULL AND :original_color_comp IS NULL));
                     ";
                     $stmt_delete = $conn->prepare($delete_query);
                     $stmt_delete->execute([
                         ':mission_date' => $mission_date,
                         ':original_title' => $original_mission_details['title'],
-                        ':original_start_time' => $original_mission_details['start_time'],
-                        ':original_end_time' => $original_mission_details['end_time'],
-                        ':original_location' => $original_mission_details['location'],
-                        ':original_mission_text' => $original_mission_details['mission_text'],
+                        ':original_start_time_comp' => $original_start_time_comp,
+                        ':original_end_time_comp' => $original_end_time_comp,
+                        ':original_location_comp' => $original_location_comp,
+                        ':original_mission_text_comp' => $original_mission_text_comp,
                         ':original_shift_type' => $original_mission_details['shift_type'],
-                        ':original_color' => $original_mission_details['color']
+                        ':original_color_comp' => $original_color_comp
                     ]);
                     respondWithSuccess('Mission et toutes ses affectations associées supprimées avec succès.');
 
                 } else {
-                    // Deleting a single assignment (this case might be less used with the new UI)
-                    $stmt_delete = $conn->prepare("DELETE FROM Planning_Assignments WHERE assignment_id = :assignment_id");
-                    $stmt_delete->bindParam(':assignment_id', $original_mission_id, PDO::PARAM_INT); // Original_mission_id acts as single assignment_id here
-                    $stmt_delete->execute();
-                    respondWithSuccess('Affectation individuelle supprimée avec succès.');
+                    // This case is unlikely to be triggered by the new UI but kept for completeness
+                    respondWithError('Suppression d\'une seule affectation non prise en charge par cette interface.', 405);
                 }
                 $conn->commit();
             } catch (PDOException $e) {
                 $conn->rollBack();
                 error_log("DB Error on delete_assignment: " . $e->getMessage());
-                respondWithError('Erreur de base de données lors de la suppression de la mission.');
+                respondWithError('Erreur de base de données lors de la suppression de la mission: ' . $e->getMessage());
             }
             break;
 
@@ -334,30 +375,37 @@ try {
                     respondWithError('Mission non trouvée.');
                 }
 
+                // Use NULLIF for proper comparison of potentially empty string fields as NULL
+                $mission_start_time_comp = NULLIF($mission_details['start_time'], '');
+                $mission_end_time_comp = NULLIF($mission_details['end_time'], '');
+                $mission_location_comp = NULLIF($mission_details['location'], '');
+                $mission_text_comp = NULLIF($mission_details['mission_text'], '');
+                $mission_color_comp = NULLIF($mission_details['color'], '');
+
                 // Delete the specific assignment for this worker that matches this mission group
                 $delete_query = "
                     DELETE FROM Planning_Assignments
                     WHERE assigned_user_id = :worker_id
                       AND assignment_date = :mission_date
                       AND title = :mission_title
-                      AND ISNULL(start_time, '') = ISNULL(:start_time, '')
-                      AND ISNULL(end_time, '') = ISNULL(:end_time, '')
-                      AND ISNULL(location, '') = ISNULL(:location, '')
-                      AND ISNULL(mission_text, '') = ISNULL(:mission_text, '')
+                      AND (start_time = :start_time_comp OR (start_time IS NULL AND :start_time_comp IS NULL))
+                      AND (end_time = :end_time_comp OR (end_time IS NULL AND :end_time_comp IS NULL))
+                      AND (location = :location_comp OR (location IS NULL AND :location_comp IS NULL))
+                      AND (mission_text = :mission_text_comp OR (mission_text IS NULL AND :mission_text_comp IS NULL))
                       AND shift_type = :shift_type
-                      AND ISNULL(color, '') = ISNULL(:color, '');
+                      AND (color = :color_comp OR (color IS NULL AND :color_comp IS NULL));
                 ";
                 $stmt_delete = $conn->prepare($delete_query);
                 $stmt_delete->execute([
                     ':worker_id' => $worker_id,
                     ':mission_date' => $mission_date,
                     ':mission_title' => $mission_details['title'],
-                    ':start_time' => $mission_details['start_time'],
-                    ':end_time' => $mission_details['end_time'],
-                    ':location' => $mission_details['location'],
-                    ':mission_text' => $mission_details['mission_text'],
+                    ':start_time_comp' => $mission_start_time_comp,
+                    ':end_time_comp' => $mission_end_time_comp,
+                    ':location_comp' => $mission_location_comp,
+                    ':mission_text_comp' => $mission_text_comp,
                     ':shift_type' => $mission_details['shift_type'],
-                    ':color' => $mission_details['color']
+                    ':color_comp' => $mission_color_comp
                 ]);
 
                 if ($stmt_delete->rowCount() === 0) {
@@ -370,7 +418,7 @@ try {
             } catch (PDOException $e) {
                 $conn->rollBack();
                 error_log("DB Error on remove_worker_from_assignment: " . $e->getMessage());
-                respondWithError('Erreur de base de données lors du retrait de l\'ouvrier.');
+                respondWithError('Erreur de base de données lors du retrait de l\'ouvrier: ' . $e->getMessage());
             }
             break;
 
@@ -400,7 +448,14 @@ try {
                     respondWithError('Mission non trouvée.');
                 }
 
-                $new_validation_status = !$mission_details['is_validated']; // Toggle status
+                $new_validation_status = !(bool)$mission_details['is_validated']; // Toggle status
+
+                // Use NULLIF for proper comparison of potentially empty string fields as NULL
+                $mission_start_time_comp = NULLIF($mission_details['start_time'], '');
+                $mission_end_time_comp = NULLIF($mission_details['end_time'], '');
+                $mission_location_comp = NULLIF($mission_details['location'], '');
+                $mission_text_comp = NULLIF($mission_details['mission_text'], '');
+                $mission_color_comp = NULLIF($mission_details['color'], '');
 
                 // Update all assignments that match the mission's characteristics on this date
                 $update_query = "
@@ -408,24 +463,24 @@ try {
                     SET is_validated = :new_status
                     WHERE assignment_date = :mission_date
                       AND title = :mission_title
-                      AND ISNULL(start_time, '') = ISNULL(:start_time, '')
-                      AND ISNULL(end_time, '') = ISNULL(:end_time, '')
-                      AND ISNULL(location, '') = ISNULL(:location, '')
-                      AND ISNULL(mission_text, '') = ISNULL(:mission_text, '')
+                      AND (start_time = :start_time_comp OR (start_time IS NULL AND :start_time_comp IS NULL))
+                      AND (end_time = :end_time_comp OR (end_time IS NULL AND :end_time_comp IS NULL))
+                      AND (location = :location_comp OR (location IS NULL AND :location_comp IS NULL))
+                      AND (mission_text = :mission_text_comp OR (mission_text IS NULL AND :mission_text_comp IS NULL))
                       AND shift_type = :shift_type
-                      AND ISNULL(color, '') = ISNULL(:color, '');
+                      AND (color = :color_comp OR (color IS NULL AND :color_comp IS NULL));
                 ";
                 $stmt_update = $conn->prepare($update_query);
                 $stmt_update->execute([
                     ':new_status' => $new_validation_status,
                     ':mission_date' => $mission_date,
                     ':mission_title' => $mission_details['title'],
-                    ':start_time' => $mission_details['start_time'],
-                    ':end_time' => $mission_details['end_time'],
-                    ':location' => $mission_details['location'],
-                    ':mission_text' => $mission_details['mission_text'],
+                    ':start_time_comp' => $mission_start_time_comp,
+                    ':end_time_comp' => $mission_end_time_comp,
+                    ':location_comp' => $mission_location_comp,
+                    ':mission_text_comp' => $mission_text_comp,
                     ':shift_type' => $mission_details['shift_type'],
-                    ':color' => $mission_details['color']
+                    ':color_comp' => $mission_color_comp
                 ]);
 
                 $conn->commit();
@@ -433,7 +488,7 @@ try {
             } catch (PDOException $e) {
                 $conn->rollBack();
                 error_log("DB Error on toggle_mission_validation: " . $e->getMessage());
-                respondWithError('Erreur de base de données lors de la mise à jour du statut de validation.');
+                respondWithError('Erreur de base de données lors de la mise à jour du statut de validation: ' . $e->getMessage());
             }
             break;
 
@@ -491,14 +546,14 @@ try {
                     ':assigned_user_id' => $worker_id,
                     ':creator_user_id' => $user_id, // The admin performing the drag-drop
                     ':assignment_date' => $mission_date,
-                    ':start_time' => $mission_details['start_time'],
-                    ':end_time' => $mission_details['end_time'],
+                    ':start_time' => empty($mission_details['start_time']) ? null : $mission_details['start_time'],
+                    ':end_time' => empty($mission_details['end_time']) ? null : $mission_details['end_time'],
                     ':shift_type' => $mission_details['shift_type'],
-                    ':mission_text' => $mission_details['mission_text'],
-                    ':color' => $mission_details['color'],
-                    ':location' => $mission_details['location'],
+                    ':mission_text' => empty($mission_details['mission_text']) ? null : $mission_details['mission_text'],
+                    ':color' => empty($mission_details['color']) ? '#007bff' : $mission_details['color'],
+                    ':location' => empty($mission_details['location']) ? null : $mission_details['location'],
                     ':title' => $mission_details['title'],
-                    ':is_validated' => $mission_details['is_validated']
+                    ':is_validated' => (bool)$mission_details['is_validated']
                 ]);
 
                 $conn->commit();
@@ -506,18 +561,29 @@ try {
             } catch (PDOException $e) {
                 $conn->rollBack();
                 error_log("DB Error on assign_worker_to_mission: " . $e->getMessage());
-                respondWithError('Erreur de base de données lors de l\'affectation de l\'ouvrier.');
+                respondWithError('Erreur de base de données lors de l\'affectation de l\'ouvrier: ' . $e->getMessage());
             }
             break;
 
         default:
-            respondWithError('Action non valide spécifiée.');
+            respondWithError('Action non valide spécifiée.', 400);
     }
 } catch (Exception $e) {
-    if ($conn->inTransaction()) {
+    if (isset($conn) && $conn->inTransaction()) {
         $conn->rollBack();
     }
     error_log("General Error in planning-handler.php: " . $e->getMessage());
     respondWithError('Une erreur interne du serveur est survenue: ' . $e->getMessage(), 500);
+}
+
+/**
+ * Helper function to emulate MySQL's NULLIF for SQL Server when comparing values
+ * that might be empty strings. This treats an empty string as NULL for comparison.
+ * Note: SQL Server has a native NULLIF function, but this PHP equivalent
+ * ensures consistency in comparison logic if fields could be empty strings instead of actual NULLs.
+ * For direct SQL Server usage, use `NULLIF(column, '')`.
+ */
+function NULLIF($value, $compare_value) {
+    return ($value === $compare_value || (is_string($value) && $value === '')) ? null : $value;
 }
 ?>
