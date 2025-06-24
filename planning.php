@@ -167,8 +167,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // --- DATA FETCHING ---
-    async function fetchInitialData() {
-        showLoading(true);
+    async function fetchInitialData(manageLoadingState = true) {
+        if (manageLoadingState) showLoading(true);
         try {
             const endDate = new Date(state.currentWeekStart);
             endDate.setDate(endDate.getDate() + 6);
@@ -176,7 +176,11 @@ document.addEventListener('DOMContentLoaded', function() {
             state.staff = data.staff || [];
             state.missions = data.missions || [];
             updateUI();
-        } catch (error) { alert(`Erreur de chargement: ${error.message}`); } finally { showLoading(false); }
+        } catch (error) { 
+            alert(`Erreur de chargement: ${error.message}`); 
+        } finally { 
+            if (manageLoadingState) showLoading(false);
+        }
     }
 
     // --- UI RENDERING ---
@@ -278,8 +282,8 @@ document.addEventListener('DOMContentLoaded', function() {
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
     
-    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
-    $planningContainer.on('click', '.remove-worker-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); if (!confirm("Retirer cet ouvrier?")) return; showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { worker_id: workerId, mission_id: missionId }); await fetchInitialData(); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
+    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
+    $planningContainer.on('click', '.remove-worker-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); if (!confirm("Retirer cet ouvrier?")) return; showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { worker_id: workerId, mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
     
     async function handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
@@ -301,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     assigned_user_ids: [state.draggedWorker.id]
                 });
             }
-            await fetchInitialData();
+            await fetchInitialData(false);
         } catch (error) { alert(`Erreur: ${error.message}`); } finally { state.draggedWorker = null; showLoading(false); }
     }
 
@@ -354,6 +358,8 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const isTimeDisabled = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', isTimeDisabled); if (isTimeDisabled) $('#mission_start_time, #mission_end_time').val(''); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
+    // *** BUG FIX START ***
+    // Corrected handler for saving a mission
     $('#missionForm').on('submit', async function(e) {
         e.preventDefault();
         hideModalError();
@@ -365,39 +371,54 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
         }
-        showLoading(true);
+        
+        showLoading(true); // Show overlay for the API call
         try {
             await apiCall('save_mission', 'POST', formData);
-            state.shouldRefreshOnModalClose = true;
-            $modal.modal('hide');
+            $modal.modal('hide'); // Hide modal on success
+            await fetchInitialData(false); // Refresh data in the background
         } catch (error) {
+            // If there's an error, stay in the modal and show it
             showModalError(error.message);
         } finally {
+            // Always hide the overlay
             showLoading(false);
         }
     });
 
-    $('#deleteMissionBtn').on('click', async function() {
-        if (!confirm("Supprimer cette mission?")) return;
-        const missionId = $('#mission_id_form').val();
-        showLoading(true);
-        try {
-            await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
-            state.shouldRefreshOnModalClose = true;
-            $modal.modal('hide');
-        } catch (error) {
-            showModalError(error.message);
-        } finally {
-            showLoading(false);
+    // Corrected handler for deleting a mission
+    $('#deleteMissionBtn').on('click', function() {
+        if (!confirm("Supprimer cette mission?")) {
+            return;
         }
+
+        const missionId = $('#mission_id_form').val();
+
+        // 1. Tell the modal to hide
+        $modal.modal('hide');
+
+        // 2. Use a 'one-time' event listener to act only after the modal is fully hidden
+        $modal.one('hidden.bs.modal', async () => {
+            showLoading(true); // Show overlay for the background tasks
+            try {
+                // 3. Perform the deletion and data refresh
+                await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
+                await fetchInitialData(false); // Refresh the main view
+            } catch (error) {
+                // 4. If an error occurs, show a general alert since the modal is closed
+                alert(`Erreur lors de la suppression: ${error.message}`);
+            } finally {
+                // 5. Reliably hide the overlay
+                showLoading(false);
+            }
+        });
     });
+    // *** BUG FIX END ***
     
     $modal.on('hidden.bs.modal', function () {
+        // This is now primarily for resetting the modal state after it closes,
+        // as the data refresh is handled directly by the submit/delete handlers.
         hideModalError();
-        if (state.shouldRefreshOnModalClose) {
-            fetchInitialData();
-            state.shouldRefreshOnModalClose = false;
-        }
     });
 
     // --- Init ---
