@@ -1,7 +1,7 @@
 <?php
 // planning-handler.php (Revised for Robustness)
 
-// Set error reporting to catch all errors and log them, but do not display to output
+// Set error reporting to catch all errors and log them, but do not display to outputss
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/php-error.log'); // Ensure this path is writable and secure
