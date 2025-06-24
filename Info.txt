@@ -206,6 +206,8 @@ GO
 
 ALTER TABLE Planning_Assignments ADD location NVARCHAR(255) NULL;
 GO
+
+ALTER TABLE Planning_Assignments ADD is_validated BIT NOT NULL DEFAULT 0;
 ------------------------------------------------------------------------------------------------------------------
 CREATE TABLE WorkLocations (
     location_id INT IDENTITY(1,1) PRIMARY KEY,
