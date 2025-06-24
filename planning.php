@@ -370,7 +370,11 @@ document.addEventListener('DOMContentLoaded', function() {
             await apiCall('save_mission', 'POST', formData);
             state.shouldRefreshOnModalClose = true;
             $modal.modal('hide');
-        } catch (error) { showModalError(error.message); showLoading(false); }
+        } catch (error) {
+            showModalError(error.message);
+        } finally {
+            showLoading(false);
+        }
     });
 
     $('#deleteMissionBtn').on('click', async function() {
@@ -381,7 +385,11 @@ document.addEventListener('DOMContentLoaded', function() {
             await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
             state.shouldRefreshOnModalClose = true;
             $modal.modal('hide');
-        } catch (error) { showModalError(error.message); showLoading(false); }
+        } catch (error) {
+            showModalError(error.message);
+        } finally {
+            showLoading(false);
+        }
     });
     
     $modal.on('hidden.bs.modal', function () {
