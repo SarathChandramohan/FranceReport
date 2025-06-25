@@ -117,7 +117,7 @@ $default_color = $predefined_colors[0];
                             <label>Type</label>
                             <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
                         </div>
-                        <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= $default_color; ?>"></div>
+                        <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
                         
                         <div class="form-group" id="assign-users-group" style="display:none;">
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
@@ -131,6 +131,7 @@ $default_color = $predefined_colors[0];
                             <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;">
                                 </div>
                         </div>
+
                         <div id="modal_error_message" class="alert alert-danger mt-3" style="display: none;"></div>
                     </div>
                     <div class="modal-footer">
@@ -191,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
         d = new Date(d);
         let day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
         d.setHours(0, 0, 0, 0);
-        return d;
+        return new Date(d);
     }
 
     // --- API CALLS ---
@@ -310,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- MODAL WORKER ASSIGNMENT LOGIC (NO DRAG-DROP) ---
+    // --- MODAL WORKER ASSIGNMENT LOGIC ---
     function renderAssignedWorkersInModal() {
         const $list = $('#assigned_workers_pills');
         const $hiddenInput = $('#assigned_user_ids_hidden');
@@ -378,7 +379,8 @@ document.addEventListener('DOMContentLoaded', function() {
         renderAssignedWorkersInModal();
         renderAvailableWorkersInModal();
         
-        $modal.modal({ backdrop: 'static', keyboard: false });
+        // --- MODIFIED: Reverted to default modal behavior ---
+        $modal.modal('show');
     });
 
     $planningContainer.on('click', '.add-mission-to-day-btn', function() {
@@ -442,7 +444,8 @@ document.addEventListener('DOMContentLoaded', function() {
         renderAssignedWorkersInModal();
         renderAvailableWorkersInModal();
         
-        $modal.modal({ backdrop: 'static', keyboard: false });
+        // --- MODIFIED: Reverted to default modal behavior ---
+        $modal.modal('show');
     }
     
     $planningContainer.on('click', '.mission-card-body', function() {
@@ -470,7 +473,8 @@ document.addEventListener('DOMContentLoaded', function() {
         $modal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
         
-        $modal.modal({ backdrop: 'static', keyboard: false });
+        // --- MODIFIED: Reverted to default modal behavior ---
+        $modal.modal('show');
     });
     
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const isTimeDisabled = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', isTimeDisabled); if (isTimeDisabled) $('#mission_start_time, #mission_end_time').val(''); });
@@ -513,9 +517,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- CONFIRMATION LOGIC ---
-    $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); /* ... no changes here ... */ });
-    $('#deleteMissionBtn').on('click', function() { /* ... no changes here ... */ });
-    $('#confirmActionBtn').on('click', async function() { /* ... no changes here ... */ });
+    // NOTE: Confirmation logic for delete/remove actions is not fully implemented in the provided snippet.
+    // This section would need to be built out with calls to a confirmation modal.
+    $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); alert('Remove worker logic to be implemented.'); });
+    $('#deleteMissionBtn').on('click', function() { alert('Delete mission logic to be implemented.'); });
+    $('#confirmActionBtn').on('click', async function() { /* ... */ });
 
     // --- Init ---
     fetchInitialData();
