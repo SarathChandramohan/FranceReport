@@ -25,35 +25,36 @@ $default_color = $predefined_colors[0];
     <style>
         :root { --primary: #007bff; --light-gray: #f0f2f5; --card-bg: #ffffff; --border-color: #dee2e6; }
         html, body { height: 100%; overflow: hidden; }
-        body { background-color: var(--light-gray); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        body { background-color: var(--light-gray); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 0.8rem; }
+        h4 { font-size: 1rem; }
+        h5, .modal-title { font-size: 0.85rem; }
         .main-container { display: flex; height: calc(100vh - 78px); }
         .workers-list-col, .planning-col { height: 100%; overflow-y: auto; padding: 15px; }
         .workers-list-col { flex: 0 0 280px; background: var(--card-bg); border-right: 1px solid var(--border-color); }
         .planning-col { flex: 1; }
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
-        .assignment-count { font-size: 0.75rem; color: #fff; background-color: #28a745; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
+        .assignment-count { font-size: 0.5rem; color: #fff; background-color: #28a745; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
         .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; }
         .day-content { flex-grow: 1; padding: 10px; }
-        .add-mission-to-day-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; }
+        .add-mission-to-day-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.validated { opacity: 0.8; background-color: #e6ffed; }
         .mission-card-body { cursor: pointer; }
-        .mission-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; }
-        .mission-meta { font-size: 0.8rem; color: #6c757d; margin-bottom: 8px; }
-        .assigned-workers-list { list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.8rem; }
+        .mission-title { font-weight: 600; font-size: 0.6rem; margin-bottom: 5px; }
+        .mission-meta { font-size: 0.5rem; color: #6c757d; margin-bottom: 8px; }
+        .assigned-workers-list { list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.5rem; }
         .assigned-workers-list li { background-color: #e7f1ff; padding: 3px 8px; border-radius: 4px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center; }
         .remove-worker-btn { cursor: pointer; color: #dc3545; }
-        .mission-placeholder { font-size: 0.85rem; color: #6c757d; text-align: center; padding: 20px; border: 2px dashed #ced4da; border-radius: 6px; height: 100%; display: flex; align-items: center; justify-content: center;}
+        .mission-placeholder { font-size: 0.55rem; color: #6c757d; text-align: center; padding: 20px; border: 2px dashed #ced4da; border-radius: 6px; height: 100%; display: flex; align-items: center; justify-content: center;}
         .mission-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; background: rgba(255,255,255,0.8); border-radius: 5px; padding: 2px;}
-        .action-btn { background: none; border: none; color: #6c757d; font-size: 0.8rem; cursor: pointer; padding: 3px; }
+        .action-btn { background: none; border: none; color: #6c757d; font-size: 0.5rem; cursor: pointer; padding: 3px; }
         .action-btn.validate-btn.validated { color: #28a545; }
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
         .color-swatch { width:25px; height:25px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
         .color-swatch.selected { border-color: #333; }
-        /* Style for the new assigned workers pills in the modal */
-        #assigned_workers_pills .badge { margin: 2px; font-size: 0.9rem; }
+        #assigned_workers_pills .badge { margin: 2px; font-size: 0.6rem; }
         #assigned_workers_pills .remove-assigned-worker { cursor: pointer; }
     </style>
 </head>
@@ -379,7 +380,6 @@ document.addEventListener('DOMContentLoaded', function() {
         renderAssignedWorkersInModal();
         renderAvailableWorkersInModal();
         
-        // --- MODIFIED: Reverted to default modal behavior ---
         $modal.modal('show');
     });
 
@@ -444,7 +444,6 @@ document.addEventListener('DOMContentLoaded', function() {
         renderAssignedWorkersInModal();
         renderAvailableWorkersInModal();
         
-        // --- MODIFIED: Reverted to default modal behavior ---
         $modal.modal('show');
     }
     
@@ -473,7 +472,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $modal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
         
-        // --- MODIFIED: Reverted to default modal behavior ---
         $modal.modal('show');
     });
     
@@ -508,7 +506,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $modal.on('hidden.bs.modal', function () {
         hideModalError();
-        // Reset assignment group visibility
         $('#assign-users-group').hide();
         if (state.shouldRefreshOnModalClose) {
             fetchInitialData();
@@ -516,12 +513,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- CONFIRMATION LOGIC ---
-    // NOTE: Confirmation logic for delete/remove actions is not fully implemented in the provided snippet.
-    // This section would need to be built out with calls to a confirmation modal.
-    $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); alert('Remove worker logic to be implemented.'); });
-    $('#deleteMissionBtn').on('click', function() { alert('Delete mission logic to be implemented.'); });
-    $('#confirmActionBtn').on('click', async function() { /* ... */ });
+    // --- CONFIRMATION & DELETE LOGIC ---
+    const $confirmationModal = $('#confirmationModal');
+    const $confirmBtn = $('#confirmActionBtn');
+
+    function showConfirmation(body, onConfirm) {
+        $confirmationModal.find('#confirmationModalBody').text(body);
+        $confirmBtn.off('click').on('click', function() {
+            onConfirm();
+            $confirmationModal.modal('hide');
+        });
+        $confirmationModal.modal('show');
+    }
+
+    $planningContainer.on('click', '.remove-worker-btn', function(e) {
+        e.stopPropagation();
+        const $missionCard = $(this).closest('.mission-card');
+        const missionId = $missionCard.data('mission-id');
+        const workerId = $(this).data('worker-id');
+        const workerName = $(this).closest('li').text().trim();
+
+        showConfirmation(`Êtes-vous sûr de vouloir retirer ${workerName} de cette mission ?`, async () => {
+            showLoading(true);
+            try {
+                await apiCall('remove_worker_from_mission', 'POST', { mission_id: missionId, worker_id: workerId });
+                await fetchInitialData(false);
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        });
+    });
+
+    $('#deleteMissionBtn').on('click', function() {
+        const missionId = $('#mission_id_form').val();
+        if (!missionId) return;
+
+        $modal.modal('hide');
+
+        showConfirmation('Êtes-vous sûr de vouloir supprimer cette mission et toutes ses affectations ?', async () => {
+            showLoading(true);
+            try {
+                await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
+                await fetchInitialData(false);
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        });
+    });
 
     // --- Init ---
     fetchInitialData();
