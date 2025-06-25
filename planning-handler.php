@@ -157,17 +157,14 @@ function saveMission($conn, $creator_id, $data) {
             INSERT INTO Planning_Assignments (
                 assigned_user_id, creator_user_id, assignment_date, start_time, end_time,
                 shift_type, mission_text, color, location, is_validated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         foreach ($assigned_users as $user_id) {
-            // REMOVED: The logic that deletes other assignments for the day.
-            // $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
-            // $stmt_delete_old->execute([$user_id, $mission_date]);
-
             // Insert the new assignment
             $stmt_insert->execute([
                 $user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null,
-                $data['shift_type'], $data['mission_text'], $data['color'], $data['location'] ?: null
+                $data['shift_type'], $data['mission_text'], $data['color'], $data['location'] ?: null,
+                0 // Explicitly set is_validated to 0 for new missions
             ]);
         }
     }
@@ -219,10 +216,6 @@ function assignWorkerToMission($conn, $creator_id, $data) {
     
     $conn->beginTransaction();
     
-    // REMOVED: The logic that deletes other assignments for the day.
-    // $stmt_delete_old = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
-    // $stmt_delete_old->execute([$worker_id, $mission_date]);
-
     // Get the details of the mission to copy
     $stmt_orig = $conn->prepare("SELECT * FROM Planning_Assignments WHERE assignment_id = ?");
     $stmt_orig->execute([$mission_id]);
@@ -294,7 +287,8 @@ function toggleMissionValidation($conn, $data) {
         respondWithError('Mission non trouvée.');
     }
 
-    $new_status = !$original_mission['is_validated'];
+    // More explicit toggle from 0 to 1 and vice-versa
+    $new_status = $original_mission['is_validated'] ? 0 : 1;
 
     $stmt_update = $conn->prepare("
         UPDATE Planning_Assignments SET is_validated = ?
