@@ -1,5 +1,5 @@
 <?php
-// planning.php (Final, Complete with all features and bug fixes)
+// planning.php (Final, with Full-screen Mission Editor)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
@@ -26,17 +26,27 @@ $default_color = $predefined_colors[0];
         :root { --primary: #007bff; --light-gray: #f0f2f5; --card-bg: #ffffff; --border-color: #dee2e6; }
         html, body { height: 100%; overflow: hidden; }
         body { background-color: var(--light-gray); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        .main-container { display: flex; height: calc(100vh - 78px); }
-        .workers-list-col, .planning-col { height: 100%; overflow-y: auto; padding: 15px; }
+        
+        /* Main containers for view switching */
+        .view-container { height: calc(100vh - 78px); /* Full height minus navbar */ }
+        .main-container { display: flex; height: 100%; }
+
+        .workers-list-col, .planning-col, .form-col { height: 100%; overflow-y: auto; padding: 20px; }
         .workers-list-col { flex: 0 0 280px; background: var(--card-bg); border-right: 1px solid var(--border-color); }
-        .planning-col { flex: 1; }
+        .planning-col, .form-col { flex: 1; }
+        
+        /* Worker items */
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
         .assignment-count { font-size: 0.75rem; color: #fff; background-color: #28a745; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
+
+        /* Planning Grid */
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
         .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; }
         .day-content { flex-grow: 1; padding: 10px; }
         .add-mission-to-day-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; }
+        
+        /* Mission Cards */
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.validated { opacity: 0.8; background-color: #e6ffed; }
         .mission-card-body { cursor: pointer; }
@@ -49,109 +59,133 @@ $default_color = $predefined_colors[0];
         .mission-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; background: rgba(255,255,255,0.8); border-radius: 5px; padding: 2px;}
         .action-btn { background: none; border: none; color: #6c757d; font-size: 0.8rem; cursor: pointer; padding: 3px; }
         .action-btn.validate-btn.validated { color: #28a545; }
-        #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
+
+        /* Form Specific */
+        .form-col { background-color: var(--card-bg); }
         .color-swatch { width:25px; height:25px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
         .color-swatch.selected { border-color: #333; }
-        #assigned_workers_list > .badge { margin: 4px; }
+        #assigned_workers_list > .badge { margin: 4px; font-size: 0.9rem; }
+        #workers_drop_zone { border: 2px dashed #ced4da; border-radius: 6px; padding: 20px; text-align: center; background-color: #f8f9fa; min-height: 100px; }
+        #workers_drop_zone.dragover { background-color: #e9ecef; }
+        
+        /* Utility */
+        #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
 
     <?php include 'navbar.php'; ?>
 
-    <div class="main-container">
-        <div class="workers-list-col">
-            <h5><i class="fas fa-users"></i> Ouvriers</h5>
-            <div id="workerList"></div>
-        </div>
-
-        <div class="planning-col">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <button class="btn btn-outline-secondary" id="prevWeekBtn"><i class="fas fa-chevron-left"></i></button>
-                    <button class="btn btn-outline-secondary" id="nextWeekBtn"><i class="fas fa-chevron-right"></i></button>
-                </div>
-                <h4 id="currentWeekRange" class="mb-0 mx-3 text-center"></h4>
-                <button class="btn btn-primary" id="addMultiDayMissionBtn"><i class="fas fa-calendar-plus"></i> Ajouter une mission sur plusieurs jours</button>
+    <!-- Main Planning View Container (visible by default) -->
+    <div id="planningViewContainer" class="view-container">
+        <div class="main-container">
+            <div class="workers-list-col">
+                <h5><i class="fas fa-users"></i> Ouvriers</h5>
+                <div id="mainWorkerList"></div>
             </div>
-            <div id="dailyPlanningContainer" class="daily-planning-container"></div>
+
+            <div class="planning-col">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button class="btn btn-outline-secondary" id="prevWeekBtn"><i class="fas fa-chevron-left"></i></button>
+                        <button class="btn btn-outline-secondary" id="nextWeekBtn"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <h4 id="currentWeekRange" class="mb-0 mx-3 text-center"></h4>
+                    <button class="btn btn-primary" id="addMultiDayMissionBtn"><i class="fas fa-calendar-plus"></i> Ajouter une mission sur plusieurs jours</button>
+                </div>
+                <div id="dailyPlanningContainer" class="daily-planning-container"></div>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="missionFormModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <form id="missionForm">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title" id="missionFormModalLabel">Nouvelle Mission</h5>
-                        <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+    <!-- Full-screen Mission Creator (hidden by default) -->
+    <div id="missionCreatorContainer" class="view-container" style="display: none;">
+        <div class="main-container">
+            <!-- Left column: Draggable worker list -->
+            <div class="workers-list-col">
+                <h5><i class="fas fa-user-plus"></i> Assigner un ouvrier</h5>
+                <p class="text-muted small">Glissez un ouvrier de cette liste et déposez-le dans la zone d'assignation à droite.</p>
+                <div id="creatorWorkerList"></div>
+            </div>
+            
+            <!-- Right column: The form -->
+            <div class="form-col">
+                <form id="missionForm" novalidate>
+                    <h4 id="missionFormTitle">Nouvelle Mission</h4>
+                    <hr>
+                    
+                    <input type="hidden" id="mission_id_form" name="mission_id">
+                    <input type="hidden" id="assignment_date_form" name="assignment_date">
+                    
+                    <div class="alert alert-info" id="formDateDisplay" style="display:none;"></div>
+                    
+                    <div class="form-row" id="multi_day_fields" style="display: none;">
+                        <div class="form-group col-md-6">
+                            <label for="start_date_form">Date de début *</label>
+                            <input type="date" class="form-control" name="start_date" id="start_date_form">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="end_date_form">Date de fin *</label>
+                            <input type="date" class="form-control" name="end_date" id="end_date_form">
+                        </div>
                     </div>
-                    <div class="modal-body">
-                        <input type="hidden" id="mission_id_form" name="mission_id">
-                        <input type="hidden" id="assignment_date_form" name="assignment_date">
-                        <div class="alert alert-info" id="modalDateDisplay"></div>
-                        
-                        <div class="form-row" id="multi_day_fields" style="display: none;">
-                            <div class="form-group col-md-6">
-                                <label>Date de début *</label>
-                                <input type="date" class="form-control" name="start_date">
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label>Date de fin *</label>
-                                <input type="date" class="form-control" name="end_date">
-                            </div>
-                        </div>
 
-                        <div class="form-group">
-                            <label>Titre de la mission *</label>
-                            <input type="text" class="form-control" name="mission_text" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control" name="start_time" id="mission_start_time"></div>
-                            <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control" name="end_time" id="mission_end_time"></div>
-                        </div>
-                        <div class="form-group"><label>Lieu</label><input type="text" class="form-control" name="location"></div>
-                        <div class="form-group">
-                            <label>Type</label>
-                            <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
-                        </div>
-                        <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= $default_color; ?>"></div>
-                        
-                        <div class="form-group" id="assign-users-group">
-                            <label>Ouvriers assignés *</label>
-                            <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
-                            <div id="workers_drop_zone" style="border: 2px dashed #ced4da; border-radius: 6px; padding: 20px; text-align: center; background-color: #f8f9fa;">
-                                <div id="assigned_workers_list" class="d-flex flex-wrap">
-                                    </div>
-                                <p class="text-muted mt-2 mb-0">Glissez les ouvriers depuis la liste de gauche et déposez-les ici.</p>
-                            </div>
-                        </div>
-
-                        <div id="modal_error_message" class="alert alert-danger" style="display: none;"></div>
+                    <div class="form-group">
+                        <label for="mission_text_form">Titre de la mission *</label>
+                        <input type="text" class="form-control" name="mission_text" id="mission_text_form" required>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-danger mr-auto" id="deleteMissionBtn" style="display: none;">Supprimer</button>
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
-                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="mission_start_time">Heure début</label>
+                            <input type="time" class="form-control" name="start_time" id="mission_start_time">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="mission_end_time">Heure fin</label>
+                            <input type="time" class="form-control" name="end_time" id="mission_end_time">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="location_form">Lieu</label>
+                        <input type="text" class="form-control" name="location" id="location_form">
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Couleur</label>
+                        <div id="mission_color_swatches"></div>
+                        <input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>">
+                    </div>
+                    
+                    <div class="form-group" id="assign-users-group">
+                        <label>Ouvriers assignés *</label>
+                        <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
+                        <div id="workers_drop_zone">
+                            <div id="assigned_workers_list" class="d-flex flex-wrap align-items-start"></div>
+                            <p id="drop_zone_placeholder" class="text-muted mt-2 mb-0">Déposez les ouvriers ici.</p>
+                        </div>
+                    </div>
+
+                    <div id="form_error_message" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer</button>
+                        <button type="button" class="btn btn-secondary" id="cancelMissionFormBtn">Annuler</button>
+                        <button type="button" class="btn btn-danger mr-auto" id="deleteMissionBtn" style="display: none;"><i class="fas fa-trash"></i> Supprimer</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
     
+    <!-- Confirmation Modal (still useful for deletions) -->
     <div class="modal fade" id="confirmationModal" tabindex="-1">
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmation</h5>
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
-                </div>
-                <div class="modal-body" id="confirmationModalBody">
-                    </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-danger" id="confirmActionBtn">Confirmer</button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title">Confirmation</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+                <div class="modal-body" id="confirmationModalBody"></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-danger" id="confirmActionBtn">Confirmer</button></div>
             </div>
         </div>
     </div>
@@ -168,66 +202,80 @@ document.addEventListener('DOMContentLoaded', function() {
     const HANDLER_URL = 'planning-handler.php';
     const PREDEFINED_COLORS = <?php echo json_encode($predefined_colors); ?>;
     const DEFAULT_COLOR = <?php echo json_encode($default_color); ?>;
-    let state = { staff: [], missions: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, shouldRefreshOnModalClose: false };
+    let state = { staff: [], missions: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, confirmationCallback: null };
+    let assignedWorkersInForm = []; 
 
     // --- DOM ELEMENTS ---
     const $loading = $('#loadingOverlay');
+    const $planningView = $('#planningViewContainer');
+    const $creatorView = $('#missionCreatorContainer');
     const $planningContainer = $('#dailyPlanningContainer');
-    const $workerList = $('#workerList');
-    const $modal = $('#missionFormModal');
+    const $mainWorkerList = $('#mainWorkerList');
+    const $creatorWorkerList = $('#creatorWorkerList');
+    const $missionForm = $('#missionForm');
+    const $dropZone = $('#workers_drop_zone');
     
     // --- HELPERS ---
     const showLoading = (show) => $loading.toggle(show);
     const formatDate = (date) => date.toISOString().split('T')[0];
     const formatTime = (time) => time ? time.substring(0, 5) : '';
-    const showModalError = (msg) => $('#modal_error_message').text(msg).show();
-    const hideModalError = () => $('#modal_error_message').hide();
+    const showFormError = (msg) => $('#form_error_message').text(msg).show();
+    const hideFormError = () => $('#form_error_message').hide();
     function getMonday(d) {
         d = new Date(d);
         let day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
         d.setHours(0, 0, 0, 0);
-        return d;
+        return new Date(diff);
     }
 
     // --- API CALLS ---
     async function apiCall(action, method = 'POST', data = {}) {
-        const options = { method, headers: { 'Content-Type': 'application/json' } };
-        let url = `${HANDLER_URL}?action=${action}`;
-        if (method === 'GET') {
-            url += '&' + new URLSearchParams(data).toString();
-        } else {
-            options.body = JSON.stringify(data);
+        showLoading(true);
+        try {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            let url = `${HANDLER_URL}?action=${action}`;
+            if (method === 'GET') {
+                url += '&' + new URLSearchParams(data).toString();
+            } else {
+                options.body = JSON.stringify(data);
+            }
+            const response = await fetch(url, options);
+            const result = await response.json();
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || `Erreur réseau: ${response.statusText}`);
+            }
+            return result.data;
+        } catch (error) {
+            alert(`Erreur: ${error.message}`); // Simple feedback for now
+            throw error; // Re-throw to be caught by caller
+        } finally {
+            showLoading(false);
         }
-        const response = await fetch(url, options);
-        if (!response.ok) throw new Error(`Erreur réseau: ${response.statusText}`);
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
-        return result.data;
     }
     
-    // --- DATA FETCHING ---
-    async function fetchInitialData(manageLoadingState = true) {
-        if (manageLoadingState) showLoading(true);
+    // --- DATA FETCHING & INITIAL LOAD ---
+    async function fetchAndRenderAll() {
+        showLoading(true);
         try {
             const endDate = new Date(state.currentWeekStart);
             endDate.setDate(endDate.getDate() + 6);
             const data = await apiCall('get_initial_data', 'GET', { start: formatDate(state.currentWeekStart), end: formatDate(endDate) });
             state.staff = data.staff || [];
             state.missions = data.missions || [];
-            updateUI();
+            renderAllViews();
         } catch (error) { 
-            alert(`Erreur de chargement: ${error.message}`); 
+            console.error("Failed to fetch initial data:", error);
         } finally { 
-            if (manageLoadingState) showLoading(false);
+            showLoading(false);
         }
     }
 
     // --- UI RENDERING ---
-    function updateUI() {
+    function renderAllViews() {
         renderWeekHeader();
         renderPlanningGrid();
-        renderWorkerList();
-        setupModalStaticContent();
+        renderMainWorkerList();
+        // The creator worker list is rendered when the view is opened
     }
     
     function renderWeekHeader() {
@@ -263,8 +311,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',') : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
-        const workersHtml = assignedNames.map((name, i) => `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${assignedIds[i]}"></i></li>`).join('');
-        const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
+        const workersHtml = assignedIds.map((id, i) => `<li>${assignedNames[i] || 'N/A'} <i class="fas fa-times remove-worker-btn" data-worker-id="${id}" title="Retirer cet ouvrier"></i></li>`).join('');
+        const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider/Dévalider"></i></div>`;
 
         return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
@@ -278,25 +326,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div></div>`);
     }
 
-    function renderWorkerList() {
+    function renderMainWorkerList() {
+        renderWorkerList($mainWorkerList);
+    }
+    
+    function renderCreatorWorkerList() {
+        renderWorkerList($creatorWorkerList);
+    }
+
+    function renderWorkerList($container) {
         const workerAssignmentCounts = new Map();
         state.missions.forEach(mission => {
             if (mission.assigned_user_ids) {
-                const userIds = mission.assigned_user_ids.split(',');
-                userIds.forEach(id => {
+                mission.assigned_user_ids.split(',').forEach(id => {
                     workerAssignmentCounts.set(id, (workerAssignmentCounts.get(id) || 0) + 1);
                 });
             }
         });
 
-        $workerList.empty();
+        $container.empty();
         state.staff.forEach(worker => {
             const assignmentCount = workerAssignmentCounts.get(String(worker.user_id)) || 0;
             const countHtml = assignmentCount > 0 
                 ? `<div class="assignment-count">Assigné à ${assignmentCount} mission(s)</div>`
                 : '';
             
-            $workerList.append(`
+            $container.append(`
                 <div class="worker-item" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                     <div>${worker.prenom} ${worker.nom}</div>
                     ${countHtml}
@@ -305,95 +360,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- LOGIC FOR DRAG-DROP IN MODAL ---
-    let assignedWorkersInModal = []; 
-
-    function renderAssignedWorkersInModal() {
-        const $list = $('#assigned_workers_list');
-        const $hiddenInput = $('#assigned_user_ids_hidden');
-        $list.empty();
-        
-        if (assignedWorkersInModal.length > 0) {
-            assignedWorkersInModal.forEach(worker => {
-                const pillHtml = $(`
-                    <span class="badge badge-primary p-2" style="font-size: 0.9rem;">
-                        ${worker.name}
-                        <i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${worker.id}" style="cursor: pointer;"></i>
-                    </span>
-                `);
-                $list.append(pillHtml);
-            });
-        }
-        const ids = assignedWorkersInModal.map(w => w.id);
-        $hiddenInput.val(ids.join(','));
+    // --- VIEW SWITCHING LOGIC ---
+    function showPlanningView() {
+        $creatorView.hide();
+        $planningView.show();
     }
 
-    const $dropZone = $('#workers_drop_zone');
-    $dropZone.on('dragover', function(e) { e.preventDefault(); $(this).css('background-color', '#e9ecef'); });
-    $dropZone.on('dragleave', function(e) { e.preventDefault(); $(this).css('background-color', '#f8f9fa'); });
-    $dropZone.on('drop', function(e) {
-        e.preventDefault();
-        $(this).css('background-color', '#f8f9fa');
-        if (!state.draggedWorker) return;
-
-        const isAlreadyAdded = assignedWorkersInModal.some(w => w.id == state.draggedWorker.id);
-        if (!isAlreadyAdded) {
-            assignedWorkersInModal.push({ id: state.draggedWorker.id, name: state.draggedWorker.name });
-            renderAssignedWorkersInModal();
-        }
-    });
-
-    $('#assigned_workers_list').on('click', '.remove-assigned-worker', function() {
-        const workerIdToRemove = $(this).data('worker-id');
-        assignedWorkersInModal = assignedWorkersInModal.filter(w => w.id != workerIdToRemove);
-        renderAssignedWorkersInModal();
-    });
-
-    // --- EVENT HANDLERS ---
-    $('#prevWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7); fetchInitialData(); });
-    $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchInitialData(); });
+    function showCreatorView(mode, options = {}) {
+        // Reset and configure form
+        resetAndConfigureForm(mode, options);
+        // Render the draggable list of workers for the creator
+        renderCreatorWorkerList();
+        // Switch views
+        $planningView.hide();
+        $creatorView.show();
+    }
     
-    $('#addMultiDayMissionBtn').on('click', function() {
-        assignedWorkersInModal = [];
-        renderAssignedWorkersInModal();
-        $modal.find('form')[0].reset();
-        hideModalError();
-        $('#shift_type_buttons label').removeClass('active');
-        $modal.find('input[name="mission_id"]').val('');
-        $('#modalDateDisplay').hide();
-        $('#multi_day_fields').show();
-        $('#assign-users-group').show();
-        $('#deleteMissionBtn').hide();
-        $modal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
-        // --- MODIFIED --- Open modal with static backdrop
-        $modal.modal({ backdrop: 'static', keyboard: false });
+    // --- DRAG-DROP LOGIC ---
+    // For main grid
+    $mainWorkerList.on('dragstart', '.worker-item', (e) => {
+        state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') };
     });
-
-    $planningContainer.on('click', '.add-mission-to-day-btn', function() {
-        const date = $(this).closest('.day-header').data('date');
-        openModalForCreate(date);
-    });
-
-    $workerList.on('dragstart', '.worker-item', (e) => {
+    
+    // For creator form
+    $creatorWorkerList.on('dragstart', '.worker-item', (e) => {
         state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') };
     });
 
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
-    $planningContainer.on('drop', '.day-content', handleDrop);
+    $planningContainer.on('drop', '.day-content', handleDropOnGrid);
+
+    $dropZone.on('dragover', function(e) { e.preventDefault(); $(this).addClass('dragover'); });
+    $dropZone.on('dragleave', function(e) { e.preventDefault(); $(this).removeClass('dragover'); });
+    $dropZone.on('drop', handleDropOnForm);
     
-    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
-    
-    async function handleDrop(e) {
+    async function handleDropOnGrid(e) {
         e.preventDefault(); e.stopPropagation();
         if (!state.draggedWorker) return;
+        
         const $target = $(e.target);
         const $missionCard = $target.closest('.mission-card');
-        showLoading(true);
+        
         try {
             if ($missionCard.length > 0) {
                 const missionId = $missionCard.data('mission-id');
-                const mission = state.missions.find(m => m.mission_id == missionId);
-                await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_id: missionId, assignment_date: mission.assignment_date });
+                await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_id: missionId });
             } else {
                 const date = $target.closest('.day-content').data('date');
                 await apiCall('save_mission', 'POST', {
@@ -402,105 +413,208 @@ document.addEventListener('DOMContentLoaded', function() {
                     assigned_user_ids: [state.draggedWorker.id]
                 });
             }
-            await fetchInitialData(false);
-        } catch (error) { alert(`Erreur: ${error.message}`); } finally { state.draggedWorker = null; showLoading(false); }
-    }
-
-    // --- MODAL & FORM LOGIC ---
-    function setupModalStaticContent() {
-        $('#shift_type_buttons').html(Object.entries({matin:'Matin', 'apres-midi':'Après-midi', nuit:'Nuit', repos:'Repos', custom:'Personnalisé'}).map(([v, l]) => `<label class="btn btn-sm btn-outline-secondary"><input type="radio" name="shift_type" value="${v}" required> ${l}</label>`).join(''));
-        $('#mission_color_swatches').html(PREDEFINED_COLORS.map(c => `<div class="color-swatch" style="background-color:${c};" data-color="${c}"></div>`).join(''));
-    }
-
-    function openModalForCreate(date) {
-        assignedWorkersInModal = [];
-        renderAssignedWorkersInModal();
-        $modal.find('form')[0].reset();
-        hideModalError();
-        $('#shift_type_buttons label').removeClass('active');
-        $modal.find('input[name="mission_id"]').val('');
-        $modal.find('input[name="assignment_date"]').val(date);
-        const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        $('#multi_day_fields').hide();
-        $('#modalDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`).show();
-        $modal.find('#missionFormModalLabel').text('Nouvelle Mission');
-        $modal.find('#deleteMissionBtn').hide();
-        $('#assign-users-group').show();
-        // --- MODIFIED --- Open modal with static backdrop
-        $modal.modal({ backdrop: 'static', keyboard: false });
+            await fetchAndRenderAll();
+        } catch (error) { console.error("Drop failed:", error); } 
+        finally { state.draggedWorker = null; }
     }
     
-    $planningContainer.on('click', '.mission-card-body', function() {
-        const missionId = $(this).closest('.mission-card').data('mission-id');
-        const mission = state.missions.find(m => m.mission_id == missionId);
-        if (!mission) return;
-
-        $modal.find('form')[0].reset(); hideModalError();
-        $('#shift_type_buttons label').removeClass('active');
-        $modal.find('input[name="mission_id"]').val(mission.mission_id);
-        $modal.find('input[name="assignment_date"]').val(mission.assignment_date);
-        const displayDate = new Date(mission.assignment_date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        $('#multi_day_fields').hide();
-        $('#modalDateDisplay').html(`Modifier la mission du: <strong>${displayDate}</strong>`).show();
-        $modal.find('input[name="mission_text"]').val(mission.mission_text);
-        $modal.find('input[name="start_time"]').val(mission.start_time);
-        $modal.find('input[name="end_time"]').val(mission.end_time);
-        $modal.find('input[name="location"]').val(mission.location);
-        const $shiftButton = $modal.find(`input[name="shift_type"][value="${mission.shift_type}"]`);
-        if ($shiftButton.length) $shiftButton.prop('checked', true).parent().addClass('active');
-        $modal.find('input[name="color"]').val(mission.color || DEFAULT_COLOR);
-        $('.color-swatch.selected').removeClass('selected');
-        $(`.color-swatch[data-color="${mission.color || DEFAULT_COLOR}"]`).addClass('selected');
-        $modal.find('#missionFormModalLabel').text('Modifier la Mission');
-        $modal.find('#deleteMissionBtn').show();
-        $('#assign-users-group').hide();
-        // --- MODIFIED --- Open modal with static backdrop
-        $modal.modal({ backdrop: 'static', keyboard: false });
-    });
-    
-    $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const isTimeDisabled = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', isTimeDisabled); if (isTimeDisabled) $('#mission_start_time, #mission_end_time').val(''); });
-    $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
-
-    $('#missionForm').on('submit', async function(e) {
+    function handleDropOnForm(e) {
         e.preventDefault();
-        hideModalError();
+        $(this).removeClass('dragover');
+        if (!state.draggedWorker) return;
+
+        const isAlreadyAdded = assignedWorkersInForm.some(w => w.id == state.draggedWorker.id);
+        if (!isAlreadyAdded) {
+            assignedWorkersInForm.push({ id: state.draggedWorker.id, name: state.draggedWorker.name });
+            renderAssignedWorkersInForm();
+        }
+        state.draggedWorker = null;
+    }
+    
+    // --- FORM LOGIC ---
+    function resetAndConfigureForm(mode, options) {
+        $missionForm[0].reset();
+        hideFormError();
+        assignedWorkersInForm = [];
+        renderAssignedWorkersInForm();
+        
+        // Reset UI elements
+        $('#shift_type_buttons label').removeClass('active');
+        $('.color-swatch.selected').removeClass('selected');
+        $(`.color-swatch[data-color="${DEFAULT_COLOR}"]`).addClass('selected');
+        $('input[name="color"]').val(DEFAULT_COLOR);
+        
+        $('#deleteMissionBtn').hide();
+        $('#assign-users-group').show();
+
+        if (mode === 'createMulti') {
+            $('#missionFormTitle').text('Nouvelle Mission sur Plusieurs Jours');
+            $('#multi_day_fields').show();
+            $('#formDateDisplay').hide();
+        } else if (mode === 'createSingle') {
+            const { date } = options;
+            $('#missionFormTitle').text('Nouvelle Mission');
+            $('#multi_day_fields').hide();
+            const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            $('#formDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`).show();
+            $('#assignment_date_form').val(date);
+        } else if (mode === 'edit') {
+            const { mission } = options;
+            $('#missionFormTitle').text('Modifier la Mission');
+            $('#multi_day_fields').hide();
+            const displayDate = new Date(mission.assignment_date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            $('#formDateDisplay').html(`Modification de la mission du: <strong>${displayDate}</strong>`).show();
+
+            $('#mission_id_form').val(mission.mission_id);
+            $('#mission_text_form').val(mission.mission_text);
+            $('#mission_start_time').val(mission.start_time);
+            $('#mission_end_time').val(mission.end_time);
+            $('#location_form').val(mission.location);
+            
+            const $shiftButton = $(`input[name="shift_type"][value="${mission.shift_type}"]`);
+            if ($shiftButton.length) $shiftButton.prop('checked', true).parent().addClass('active');
+
+            $('input[name="color"]').val(mission.color || DEFAULT_COLOR);
+            $(`.color-swatch[data-color="${mission.color || DEFAULT_COLOR}"]`).addClass('selected');
+            
+            $('#deleteMissionBtn').show().data('mission-id', mission.mission_id);
+            $('#assign-users-group').hide(); // Cannot reassign users from edit screen as per original logic
+        }
+    }
+
+    function renderAssignedWorkersInForm() {
+        const $list = $('#assigned_workers_list');
+        const $hiddenInput = $('#assigned_user_ids_hidden');
+        $list.empty();
+        
+        $('#drop_zone_placeholder').toggle(assignedWorkersInForm.length === 0);
+        
+        if (assignedWorkersInForm.length > 0) {
+            assignedWorkersInForm.forEach(worker => {
+                $list.append(`
+                    <span class="badge badge-primary p-2">
+                        ${worker.name}
+                        <i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${worker.id}" style="cursor: pointer;"></i>
+                    </span>`);
+            });
+        }
+        $hiddenInput.val(assignedWorkersInForm.map(w => w.id).join(','));
+    }
+
+    $missionForm.on('submit', async function(e) {
+        e.preventDefault();
+        hideFormError();
         const formData = Object.fromEntries(new FormData(this).entries());
         
+        // Validation for new missions
         if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) {
-            showModalError("Veuillez assigner au moins un ouvrier.");
+            showFormError("Veuillez assigner au moins un ouvrier pour une nouvelle mission.");
             return;
         }
+
         if (formData.assigned_user_ids) {
             formData.assigned_user_ids = formData.assigned_user_ids.split(',');
         }
         
-        showLoading(true);
         try {
             await apiCall('save_mission', 'POST', formData);
-            state.shouldRefreshOnModalClose = true;
-            $modal.modal('hide');
+            await fetchAndRenderAll();
+            showPlanningView();
         } catch (error) {
-            showModalError(error.message);
-        } finally {
-            showLoading(false);
+            showFormError(error.message);
         }
+    });
+
+    $('#assigned_workers_list').on('click', '.remove-assigned-worker', function() {
+        const workerIdToRemove = $(this).data('worker-id');
+        assignedWorkersInForm = assignedWorkersInForm.filter(w => w.id != workerIdToRemove);
+        renderAssignedWorkersInForm();
+    });
+
+    // --- EVENT HANDLERS ---
+    $('#prevWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7); fetchAndRenderAll(); });
+    $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchAndRenderAll(); });
+    
+    $('#addMultiDayMissionBtn').on('click', () => showCreatorView('createMulti'));
+    $planningContainer.on('click', '.add-mission-to-day-btn', function() {
+        const date = $(this).closest('.day-header').data('date');
+        showCreatorView('createSingle', { date });
+    });
+    $planningContainer.on('click', '.mission-card-body', function() {
+        const missionId = $(this).closest('.mission-card').data('mission-id');
+        const mission = state.missions.find(m => m.mission_id == missionId);
+        if (mission) showCreatorView('edit', { mission });
     });
     
-    $modal.on('hidden.bs.modal', function () {
-        hideModalError();
-        if (state.shouldRefreshOnModalClose) {
-            fetchInitialData();
-            state.shouldRefreshOnModalClose = false;
-        }
+    $('#cancelMissionFormBtn').on('click', showPlanningView);
+
+    $planningContainer.on('click', '.validate-btn', async function(e){ 
+        e.stopPropagation(); 
+        const missionId = $(this).closest('.mission-card').data('mission-id');
+        try {
+            await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId });
+            await fetchAndRenderAll();
+        } catch(e) { console.error("Validation toggle failed", e); }
     });
 
-    // --- CONFIRMATION LOGIC ---
-    $planningContainer.on('click', '.remove-worker-btn', function(e) { /* ... no changes here ... */ });
-    $('#deleteMissionBtn').on('click', function() { /* ... no changes here ... */ });
-    $('#confirmActionBtn').on('click', async function() { /* ... no changes here ... */ });
+    // Confirmation Modal Logic
+    function openConfirmationModal(body, callback) {
+        state.confirmationCallback = callback;
+        $('#confirmationModalBody').text(body);
+        $('#confirmationModal').modal('show');
+    }
 
-    // --- Init ---
-    fetchInitialData();
+    $planningContainer.on('click', '.remove-worker-btn', function(e) { 
+        e.stopPropagation();
+        const missionId = $(this).closest('.mission-card').data('mission-id');
+        const workerId = $(this).data('worker-id');
+        openConfirmationModal("Êtes-vous sûr de vouloir retirer cet ouvrier de la mission ?", async () => {
+            try {
+                await apiCall('remove_worker_from_mission', 'POST', { worker_id: workerId, mission_id: missionId });
+                await fetchAndRenderAll();
+            } catch(e) { console.error("Remove worker failed", e); }
+        });
+    });
+
+    $('#deleteMissionBtn').on('click', function() {
+        const missionId = $('#mission_id_form').val();
+        if(!missionId) return;
+        openConfirmationModal("Êtes-vous sûr de vouloir supprimer cette mission et toutes ses assignations ?", async () => {
+             try {
+                await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
+                await fetchAndRenderAll();
+                showPlanningView();
+            } catch(e) { console.error("Delete failed", e); }
+        });
+    });
+
+    $('#confirmActionBtn').on('click', function() {
+        if (typeof state.confirmationCallback === 'function') {
+            state.confirmationCallback();
+        }
+        $('#confirmationModal').modal('hide');
+        state.confirmationCallback = null;
+    });
+    
+    // --- STATIC CONTENT SETUP ---
+    function setupStaticContent() {
+        $('#shift_type_buttons').html(Object.entries({matin:'Matin', 'apres-midi':'Après-midi', nuit:'Nuit', repos:'Repos', custom:'Personnalisé'}).map(([v, l]) => `<label class="btn btn-sm btn-outline-secondary"><input type="radio" name="shift_type" value="${v}" required> ${l}</label>`).join(''));
+        $('#mission_color_swatches').html(PREDEFINED_COLORS.map(c => `<div class="color-swatch" style="background-color:${c};" data-color="${c}"></div>`).join(''));
+        
+        $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { 
+            const isTimeDisabled = $(this).val() === 'repos'; 
+            $('#mission_start_time, #mission_end_time').prop('disabled', isTimeDisabled); 
+            if (isTimeDisabled) $('#mission_start_time, #mission_end_time').val(''); 
+        });
+        $('#mission_color_swatches').on('click', '.color-swatch', function(){ 
+            $(this).addClass('selected').siblings().removeClass('selected'); 
+            $('input[name="color"]').val($(this).data('color')); 
+        });
+    }
+
+    // --- INITIALIZATION ---
+    setupStaticContent();
+    fetchAndRenderAll();
 });
 </script>
 </body>
