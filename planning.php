@@ -24,39 +24,38 @@ $default_color = $predefined_colors[0];
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         :root { --primary: #007bff; --light-gray: #f0f2f5; --card-bg: #ffffff; --border-color: #dee2e6; }
-        html, body { height: 100%; overflow: hidden; }
+        html, body { height: 100%; overflow: hidden; font-size: 14px; /* Base font size reduced */ }
         body { background-color: var(--light-gray); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        .main-container { display: flex; height: calc(100vh - 78px); }
-        .workers-list-col, .planning-col { height: 100%; overflow-y: auto; padding: 15px; }
-        .workers-list-col { flex: 0 0 280px; background: var(--card-bg); border-right: 1px solid var(--border-color); }
+        .main-container { display: flex; height: calc(100vh - 70px); /* Adjusted for smaller navbar if any */ }
+        .workers-list-col, .planning-col { height: 100%; overflow-y: auto; padding: 12px; }
+        .workers-list-col { flex: 0 0 240px; } /* Reduced width */
         .planning-col { flex: 1; }
-        .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
-        .assignment-count { font-size: 0.75rem; color: #fff; background-color: #28a745; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
-        .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
-        .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
-        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; }
-        .day-content { flex-grow: 1; padding: 10px; }
-        .add-mission-to-day-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 1.1rem; }
-        .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
+        .worker-item { padding: 8px; border-radius: 5px; margin-bottom: 6px; background-color: #fcfdff; cursor: grab; user-select: none; }
+        h5 { font-size: 1.1rem; }
+        .assignment-count { font-size: 0.7rem; color: #fff; background-color: #28a745; border-radius: 8px; padding: 2px 6px; display: inline-block; margin-top: 4px; }
+        .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; min-height: 100%; }
+        .day-column { background-color: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
+        .day-header { padding: 8px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; font-size: 0.85rem; }
+        .day-content { flex-grow: 1; padding: 8px; }
+        .add-mission-to-day-btn { font-size: 1rem; }
+        .mission-card { border-left-width: 4px; border-radius: 5px; padding: 8px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; }
         .mission-card.validated { opacity: 0.8; background-color: #e6ffed; }
         .mission-card-body { cursor: pointer; }
-        .mission-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; }
-        .mission-meta { font-size: 0.8rem; color: #6c757d; margin-bottom: 8px; }
-        .assigned-workers-list { list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.8rem; }
-        .assigned-workers-list li { background-color: #e7f1ff; padding: 3px 8px; border-radius: 4px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .mission-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+        .mission-meta { font-size: 0.75rem; color: #6c757d; margin-bottom: 6px; }
+        .assigned-workers-list { list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.75rem; }
+        .assigned-workers-list li { background-color: #e7f1ff; padding: 2px 6px; border-radius: 3px; margin-top: 3px; }
         .remove-worker-btn { cursor: pointer; color: #dc3545; }
-        .mission-placeholder { font-size: 0.85rem; color: #6c757d; text-align: center; padding: 20px; border: 2px dashed #ced4da; border-radius: 6px; height: 100%; display: flex; align-items: center; justify-content: center;}
-        .mission-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; background: rgba(255,255,255,0.8); border-radius: 5px; padding: 2px;}
-        .action-btn { background: none; border: none; color: #6c757d; font-size: 0.8rem; cursor: pointer; padding: 3px; }
-        .action-btn.validate-btn.validated { color: #28a545; }
-        #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
-        .color-swatch { width:25px; height:25px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
-        .color-swatch.selected { border-color: #333; }
-        /* Style for the new assigned workers pills in the modal */
-        #assigned_workers_pills .badge { margin: 2px; font-size: 0.9rem; }
-        #assigned_workers_pills .remove-assigned-worker { cursor: pointer; }
+        .mission-placeholder { font-size: 0.8rem; padding: 15px; border-radius: 5px; }
+        .mission-actions { top: 4px; right: 4px; }
+        .action-btn { font-size: 0.75rem; padding: 2px; }
+        .btn { font-size: 0.875rem; padding: 0.3rem 0.6rem; } /* Smaller buttons */
+        h4 { font-size: 1.25rem; }
+        .modal-body { font-size: 0.9rem; }
+        .color-swatch { width:22px; height:22px; }
+        #assigned_workers_pills .badge { margin: 2px; font-size: 0.8rem; }
     </style>
-</head>
+     </head>
 <body>
 
     <?php include 'navbar.php'; ?>
@@ -96,23 +95,23 @@ $default_color = $predefined_colors[0];
                         <div class="form-row" id="multi_day_fields" style="display: none;">
                             <div class="form-group col-md-6">
                                 <label>Date de début *</label>
-                                <input type="date" class="form-control" name="start_date">
+                                <input type="date" class="form-control form-control-sm" name="start_date">
                             </div>
                             <div class="form-group col-md-6">
                                 <label>Date de fin *</label>
-                                <input type="date" class="form-control" name="end_date">
+                                <input type="date" class="form-control form-control-sm" name="end_date">
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label>Titre de la mission *</label>
-                            <input type="text" class="form-control" name="mission_text" required>
+                            <input type="text" class="form-control form-control-sm" name="mission_text" required>
                         </div>
                         <div class="form-row">
-                            <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control" name="start_time" id="mission_start_time"></div>
-                            <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control" name="end_time" id="mission_end_time"></div>
+                            <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control form-control-sm" name="start_time" id="mission_start_time"></div>
+                            <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control form-control-sm" name="end_time" id="mission_end_time"></div>
                         </div>
-                        <div class="form-group"><label>Lieu</label><input type="text" class="form-control" name="location"></div>
+                        <div class="form-group"><label>Lieu</label><input type="text" class="form-control form-control-sm" name="location"></div>
                         <div class="form-group">
                             <label>Type</label>
                             <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
@@ -123,12 +122,12 @@ $default_color = $predefined_colors[0];
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
                             
                             <label>Ouvriers assignés *</label>
-                            <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;">
+                            <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 40px;">
                                 <span class="text-muted small p-2" id="no_workers_assigned_text">Aucun ouvrier assigné.</span>
                             </div>
 
                             <label>Cliquer pour assigner un ouvrier :</label>
-                            <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;">
+                            <div id="modal_available_workers" class="list-group" style="max-height: 150px; overflow-y: auto;">
                                 </div>
                         </div>
 
@@ -340,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const assignedIds = new Set(assignedWorkersInModal.map(w => String(w.id)));
         state.staff.forEach(worker => {
             if (!assignedIds.has(String(worker.user_id))) {
-                const workerHtml = $(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">${worker.prenom} ${worker.nom}</a>`);
+                const workerHtml = $(`<a href="#" class="list-group-item list-group-item-action py-1 px-2" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">${worker.prenom} ${worker.nom}</a>`);
                 $list.append(workerHtml);
             }
         });
@@ -379,7 +378,6 @@ document.addEventListener('DOMContentLoaded', function() {
         renderAssignedWorkersInModal();
         renderAvailableWorkersInModal();
         
-        // --- MODIFIED: Reverted to default modal behavior ---
         $modal.modal('show');
     });
 
@@ -444,7 +442,6 @@ document.addEventListener('DOMContentLoaded', function() {
         renderAssignedWorkersInModal();
         renderAvailableWorkersInModal();
         
-        // --- MODIFIED: Reverted to default modal behavior ---
         $modal.modal('show');
     }
     
@@ -473,10 +470,15 @@ document.addEventListener('DOMContentLoaded', function() {
         $modal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
         
-        // --- MODIFIED: Reverted to default modal behavior ---
         $modal.modal('show');
     });
     
+    // ==== ADDED: Definitive fix for cancel button ====
+    $modal.find('[data-dismiss="modal"]').on('click', function() {
+        $modal.modal('hide');
+    });
+    // ==== END ADDITION ====
+
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const isTimeDisabled = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', isTimeDisabled); if (isTimeDisabled) $('#mission_start_time, #mission_end_time').val(''); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
@@ -485,7 +487,6 @@ document.addEventListener('DOMContentLoaded', function() {
         hideModalError();
         const formData = Object.fromEntries(new FormData(this).entries());
         
-        // Validation only for new missions
         if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) {
             showModalError("Veuillez assigner au moins un ouvrier.");
             return;
@@ -508,7 +509,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $modal.on('hidden.bs.modal', function () {
         hideModalError();
-        // Reset assignment group visibility
         $('#assign-users-group').hide();
         if (state.shouldRefreshOnModalClose) {
             fetchInitialData();
@@ -517,8 +517,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- CONFIRMATION LOGIC ---
-    // NOTE: Confirmation logic for delete/remove actions is not fully implemented in the provided snippet.
-    // This section would need to be built out with calls to a confirmation modal.
     $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); alert('Remove worker logic to be implemented.'); });
     $('#deleteMissionBtn').on('click', function() { alert('Delete mission logic to be implemented.'); });
     $('#confirmActionBtn').on('click', async function() { /* ... */ });
