@@ -242,9 +242,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',') : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
         const workersHtml = assignedNames.map((name, i) => `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${assignedIds[i]}"></i></li>`).join('');
-        const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated ? 'validated' : ''}" title="Valider"></i></div>`;
+        
+        // --- CORRECTED --- Explicitly check for `== 1` instead of just truthiness
+        const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
 
-        return $(`<div class="mission-card ${mission.is_validated ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
+        // --- CORRECTED --- Explicitly check for `== 1` for the card's class as well
+        return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
                 <div class="mission-card-body" data-toggle="modal" data-target="#missionFormModal">
                     <div class="mission-title">${mission.mission_text}</div>
