@@ -52,7 +52,9 @@ $default_color = $predefined_colors[0];
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
         .color-swatch { width:25px; height:25px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
         .color-swatch.selected { border-color: #333; }
-        #assigned_workers_list > .badge { margin: 4px; }
+        /* Style for the new assigned workers pills in the modal */
+        #assigned_workers_pills .badge { margin: 2px; font-size: 0.9rem; }
+        #assigned_workers_pills .remove-assigned-worker { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -117,17 +119,19 @@ $default_color = $predefined_colors[0];
                         </div>
                         <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= $default_color; ?>"></div>
                         
-                        <div class="form-group" id="assign-users-group">
-                            <label>Ouvriers assignés *</label>
+                        <div class="form-group" id="assign-users-group" style="display:none;">
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
-                            <div id="workers_drop_zone" style="border: 2px dashed #ced4da; border-radius: 6px; padding: 20px; text-align: center; background-color: #f8f9fa;">
-                                <div id="assigned_workers_list" class="d-flex flex-wrap">
-                                    </div>
-                                <p class="text-muted mt-2 mb-0">Glissez les ouvriers depuis la liste de gauche et déposez-les ici.</p>
+                            
+                            <label>Ouvriers assignés *</label>
+                            <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;">
+                                <span class="text-muted small p-2" id="no_workers_assigned_text">Aucun ouvrier assigné.</span>
                             </div>
-                        </div>
 
-                        <div id="modal_error_message" class="alert alert-danger" style="display: none;"></div>
+                            <label>Cliquer pour assigner un ouvrier :</label>
+                            <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;">
+                                </div>
+                        </div>
+                        <div id="modal_error_message" class="alert alert-danger mt-3" style="display: none;"></div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-danger mr-auto" id="deleteMissionBtn" style="display: none;">Supprimer</button>
@@ -169,6 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const PREDEFINED_COLORS = <?php echo json_encode($predefined_colors); ?>;
     const DEFAULT_COLOR = <?php echo json_encode($default_color); ?>;
     let state = { staff: [], missions: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, shouldRefreshOnModalClose: false };
+    let assignedWorkersInModal = []; 
 
     // --- DOM ELEMENTS ---
     const $loading = $('#loadingOverlay');
@@ -305,48 +310,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- LOGIC FOR DRAG-DROP IN MODAL ---
-    let assignedWorkersInModal = []; 
-
+    // --- MODAL WORKER ASSIGNMENT LOGIC (NO DRAG-DROP) ---
     function renderAssignedWorkersInModal() {
-        const $list = $('#assigned_workers_list');
+        const $list = $('#assigned_workers_pills');
         const $hiddenInput = $('#assigned_user_ids_hidden');
-        $list.empty();
-        
+        const $placeholder = $('#no_workers_assigned_text');
+        $list.find('.badge').remove(); // Clear only the pills
+
         if (assignedWorkersInModal.length > 0) {
+            $placeholder.hide();
             assignedWorkersInModal.forEach(worker => {
                 const pillHtml = $(`
-                    <span class="badge badge-primary p-2" style="font-size: 0.9rem;">
+                    <span class="badge badge-primary p-2 m-1">
                         ${worker.name}
                         <i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${worker.id}" style="cursor: pointer;"></i>
-                    </span>
-                `);
+                    </span>`);
                 $list.append(pillHtml);
             });
+        } else {
+            $placeholder.show();
         }
-        const ids = assignedWorkersInModal.map(w => w.id);
-        $hiddenInput.val(ids.join(','));
+        $hiddenInput.val(assignedWorkersInModal.map(w => w.id).join(','));
+    }
+    
+    function renderAvailableWorkersInModal() {
+        const $list = $('#modal_available_workers');
+        $list.empty();
+        const assignedIds = new Set(assignedWorkersInModal.map(w => String(w.id)));
+        state.staff.forEach(worker => {
+            if (!assignedIds.has(String(worker.user_id))) {
+                const workerHtml = $(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">${worker.prenom} ${worker.nom}</a>`);
+                $list.append(workerHtml);
+            }
+        });
     }
 
-    const $dropZone = $('#workers_drop_zone');
-    $dropZone.on('dragover', function(e) { e.preventDefault(); $(this).css('background-color', '#e9ecef'); });
-    $dropZone.on('dragleave', function(e) { e.preventDefault(); $(this).css('background-color', '#f8f9fa'); });
-    $dropZone.on('drop', function(e) {
+    $('#modal_available_workers').on('click', '.list-group-item', function(e) {
         e.preventDefault();
-        $(this).css('background-color', '#f8f9fa');
-        if (!state.draggedWorker) return;
-
-        const isAlreadyAdded = assignedWorkersInModal.some(w => w.id == state.draggedWorker.id);
-        if (!isAlreadyAdded) {
-            assignedWorkersInModal.push({ id: state.draggedWorker.id, name: state.draggedWorker.name });
-            renderAssignedWorkersInModal();
-        }
+        assignedWorkersInModal.push({ id: $(this).data('worker-id'), name: $(this).data('worker-name') });
+        renderAssignedWorkersInModal();
+        $(this).remove(); // Remove from available list
     });
 
-    $('#assigned_workers_list').on('click', '.remove-assigned-worker', function() {
+    $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() {
         const workerIdToRemove = $(this).data('worker-id');
-        assignedWorkersInModal = assignedWorkersInModal.filter(w => w.id != workerIdToRemove);
+        assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(workerIdToRemove));
         renderAssignedWorkersInModal();
+        renderAvailableWorkersInModal(); // Refresh available list to add worker back
     });
 
     // --- EVENT HANDLERS ---
@@ -355,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $('#addMultiDayMissionBtn').on('click', function() {
         assignedWorkersInModal = [];
-        renderAssignedWorkersInModal();
         $modal.find('form')[0].reset();
         hideModalError();
         $('#shift_type_buttons label').removeClass('active');
@@ -365,7 +374,10 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#assign-users-group').show();
         $('#deleteMissionBtn').hide();
         $modal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
-        // --- MODIFIED --- Open modal with static backdrop
+        
+        renderAssignedWorkersInModal();
+        renderAvailableWorkersInModal();
+        
         $modal.modal({ backdrop: 'static', keyboard: false });
     });
 
@@ -374,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
         openModalForCreate(date);
     });
 
+    // --- Drag-drop for main calendar ---
     $workerList.on('dragstart', '.worker-item', (e) => {
         state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') };
     });
@@ -414,7 +427,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function openModalForCreate(date) {
         assignedWorkersInModal = [];
-        renderAssignedWorkersInModal();
         $modal.find('form')[0].reset();
         hideModalError();
         $('#shift_type_buttons label').removeClass('active');
@@ -426,7 +438,10 @@ document.addEventListener('DOMContentLoaded', function() {
         $modal.find('#missionFormModalLabel').text('Nouvelle Mission');
         $modal.find('#deleteMissionBtn').hide();
         $('#assign-users-group').show();
-        // --- MODIFIED --- Open modal with static backdrop
+
+        renderAssignedWorkersInModal();
+        renderAvailableWorkersInModal();
+        
         $modal.modal({ backdrop: 'static', keyboard: false });
     }
     
@@ -454,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $modal.find('#missionFormModalLabel').text('Modifier la Mission');
         $modal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
-        // --- MODIFIED --- Open modal with static backdrop
+        
         $modal.modal({ backdrop: 'static', keyboard: false });
     });
     
@@ -466,6 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
         hideModalError();
         const formData = Object.fromEntries(new FormData(this).entries());
         
+        // Validation only for new missions
         if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) {
             showModalError("Veuillez assigner au moins un ouvrier.");
             return;
@@ -488,6 +504,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $modal.on('hidden.bs.modal', function () {
         hideModalError();
+        // Reset assignment group visibility
+        $('#assign-users-group').hide();
         if (state.shouldRefreshOnModalClose) {
             fetchInitialData();
             state.shouldRefreshOnModalClose = false;
@@ -495,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- CONFIRMATION LOGIC ---
-    $planningContainer.on('click', '.remove-worker-btn', function(e) { /* ... no changes here ... */ });
+    $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); /* ... no changes here ... */ });
     $('#deleteMissionBtn').on('click', function() { /* ... no changes here ... */ });
     $('#confirmActionBtn').on('click', async function() { /* ... no changes here ... */ });
 
