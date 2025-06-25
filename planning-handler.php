@@ -1,5 +1,5 @@
 <?php
-// planning-handler.php (Corrected and Improved)
+// planning-handler.php (Corrected and with all features)
 
 require_once 'db-connection.php';
 require_once 'session-management.php';
@@ -62,30 +62,21 @@ try {
 }
 
 /**
- * Fetches all necessary data for the initial page load:
- * staff users and assignments for a given date range.
+ * Fetches all necessary data for the initial page load.
  */
 function getInitialData($conn) {
     $start_date = $_GET['start'] ?? date('Y-m-d');
     $end_date = $_GET['end'] ?? date('Y-m-d', strtotime('+6 days'));
 
-    // 1. Get Staff Users
     $stmt_users = $conn->prepare("SELECT user_id, nom, prenom FROM Users WHERE status = 'Active' ORDER BY nom, prenom");
     $stmt_users->execute();
     $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. Get Assignments grouped into "Missions"
     $stmt_missions = $conn->prepare("
         SELECT
-            MIN(pa.assignment_id) as mission_id, -- A representative ID for the group
-            pa.assignment_date,
-            pa.mission_text,
-            pa.location,
-            pa.start_time,
-            pa.end_time,
-            pa.shift_type,
-            pa.color,
-            pa.is_validated,
+            MIN(pa.assignment_id) as mission_id,
+            pa.assignment_date, pa.mission_text, pa.location, pa.start_time,
+            pa.end_time, pa.shift_type, pa.color, pa.is_validated,
             STRING_AGG(CAST(pa.assigned_user_id AS VARCHAR(10)), ',') WITHIN GROUP (ORDER BY u.nom) as assigned_user_ids,
             STRING_AGG(u.prenom + ' ' + u.nom, ', ') WITHIN GROUP (ORDER BY u.nom) as assigned_user_names
         FROM Planning_Assignments pa
@@ -99,29 +90,24 @@ function getInitialData($conn) {
     $stmt_missions->execute([$start_date, $end_date]);
     $missions = $stmt_missions->fetchAll(PDO::FETCH_ASSOC);
 
-    respondWithSuccess('Données initiales chargées.', [
-        'staff' => $users,
-        'missions' => $missions
-    ]);
+    respondWithSuccess('Données initiales chargées.', ['staff' => $users, 'missions' => $missions]);
 }
 
 /**
  * Creates a new mission or updates an existing one for all assigned workers.
+ * Now handles single-day, multi-day, and updates.
  */
 function saveMission($conn, $creator_id, $data) {
-    $mission_id = $data['mission_id'] ?? null; // This is the representative ID of the group
-    $mission_date = $data['assignment_date'];
+    $mission_id = $data['mission_id'] ?? null;
     $assigned_users = $data['assigned_user_ids'] ?? [];
 
-    // Basic validation
-    if (empty($mission_date) || empty($data['mission_text'])) {
-        respondWithError('La date et le titre de la mission sont obligatoires.');
+    if (empty($data['mission_text'])) {
+        respondWithError('Le titre de la mission est obligatoire.');
     }
     
     $conn->beginTransaction();
 
-    if ($mission_id) { // This is an UPDATE
-        // 1. Get the original mission details to identify the group
+    if ($mission_id) { // UPDATE
         $stmt_orig = $conn->prepare("SELECT * FROM Planning_Assignments WHERE assignment_id = ?");
         $stmt_orig->execute([$mission_id]);
         $original_mission = $stmt_orig->fetch(PDO::FETCH_ASSOC);
@@ -130,7 +116,6 @@ function saveMission($conn, $creator_id, $data) {
             respondWithError('Mission à mettre à jour non trouvée.');
         }
 
-        // 2. Update all assignments that belong to this group on that specific date
         $stmt_update = $conn->prepare("
             UPDATE Planning_Assignments SET
                 mission_text = ?, start_time = ?, end_time = ?, location = ?,
@@ -142,35 +127,61 @@ function saveMission($conn, $creator_id, $data) {
         ");
         $stmt_update->execute([
             $data['mission_text'], $data['start_time'] ?: null, $data['end_time'] ?: null, $data['location'] ?: null,
-            $data['shift_type'], $data['color'], $mission_date,
+            $data['shift_type'], $data['color'], $original_mission['assignment_date'],
             $original_mission['mission_text'], $original_mission['shift_type'],
             $original_mission['start_time'], $original_mission['location']
         ]);
 
-    } else { // This is a CREATE
+    } else { // CREATE
         if (empty($assigned_users)) {
+            $conn->rollBack();
             respondWithError('Veuillez assigner au moins un ouvrier pour créer une mission.');
         }
 
-        // Insert a new row for each assigned user
+        $dates = [];
+        if (!empty($data['start_date']) && !empty($data['end_date'])) { // Multi-day
+            try {
+                $start = new DateTime($data['start_date']);
+                $end = new DateTime($data['end_date']);
+                $end->modify('+1 day');
+                $period = new DatePeriod($start, new DateInterval('P1D'), $end);
+                foreach ($period as $date) {
+                    $dates[] = $date->format('Y-m-d');
+                }
+            } catch (Exception $e) {
+                $conn->rollBack();
+                respondWithError('Format de date invalide.');
+            }
+        } else if (!empty($data['assignment_date'])) { // Single-day
+            $dates[] = $data['assignment_date'];
+        }
+
+        if (empty($dates)) {
+            $conn->rollBack();
+            respondWithError('La date de la mission est obligatoire.');
+        }
+        
         $stmt_insert = $conn->prepare("
             INSERT INTO Planning_Assignments (
                 assigned_user_id, creator_user_id, assignment_date, start_time, end_time,
                 shift_type, mission_text, color, location, is_validated
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        foreach ($assigned_users as $user_id) {
-            // Insert the new assignment
-            $stmt_insert->execute([
-                $user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null,
-                $data['shift_type'], $data['mission_text'], $data['color'], $data['location'] ?: null,
-                0 // Explicitly set is_validated to 0 for new missions
-            ]);
+
+        foreach ($dates as $mission_date) {
+            foreach ($assigned_users as $user_id) {
+                $stmt_insert->execute([
+                    $user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null,
+                    $data['shift_type'], $data['mission_text'], $data['color'], $data['location'] ?: null,
+                    0 // is_validated
+                ]);
+            }
         }
     }
     $conn->commit();
     respondWithSuccess('Mission enregistrée avec succès.');
 }
+
 
 /**
  * Deletes an entire mission group based on its representative ID.
@@ -179,7 +190,6 @@ function deleteMissionGroup($conn, $data) {
     $mission_id = $data['mission_id'];
     $conn->beginTransaction();
     
-    // Get original details to identify the group
     $stmt_orig = $conn->prepare("SELECT * FROM Planning_Assignments WHERE assignment_id = ?");
     $stmt_orig->execute([$mission_id]);
     $original_mission = $stmt_orig->fetch(PDO::FETCH_ASSOC);
@@ -188,7 +198,6 @@ function deleteMissionGroup($conn, $data) {
         respondWithError('Mission à supprimer non trouvée.');
     }
 
-    // Delete all matching assignments
     $stmt_delete = $conn->prepare("
         DELETE FROM Planning_Assignments
         WHERE
@@ -211,12 +220,10 @@ function deleteMissionGroup($conn, $data) {
  */
 function assignWorkerToMission($conn, $creator_id, $data) {
     $worker_id = $data['worker_id'];
-    $mission_id = $data['mission_id']; // Representative ID of the target mission
-    $mission_date = $data['assignment_date'];
+    $mission_id = $data['mission_id'];
     
     $conn->beginTransaction();
     
-    // Get the details of the mission to copy
     $stmt_orig = $conn->prepare("SELECT * FROM Planning_Assignments WHERE assignment_id = ?");
     $stmt_orig->execute([$mission_id]);
     $mission_details = $stmt_orig->fetch(PDO::FETCH_ASSOC);
@@ -225,7 +232,6 @@ function assignWorkerToMission($conn, $creator_id, $data) {
         respondWithError('Mission cible non trouvée.');
     }
 
-    // Create a new assignment for the worker with the copied details
     $stmt_insert = $conn->prepare("
         INSERT INTO Planning_Assignments (
             assigned_user_id, creator_user_id, assignment_date, start_time, end_time,
@@ -246,7 +252,7 @@ function assignWorkerToMission($conn, $creator_id, $data) {
  */
 function removeWorkerFromMission($conn, $data) {
     $worker_id = $data['worker_id'];
-    $mission_id = $data['mission_id']; // Representative ID of the mission group
+    $mission_id = $data['mission_id'];
     
     $stmt_orig = $conn->prepare("SELECT * FROM Planning_Assignments WHERE assignment_id = ?");
     $stmt_orig->execute([$mission_id]);
@@ -255,7 +261,6 @@ function removeWorkerFromMission($conn, $data) {
         respondWithError('Mission non trouvée.');
     }
 
-    // Find the specific assignment_id for this user within this group and delete it.
     $stmt_delete = $conn->prepare("
         DELETE FROM Planning_Assignments
         WHERE
@@ -287,7 +292,6 @@ function toggleMissionValidation($conn, $data) {
         respondWithError('Mission non trouvée.');
     }
 
-    // More explicit toggle from 0 to 1 and vice-versa
     $new_status = $original_mission['is_validated'] ? 0 : 1;
 
     $stmt_update = $conn->prepare("
