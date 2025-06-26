@@ -1,23 +1,17 @@
 <?php
-// inventory-handler.php
+// inventory-handler.php (REWORKED - FULL CODE)
 
-// Core dependencies
 require_once 'session-management.php';
 requireLogin();
 require_once 'db-connection.php';
 
-// Ensure the response is always JSON
 header('Content-Type: application/json');
-
-// Get the current user details for permission checks
 $currentUser = getCurrentUser();
-
-// Get the action from the request (works for GET and POST)
 $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
 
-// --- Main Action Router ---
 try {
     switch ($action) {
+        // EXISTING/MODIFIED ACTIONS
         case 'get_inventory':
             getInventory($conn);
             break;
@@ -27,14 +21,8 @@ try {
         case 'get_users':
             getUsers($conn);
             break;
-        case 'check_barcode':
-            checkBarcodeExists($conn);
-            break;
         case 'add_asset':
             addAsset($conn, $currentUser);
-            break;
-        case 'update_asset_status':
-            updateAssetStatus($conn, $currentUser);
             break;
         case 'delete_asset':
             deleteAsset($conn, $currentUser);
@@ -42,32 +30,37 @@ try {
         case 'add_category':
             addCategory($conn, $currentUser);
             break;
-        case 'get_asset_bookings':
-            getAssetBookings($conn);
+        case 'update_maintenance_status':
+            updateMaintenanceStatus($conn, $currentUser);
+            break;
+
+        // --- NEW BOOKING & SCANNER ACTIONS ---
+        case 'process_scan':
+            processScan($conn, $currentUser);
             break;
         case 'book_asset':
             bookAsset($conn, $currentUser);
             break;
-        case 'get_booking_history':
-            getBookingHistory($conn, $currentUser);
+        case 'get_all_bookings':
+            getAllBookings($conn);
             break;
-        case 'get_daily_inventory_status':
-            getDailyInventoryStatus($conn);
+        case 'get_asset_availability':
+            getAssetAvailability($conn);
             break;
+        case 'cancel_booking':
+            cancelBooking($conn, $currentUser);
+            break;
+            
         default:
             throw new Exception("Action non valide ou non spécifiée.");
     }
 } catch (PDOException $e) {
-    // Catch database-specific errors
     error_log("Database Error in inventory-handler.php: " . $e->getMessage());
     respondWithError("Erreur de base de données: " . $e->getMessage(), 500);
 } catch (Exception $e) {
-    // Catch general application errors
     error_log("General Error in inventory-handler.php: " . $e->getMessage());
     respondWithError($e->getMessage());
 }
-
-// --- Function Definitions ---
 
 function respondWithSuccess($data = [], $message = "Opération réussie.") {
     echo json_encode(['status' => 'success', 'message' => $message] + $data);
@@ -81,22 +74,220 @@ function respondWithError($message, $code = 400) {
 }
 
 function getInventory($conn) {
+    // This query now also fetches the next booking date for each available asset.
     $sql = "SELECT 
                 i.*, 
                 ac.category_name,
                 u.prenom AS assigned_to_prenom, 
-                u.nom AS assigned_to_nom
+                u.nom AS assigned_to_nom,
+                (
+                    SELECT MIN(b.booking_date) 
+                    FROM Bookings b 
+                    WHERE b.asset_id = i.asset_id 
+                    AND b.booking_date >= CAST(GETDATE() AS DATE)
+                    AND b.status = 'booked'
+                ) as next_booking_date
             FROM Inventory i
             LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id
             LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
-            ORDER BY i.date_added DESC";
+            ORDER BY i.asset_name ASC";
     
     $stmt = $conn->prepare($sql);
     $stmt->execute();
     $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
     respondWithSuccess(['inventory' => $inventory]);
 }
+
+// --- CORE SCANNER LOGIC ---
+function processScan($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $barcode = isset($data['barcode']) ? trim($data['barcode']) : '';
+    if (empty($barcode)) {
+        throw new Exception("Code-barres non fourni.");
+    }
+
+    // Find the asset
+    $stmt_asset = $conn->prepare("SELECT * FROM Inventory WHERE barcode = ?");
+    $stmt_asset->execute([$barcode]);
+    $asset = $stmt_asset->fetch(PDO::FETCH_ASSOC);
+
+    if (!$asset) {
+        respondWithSuccess(['scan_code' => 'asset_not_found', 'barcode' => $barcode], "Cet actif n'existe pas. Voulez-vous l'ajouter?");
+    }
+
+    // If asset is in maintenance, deny.
+    if ($asset['status'] === 'maintenance') {
+        throw new Exception("Cet actif est actuellement en maintenance et ne peut pas être utilisé.");
+    }
+
+    $today = date('Y-m-d');
+    $current_user_id = $user['user_id'];
+
+    // --- HANDLE RETURN ---
+    if ($asset['status'] === 'in-use') {
+        if ($asset['assigned_to_user_id'] == $current_user_id) {
+            // User is returning the item
+            $conn->beginTransaction();
+            // Update booking status to 'completed'
+            $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active'");
+            $stmt_update_booking->execute([$asset['asset_id']]);
+
+            // Update inventory status to 'available'
+            $stmt_update_inventory = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL, last_modified = GETDATE() WHERE asset_id = ?");
+            $stmt_update_inventory->execute([$asset['asset_id']]);
+            $conn->commit();
+            respondWithSuccess(['scan_code' => 'return_success'], "Actif retourné avec succès.");
+        } else {
+            // Find who has it checked out
+            $stmt_user = $conn->prepare("SELECT prenom, nom FROM Users WHERE user_id = ?");
+            $stmt_user->execute([$asset['assigned_to_user_id']]);
+            $assigned_user = $stmt_user->fetch(PDO::FETCH_ASSOC);
+            $user_name = $assigned_user ? $assigned_user['prenom'] . ' ' . $assigned_user['nom'] : 'un autre utilisateur';
+            throw new Exception("Cet actif est actuellement utilisé par " . $user_name . ".");
+        }
+    }
+
+    // --- HANDLE CHECKOUT ---
+    if ($asset['status'] === 'available') {
+        $stmt_booking = $conn->prepare("
+            SELECT b.*, u.prenom, u.nom FROM Bookings b
+            JOIN Users u ON b.user_id = u.user_id
+            WHERE b.asset_id = ? AND b.booking_date = ? AND b.status = 'booked'");
+        $stmt_booking->execute([$asset['asset_id'], $today]);
+        $booking = $stmt_booking->fetch(PDO::FETCH_ASSOC);
+
+        if ($booking) { // A booking exists for today
+            if ($booking['user_id'] == $current_user_id) {
+                // Checkout successful
+                $conn->beginTransaction();
+                $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ?");
+                $stmt_update_booking->execute([$booking['booking_id']]);
+
+                $stmt_update_inventory = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ?, assigned_mission = ?, last_modified = GETDATE() WHERE asset_id = ?");
+                $stmt_update_inventory->execute([$current_user_id, $booking['mission'], $asset['asset_id']]);
+                $conn->commit();
+                
+                respondWithSuccess(['scan_code' => 'checkout_success', 'asset' => $asset], "Sortie de l'actif enregistrée.");
+            } else {
+                // Booked by someone else
+                throw new Exception("Action impossible. L'actif est réservé par " . $booking['prenom'] . " " . $booking['nom'] . " pour aujourd'hui.");
+            }
+        } else {
+            // No booking for today, prompt user to book
+            respondWithSuccess(['scan_code' => 'prompt_booking', 'asset' => $asset], "Aucune réservation pour aujourd'hui. Veuillez en créer une.");
+        }
+    }
+}
+
+function bookAsset($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!isset($data['asset_id'], $data['booking_date']) || empty($data['booking_date'])) {
+        throw new Exception("Données de réservation manquantes.");
+    }
+
+    $asset_id = $data['asset_id'];
+    $booking_date = $data['booking_date'];
+    $mission = isset($data['mission']) ? trim($data['mission']) : 'Non spécifiée';
+    $user_id = $user['user_id'];
+
+    // Check for existing booking on the same day for the same asset
+    $stmt_check = $conn->prepare("SELECT booking_id FROM Bookings WHERE asset_id = ? AND booking_date = ? AND status IN ('booked', 'active')");
+    $stmt_check->execute([$asset_id, $booking_date]);
+    if ($stmt_check->fetch()) {
+        throw new Exception("Cet actif est déjà réservé pour cette date.");
+    }
+    
+    // Insert new booking
+    $sql = "INSERT INTO Bookings (asset_id, user_id, booking_date, mission) VALUES (?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id, $user_id, $booking_date, $mission]);
+    
+    respondWithSuccess([], "Actif réservé avec succès.");
+}
+
+function getAssetAvailability($conn) {
+    $asset_id = isset($_GET['asset_id']) ? $_GET['asset_id'] : 0;
+    if (!$asset_id) throw new Exception("ID de l'actif manquant.");
+    
+    $sql = "SELECT booking_date FROM Bookings WHERE asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id]);
+    $dates = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+    
+    respondWithSuccess(['booked_dates' => $dates]);
+}
+
+function getAllBookings($conn) {
+    $sql = "SELECT 
+                b.booking_id, b.booking_date, b.mission, b.status,
+                a.asset_name, a.barcode,
+                u.prenom, u.nom, u.user_id
+            FROM Bookings b
+            JOIN Inventory a ON b.asset_id = a.asset_id
+            JOIN Users u ON b.user_id = u.user_id
+            WHERE b.booking_date >= CAST(GETDATE() AS DATE) AND b.status IN ('booked', 'active')
+            ORDER BY b.booking_date ASC, a.asset_name ASC";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    respondWithSuccess(['bookings' => $bookings]);
+}
+
+function cancelBooking($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $booking_id = isset($data['booking_id']) ? $data['booking_id'] : 0;
+    if (!$booking_id) throw new Exception("ID de réservation manquant.");
+
+    // Check if user is authorized to cancel (either their own booking or is an admin)
+    $stmt_check = $conn->prepare("SELECT user_id FROM Bookings WHERE booking_id = ?");
+    $stmt_check->execute([$booking_id]);
+    $booking_user_id = $stmt_check->fetchColumn();
+
+    if ($user['role'] !== 'admin' && $user['user_id'] != $booking_user_id) {
+        respondWithError("Vous n'êtes pas autorisé à annuler cette réservation.", 403);
+    }
+    
+    $stmt = $conn->prepare("UPDATE Bookings SET status = 'cancelled' WHERE booking_id = ? AND status = 'booked'");
+    $stmt->execute([$booking_id]);
+    
+    if ($stmt->rowCount() > 0) {
+        respondWithSuccess([], "Réservation annulée.");
+    } else {
+        throw new Exception("Impossible d'annuler cette réservation (elle est peut-être déjà active ou annulée).");
+    }
+}
+
+function updateMaintenanceStatus($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $asset_id = $data['asset_id'];
+    $status = $data['status']; // 'maintenance' or 'available'
+
+    if (!in_array($status, ['maintenance', 'available'])) {
+        throw new Exception("Statut non valide.");
+    }
+
+    if ($status === 'maintenance') {
+        // Check for active or future bookings
+        $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')");
+        $stmt_check->execute([$asset_id]);
+        if ($stmt_check->fetchColumn() > 0) {
+            throw new Exception("Impossible de mettre en maintenance. L'actif a des réservations futures. Veuillez les annuler d'abord.");
+        }
+    }
+    
+    $sql = "UPDATE Inventory SET status = ?, last_modified = GETDATE() WHERE asset_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$status, $asset_id]);
+
+    $stmt_updated = $conn->prepare("SELECT * FROM Inventory WHERE asset_id = ?");
+    $stmt_updated->execute([$asset_id]);
+    $updatedAsset = $stmt_updated->fetch(PDO::FETCH_ASSOC);
+
+    respondWithSuccess(['asset' => $updatedAsset], "Statut de maintenance mis à jour.");
+}
+
+
+// --- ORIGINAL UNCHANGED FUNCTIONS ---
 
 function getAssetCategories($conn) {
     $stmt = $conn->prepare("SELECT category_id, category_name, category_type FROM AssetCategories ORDER BY category_name");
@@ -110,23 +301,6 @@ function getUsers($conn) {
     $stmt->execute();
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     respondWithSuccess(['users' => $users]);
-}
-
-function checkBarcodeExists($conn) {
-    $barcode = isset($_GET['barcode']) ? trim($_GET['barcode']) : '';
-    if (empty($barcode)) {
-        throw new Exception("Le code-barres n'a pas été fourni.");
-    }
-
-    $stmt = $conn->prepare("SELECT * FROM Inventory WHERE barcode = ?");
-    $stmt->execute([$barcode]);
-    $asset = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($asset) {
-        respondWithSuccess(['exists' => true, 'asset' => $asset]);
-    } else {
-        respondWithSuccess(['exists' => false]);
-    }
 }
 
 function addAsset($conn, $user) {
@@ -163,6 +337,7 @@ function addAsset($conn, $user) {
     
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
+    $newId = $conn->lastInsertId();
     
     $select_stmt = $conn->prepare("
         SELECT 
@@ -173,8 +348,8 @@ function addAsset($conn, $user) {
         FROM Inventory i
         LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id
         LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
-        WHERE i.barcode = ?");
-    $select_stmt->execute([$barcode]);
+        WHERE i.asset_id = ?");
+    $select_stmt->execute([$newId]);
     $newAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($newAsset) {
@@ -182,37 +357,6 @@ function addAsset($conn, $user) {
     } else {
         throw new Exception("Échec de la création ou de la récupération de l'actif.");
     }
-}
-
-function updateAssetStatus($conn, $user) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    if (!$data || !isset($data['asset_id'], $data['status'])) {
-        throw new Exception("Données de mise à jour de statut manquantes.");
-    }
-
-    $asset_id = $data['asset_id'];
-    $status = $data['status'];
-    $assigned_to = ($status === 'in-use' && !empty($data['assigned_to_user_id'])) ? $data['assigned_to_user_id'] : null;
-    $mission = ($status === 'in-use' && !empty($data['assigned_mission'])) ? trim($data['assigned_mission']) : null;
-
-    $sql = "UPDATE Inventory 
-            SET status = ?, assigned_to_user_id = ?, assigned_mission = ?, last_modified = GETDATE()
-            WHERE asset_id = ?";
-            
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$status, $assigned_to, $mission, $asset_id]);
-
-    $stmt_updated = $conn->prepare("
-        SELECT i.*, ac.category_name, u.prenom AS assigned_to_prenom, u.nom AS assigned_to_nom
-        FROM Inventory i
-        LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id
-        LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
-        WHERE i.asset_id = ?");
-    $stmt_updated->execute([$asset_id]);
-    $updatedAsset = $stmt_updated->fetch(PDO::FETCH_ASSOC);
-
-    respondWithSuccess(['asset' => $updatedAsset], "Statut de l'actif mis à jour.");
 }
 
 function deleteAsset($conn, $user) {
@@ -227,6 +371,11 @@ function deleteAsset($conn, $user) {
     
     $asset_id = $data['asset_id'];
     
+    // First, delete related bookings to avoid foreign key constraint issues
+    $stmt_bookings = $conn->prepare("DELETE FROM Bookings WHERE asset_id = ?");
+    $stmt_bookings->execute([$asset_id]);
+
+    // Then, delete the asset
     $stmt = $conn->prepare("DELETE FROM Inventory WHERE asset_id = ?");
     $stmt->execute([$asset_id]);
     
@@ -266,105 +415,5 @@ function addCategory($conn, $user) {
     } else {
         throw new Exception("Échec de la création de la catégorie.");
     }
-}
-
-function getAssetBookings($conn) {
-    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
-    if ($asset_id === 0) {
-        throw new Exception("ID d'actif non valide.");
-    }
-
-    $sql = "SELECT b.booking_date, u.prenom, u.nom 
-            FROM Bookings b
-            JOIN Users u ON b.user_id = u.user_id
-            WHERE b.asset_id = ? AND b.booking_date >= CAST(GETDATE() AS DATE)
-            ORDER BY b.booking_date ASC";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$asset_id]);
-    $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    respondWithSuccess(['bookings' => $bookings]);
-}
-
-function bookAsset($conn, $user) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    if (!isset($data['asset_id'], $data['booking_date'])) {
-        throw new Exception("Données de réservation manquantes.");
-    }
-
-    $asset_id = intval($data['asset_id']);
-    $booking_date = $data['booking_date'];
-    $user_id = $user['user_id'];
-
-    // Check for existing booking on the same day
-    $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date = ?");
-    $stmt_check->execute([$asset_id, $booking_date]);
-    if ($stmt_check->fetchColumn() > 0) {
-        throw new Exception("Cet article est déjà réservé pour cette date.");
-    }
-
-    $conn->beginTransaction();
-
-    try {
-        // Insert booking
-        $sql_book = "INSERT INTO Bookings (asset_id, user_id, booking_date) VALUES (?, ?, ?)";
-        $stmt_book = $conn->prepare($sql_book);
-        $stmt_book->execute([$asset_id, $user_id, $booking_date]);
-        $booking_id = $conn->lastInsertId();
-
-        // Insert into history
-        $sql_history = "INSERT INTO BookingHistory (booking_id, asset_id, user_id, action_type, changed_by_user_id) VALUES (?, ?, ?, 'booked', ?)";
-        $stmt_history = $conn->prepare($sql_history);
-        $stmt_history->execute([$booking_id, $asset_id, $user_id, $user['user_id']]);
-
-        $conn->commit();
-        respondWithSuccess([], "Article réservé avec succès pour le " . date('d/m/Y', strtotime($booking_date)) . ".");
-
-    } catch (Exception $e) {
-        $conn->rollBack();
-        throw $e;
-    }
-}
-
-function getBookingHistory($conn, $user) {
-    if ($user['role'] !== 'admin') {
-        respondWithError("Accès non autorisé.", 403);
-    }
-
-    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
-    if ($asset_id === 0) {
-        throw new Exception("ID d'actif non valide.");
-    }
-    
-    $sql = "SELECT h.*, u.prenom, u.nom 
-            FROM BookingHistory h
-            JOIN Users u ON h.changed_by_user_id = u.user_id
-            WHERE h.asset_id = ?
-            ORDER BY h.action_timestamp DESC";
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$asset_id]);
-    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    respondWithSuccess(['history' => $history]);
-}
-
-function getDailyInventoryStatus($conn) {
-    $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
-
-    $sql = "SELECT 
-                i.asset_id, i.asset_name, i.asset_type,
-                CASE WHEN b.booking_id IS NOT NULL THEN 'booked' ELSE 'available' END as daily_status,
-                u.prenom as booked_by_prenom, u.nom as booked_by_nom
-            FROM Inventory i
-            LEFT JOIN Bookings b ON i.asset_id = b.asset_id AND b.booking_date = ?
-            LEFT JOIN Users u ON b.user_id = u.user_id
-            ORDER BY i.asset_name";
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$date]);
-    $status = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    respondWithSuccess(['status' => $status]);
 }
 ?>
