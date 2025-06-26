@@ -11,86 +11,29 @@ $currentUser = getCurrentUser();
     <title>Gestion de l'Inventaire</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-        }
-        .container-fluid {
-            padding-top: 20px;
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-            border: none;
-            margin-bottom: 25px;
-            padding: 25px;
-        }
-        .tabs {
-            display: flex; flex-wrap: wrap; justify-content: center;
-            gap: 15px; margin-bottom: 25px; padding-bottom: 15px;
-            border-bottom: 2px solid #e9ecef;
-        }
-        .tab {
-            padding: 12px 25px; background: #e9ecef; color: #495057;
-            border-radius: 8px; cursor: pointer; font-weight: 600;
-            transition: all 0.3s ease; text-align: center;
-        }
-        .tab.active {
-            background: #007bff; color: white;
-            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
-            transform: translateY(-2px);
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; }
+        .container-fluid { padding-top: 20px; }
+        .card { background-color: #ffffff; border-radius: 15px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); border: none; margin-bottom: 25px; padding: 25px; }
+        .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e9ecef; }
+        .tab { padding: 12px 25px; background: #e9ecef; color: #495057; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; text-align: center; }
+        .tab.active { background: #007bff; color: white; box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25); transform: translateY(-2px); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .form-control:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
-        }
-        .scanner-container {
-            position: relative; width: 100%; max-width: 500px;
-            margin: 0 auto 20px; background: #2c3e50;
-            border-radius: 15px; overflow: hidden;
-        }
+        .scanner-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto 20px; background: #2c3e50; border-radius: 15px; overflow: hidden; }
         #video { width: 100%; height: auto; display: none; }
-        .scanner-placeholder {
-            width: 100%; min-height: 300px; background: #34495e;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 1.2em; text-align: center;
-        }
-        .scan-overlay {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%; max-width: 250px; height: 60%; max-height: 150px;
-            border: 3px solid rgba(0, 255, 0, 0.8);
-            border-radius: 10px; display: none;
-        }
-        .inventory-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 25px;
-        }
-        .asset-card {
-            background: white; border-radius: 15px; padding: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.07);
-            transition: all 0.3s ease; position: relative;
-            border-left: 5px solid; display: flex;
-            flex-direction: column; justify-content: space-between;
-        }
+        .scanner-placeholder { width: 100%; min-height: 300px; background: #34495e; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2em; text-align: center; }
+        .scan-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 250px; height: 60%; max-height: 150px; border: 3px solid rgba(0, 255, 0, 0.8); border-radius: 10px; display: none; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 25px; }
+        .asset-card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.07); transition: all 0.3s ease; position: relative; border-left: 5px solid; display: flex; flex-direction: column; justify-content: space-between; }
         .asset-card.tool { border-left-color: #28a745; }
         .asset-card.vehicle { border-left-color: #007bff; }
-        .asset-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1);
-        }
+        .asset-card:hover { transform: translateY(-5px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1); }
         .asset-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; }
-        .asset-status {
-            padding: 5px 12px; border-radius: 20px;
-            font-size: 11px; font-weight: bold; text-transform: uppercase;
-        }
+        .asset-status { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
         .status-available { background: #d4edda; color: #155724; }
         .status-in-use { background: #fff3cd; color: #856404; }
         .status-maintenance { background: #f8d7da; color: #721c24; }
@@ -98,62 +41,13 @@ $currentUser = getCurrentUser();
         .asset-details strong { color: #495057; }
         .asset-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 20px;
-        }
-        .stat-item {
-            text-align: center; padding: 20px; background: #f8f9fa;
-            border-radius: 10px;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-            cursor: pointer;
-            border: 2px solid transparent;
-        }
-        .stat-item:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .stat-item.active {
-            border-color: #007bff;
-            background-color: #e7f1ff;
-        }
-        .stat-number { font-size: 2.5em; font-weight: bold; color: #007bff; margin-bottom: 5px; pointer-events: none; }
-        .stat-label { color: #6c757d; font-weight: 500; pointer-events: none; }
-        .notification {
-            position: fixed; top: 80px; right: 20px;
-            padding: 15px 25px; border-radius: 8px;
-            color: white; font-weight: 600; z-index: 9999;
-            transform: translateX(calc(100% + 30px));
-            transition: transform 0.4s ease-in-out;
-        }
+        .notification { position: fixed; top: 80px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 600; z-index: 10000; transform: translateX(calc(100% + 30px)); transition: transform 0.4s ease-in-out; }
         .notification.success { background: #28a745; }
         .notification.error { background: #dc3545; }
         .notification.show { transform: translateX(0); }
-        .loading-overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255, 255, 255, 0.85);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 10; border-radius: 15px;
-        }
-        #empty-inventory-message {
-            display: none; text-align: center;
-            padding: 50px; color: #6c757d;
-        }
-        #empty-inventory-message .fa-dolly {
-            font-size: 4rem; margin-bottom: 20px;
-        }
-        .category-list {
-            list-style-type: none;
-            padding-left: 0;
-        }
-        .category-list li {
-            background: #f8f9fa;
-            padding: 8px 12px;
-            border-radius: 5px;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .category-list { list-style-type: none; padding-left: 0; }
+        .category-list li { background: #f8f9fa; padding: 8px 12px; border-radius: 5px; margin-bottom: 5px; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -168,48 +62,52 @@ $currentUser = getCurrentUser();
     <div class="card">
         <div class="tabs">
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
+            <div class="tab" data-tab="booking_calendar"><i class="fas fa-calendar-alt"></i> Calendrier de Réservation</div>
             <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
-            <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
+            <?php if ($currentUser['role'] === 'admin'): ?>
+                <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Loading...</span>
         </div>
     </div>
 
     <div id="inventory" class="tab-content active">
         <div class="card position-relative">
-             <div class="loading-overlay" style="display: none;">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>
-            </div>
-
-            <h3 class="mb-3">Aperçu de l'Inventaire</h3>
-            <div id="statsGrid" class="stats-grid mb-4">
-                </div>
-            <hr/>
-
             <div class="d-flex justify-content-between align-items-center mb-3 mt-3 flex-wrap">
                 <h3 class="mb-2">Liste des Actifs</h3>
                 <div class="form-inline">
                     <input type="text" class="form-control mr-sm-2 mb-2" id="searchInput" placeholder="Rechercher...">
-                    <select id="filterType" class="form-control mr-sm-2 mb-2">
-                        <option value="all">Tous les types</option>
-                        <option value="tool">Outils</option>
-                        <option value="vehicle">Véhicules</option>
-                    </select>
-                    <select id="filterStatus" class="form-control mb-2">
-                        <option value="all">Tous les statuts</option>
-                        <option value="available">Disponible</option>
-                        <option value="in-use">En cours d'utilisation</option>
-                        <option value="maintenance">En maintenance</option>
-                    </select>
                 </div>
             </div>
             <div id="inventoryGrid" class="inventory-grid"></div>
-            <div id="empty-inventory-message">
-                <i class="fas fa-dolly"></i>
-                <h3>L'inventaire est vide</h3>
-                <p>Commencez par ajouter un nouvel actif.</p>
+        </div>
+    </div>
+    
+    <div id="booking_calendar" class="tab-content">
+        <div class="card">
+            <h3>Statut de l'Inventaire par Jour</h3>
+            <div class="form-group">
+                <label for="statusDate">Choisir une date:</label>
+                <input type="text" id="statusDate" class="form-control" style="max-width: 250px;">
             </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Actif</th>
+                        <th>Type</th>
+                        <th>Statut du Jour</th>
+                        <th>Réservé par</th>
+                    </tr>
+                </thead>
+                <tbody id="dailyStatusTableBody">
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -337,6 +235,7 @@ $currentUser = getCurrentUser();
     </div>
 </div>
 
+<!-- Status Modal -->
 <div class="modal fade" id="statusModal" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
@@ -373,15 +272,77 @@ $currentUser = getCurrentUser();
   </div>
 </div>
 
+<!-- Booking Modal -->
+<div class="modal fade" id="bookingModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Réserver <span id="bookingModalAssetName"></span></h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+            <input type="hidden" id="bookingModalAssetId">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Faire une nouvelle réservation</h6>
+                    <div class="form-group">
+                        <label for="bookingDate">Date de réservation</label>
+                        <input type="text" class="form-control" id="bookingDate" placeholder="Choisir une date...">
+                    </div>
+                     <button type="button" class="btn btn-primary" id="saveBookingBtn">Réserver</button>
+                </div>
+                <div class="col-md-6">
+                    <h6>Réservations à venir</h6>
+                    <ul id="upcomingBookingsList" class="list-group"></ul>
+                </div>
+            </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Booking History Modal -->
+<div class="modal fade" id="bookingHistoryModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Historique des Réservations pour <span id="historyModalAssetName"></span></h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Date/Heure</th>
+                    <th>Action</th>
+                    <th>Utilisateur concerné</th>
+                    <th>Action par</th>
+                </tr>
+            </thead>
+            <tbody id="bookingHistoryTableBody">
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
 <script>
 // --- CONFIGURATION ---
 const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
+const CURRENT_USER_ID = <?php echo $currentUser['user_id']; ?>;
 
 // --- GLOBAL STATE ---
 let inventory = [];
@@ -393,8 +354,6 @@ let currentStream = null;
 // --- DOM ELEMENTS ---
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
-const emptyInventoryMessage = document.getElementById('empty-inventory-message');
-const statsGrid = document.getElementById('statsGrid');
 
 // --- HELPER FUNCTIONS ---
 function showNotification(message, type = 'success') {
@@ -409,36 +368,24 @@ function showNotification(message, type = 'success') {
     }, 4000);
 }
 
-function handleApiError(error) {
-    console.error('API Error:', error);
-    showNotification(error.message || 'Une erreur de communication est survenue.', 'error');
-    loadingOverlay.style.display = 'none';
-}
-
-// --- API COMMUNICATION ---
 async function apiCall(action, method = 'GET', body = null) {
     const options = { method, headers: { 'Content-Type': 'application/json' } };
     if (body && method !== 'GET') {
         options.body = JSON.stringify(body);
     }
-
     let url = `${HANDLER_URL}?action=${action}`;
     if (method === 'GET' && body) {
          url += '&' + new URLSearchParams(body).toString();
     }
-
     try {
         const response = await fetch(url, options);
-        if (!response.ok) {
-             throw new Error(`Le serveur a répondu avec une erreur ${response.status}. Vérifiez le chemin du fichier handler.`);
-        }
+        if (!response.ok) throw new Error(`Erreur du serveur: ${response.statusText}`);
         const data = await response.json();
-        if (data.status !== 'success') {
-            throw new Error(data.message);
-        }
+        if (data.status !== 'success') throw new Error(data.message);
         return data;
     } catch (error) {
-        handleApiError(error);
+        console.error('API Error:', error);
+        showNotification(error.message, 'error');
         throw error;
     }
 }
@@ -446,10 +393,21 @@ async function apiCall(action, method = 'GET', body = null) {
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
+    flatpickr("#bookingDate", { locale: "fr", dateFormat: "Y-m-d", minDate: "today" });
+    const statusDatepicker = flatpickr("#statusDate", {
+        locale: "fr",
+        dateFormat: "Y-m-d",
+        defaultDate: "today",
+        onChange: function(selectedDates, dateStr, instance) {
+            fetchDailyInventoryStatus(dateStr);
+        }
+    });
+
     loadingOverlay.style.display = 'flex';
     await fetchInitialData();
     loadingOverlay.style.display = 'none';
     renderAll();
+    fetchDailyInventoryStatus(statusDatepicker.selectedDates[0]);
 });
 
 async function fetchInitialData() {
@@ -470,8 +428,6 @@ function setupEventListeners() {
         tab.addEventListener('click', (e) => showTab(e.currentTarget.dataset.tab));
     });
     document.getElementById('searchInput').addEventListener('keyup', renderInventory);
-    document.getElementById('filterType').addEventListener('change', renderInventory);
-    document.getElementById('filterStatus').addEventListener('change', renderInventory);
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('asset_type').addEventListener('change', toggleAssetFields);
@@ -479,17 +435,15 @@ function setupEventListeners() {
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     $('#statusModal').on('change', '#newStatus', toggleAssignmentFieldsModal);
     document.getElementById('saveStatusChange').addEventListener('click', handleSaveStatusChange);
-    statsGrid.addEventListener('click', handleStatCardClick);
+    document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
 }
 
 // --- UI & RENDERING ---
-
 function renderAll() {
     renderInventory();
-    updateStatistics();
-    populateCategoryDropdown('tool');
     populateUserDropdown();
     renderCategoriesList();
+    populateCategoryDropdown(document.getElementById('asset_type').value);
 }
 
 function showTab(tabName) {
@@ -503,23 +457,11 @@ function showTab(tabName) {
 
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const typeFilter = document.getElementById('filterType').value;
-    const statusFilter = document.getElementById('filterStatus').value;
-
     const filtered = inventory.filter(asset => {
-        const s = asset.serial_or_plate || '';
-        const p = asset.position_or_info || '';
-        const an = asset.asset_name || '';
-        const b = asset.brand || '';
-        const bc = asset.barcode || '';
-        const matchesSearch = `${s} ${p} ${an} ${b} ${bc}`.toLowerCase().includes(searchTerm);
-        const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
-        const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
-        return matchesSearch && matchesType && matchesStatus;
+        return (asset.asset_name.toLowerCase().includes(searchTerm) || asset.barcode.toLowerCase().includes(searchTerm));
     });
 
     inventoryGrid.innerHTML = '';
-    emptyInventoryMessage.style.display = filtered.length > 0 ? 'none' : 'block';
     filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
 }
 
@@ -527,6 +469,9 @@ function createAssetCard(asset) {
     const card = document.createElement('div');
     card.className = `asset-card ${asset.asset_type}`;
     card.dataset.id = asset.asset_id;
+
+    const historyBtn = IS_ADMIN ? `<button class="btn btn-info btn-small" onclick="openBookingHistoryModal(${asset.asset_id}, '${asset.asset_name.replace(/'/g, "\\'")}')">Historique</button>` : '';
+    const deleteBtn = IS_ADMIN ? `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${asset.asset_name.replace(/'/g, "\\'")}')">Supprimer</button>` : '';
 
     const assignedTo = asset.assigned_to_user_id ?
         `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br>
@@ -539,8 +484,6 @@ function createAssetCard(asset) {
         <strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br>
         <strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>
     `;
-
-    const deleteBtn = IS_ADMIN ? `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${asset.asset_name.replace(/'/g, "\\'")}')">Supprimer</button>` : '';
 
     card.innerHTML = `
         <div>
@@ -557,7 +500,9 @@ function createAssetCard(asset) {
             </div>
         </div>
         <div class="asset-actions">
+            <button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id}, '${asset.asset_name.replace(/'/g, "\\'")}')">Réserver</button>
             <button class="btn btn-primary btn-small" onclick="openStatusModal(${asset.asset_id})">Statut</button>
+            ${historyBtn}
             ${deleteBtn}
         </div>
     `;
@@ -648,18 +593,7 @@ async function processBarcode(barcode) {
     try {
         const data = await apiCall('check_barcode', 'GET', { barcode });
         if (data.exists) {
-            showTab('inventory');
-            showNotification('Actif existant trouvé et mis en surbrillance.', 'success');
-            setTimeout(() => {
-                const card = document.querySelector(`.asset-card[data-id='${data.asset.asset_id}']`);
-                if (card) {
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    card.style.transition = 'all 0.3s ease';
-                    card.style.transform = 'scale(1.05)';
-                    card.style.boxShadow = '0 0 25px rgba(0, 123, 255, 0.5)';
-                    setTimeout(() => { card.style.transform = ''; card.style.boxShadow = ''; }, 2000);
-                }
-            }, 100);
+            openBookingModal(data.asset.asset_id, data.asset.asset_name);
         } else {
             showTab('add_asset');
             document.getElementById('barcode').value = barcode;
@@ -749,12 +683,8 @@ function renderCategoriesList() {
         }
     });
 
-    if (toolList.innerHTML === '') {
-        toolList.innerHTML = '<li>Aucune catégorie d\'outil.</li>';
-    }
-    if (vehicleList.innerHTML === '') {
-        vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
-    }
+    if (toolList.innerHTML === '') toolList.innerHTML = '<li>Aucune catégorie d\'outil.</li>';
+    if (vehicleList.innerHTML === '') vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
 }
 
 async function handleCreateCategory(e) {
@@ -767,65 +697,123 @@ async function handleCreateCategory(e) {
 
     try {
         const data = await apiCall('add_category', 'POST', categoryData);
-        assetCategories.push(data.category); // Add new category to our global list
-        assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name)); // Keep it sorted
-
-        renderCategoriesList(); // Re-render the list in the tab
-        populateCategoryDropdown(document.getElementById('asset_type').value); // Re-populate dropdowns
-        
+        assetCategories.push(data.category);
+        assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
+        renderCategoriesList();
+        populateCategoryDropdown(document.getElementById('asset_type').value);
         showNotification('Catégorie créée avec succès!', 'success');
         form.reset();
     } catch (error) { /* Handled by apiCall */ }
 }
 
+// --- BOOKING LOGIC ---
+async function openBookingModal(assetId, assetName) {
+    $('#bookingModalAssetId').val(assetId);
+    $('#bookingModalAssetName').text(assetName);
 
-// --- STATISTICS & CLICKABLE FILTERS ---
-function handleStatCardClick(event) {
-    const clickedCard = event.target.closest('.stat-item');
-    if (!clickedCard) return;
+    const list = $('#upcomingBookingsList');
+    list.html('<li>Chargement...</li>');
+    $('#bookingModal').modal('show');
 
-    const filterType = clickedCard.dataset.filterType;
-    const filterStatus = clickedCard.dataset.filterStatus;
-
-    document.getElementById('filterType').value = filterType;
-    document.getElementById('filterStatus').value = filterStatus;
-
-    document.querySelectorAll('#statsGrid .stat-item').forEach(card => card.classList.remove('active'));
-    clickedCard.classList.add('active');
-
-    renderInventory();
+    try {
+        const data = await apiCall('get_asset_bookings', 'GET', { asset_id: assetId });
+        list.empty();
+        if (data.bookings.length > 0) {
+            data.bookings.forEach(b => {
+                const date = new Date(b.booking_date + 'T00:00:00');
+                const formattedDate = date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                list.append(`<li class="list-group-item">Le ${formattedDate} par <b>${b.prenom} ${b.nom}</b></li>`);
+            });
+        } else {
+            list.append('<li class="list-group-item">Aucune réservation à venir.</li>');
+        }
+    } catch (error) {
+        list.html('<li class="list-group-item text-danger">Erreur de chargement des réservations.</li>');
+    }
 }
 
-function updateStatistics() {
-    const stats = {
-        total: inventory.length,
-        tools: inventory.filter(item => item.asset_type === 'tool').length,
-        vehicles: inventory.filter(item => item.asset_type === 'vehicle').length,
-        available: inventory.filter(item => item.status === 'available').length,
-        inUse: inventory.filter(item => item.status === 'in-use').length,
-        maintenance: inventory.filter(item => item.status === 'maintenance').length
-    };
+async function handleSaveBooking() {
+    const assetId = $('#bookingModalAssetId').val();
+    const bookingDate = $('#bookingDate').val();
+
+    if (!bookingDate) {
+        showNotification("Veuillez choisir une date.", "error");
+        return;
+    }
     
-    statsGrid.innerHTML = `
-        <div class="stat-item active" data-filter-type="all" data-filter-status="all">
-            <div class="stat-number">${stats.total}</div><div class="stat-label">Actifs Totaux</div>
-        </div>
-        <div class="stat-item" data-filter-type="tool" data-filter-status="all">
-            <div class="stat-number">${stats.tools}</div><div class="stat-label">Outils</div>
-        </div>
-        <div class="stat-item" data-filter-type="vehicle" data-filter-status="all">
-            <div class="stat-number">${stats.vehicles}</div><div class="stat-label">Véhicules</div>
-        </div>
-        <div class="stat-item" data-filter-type="all" data-filter-status="available">
-            <div class="stat-number">${stats.available}</div><div class="stat-label">Disponibles</div>
-        </div>
-        <div class="stat-item" data-filter-type="all" data-filter-status="in-use">
-            <div class="stat-number">${stats.inUse}</div><div class="stat-label">En Utilisation</div>
-        </div>
-        <div class="stat-item" data-filter-type="all" data-filter-status="maintenance">
-            <div class="stat-number">${stats.maintenance}</div><div class="stat-label">En Maintenance</div>
-        </div>
-    `;
+    try {
+        const data = await apiCall('book_asset', 'POST', {
+            asset_id: assetId,
+            booking_date: bookingDate,
+            user_id: CURRENT_USER_ID
+        });
+        showNotification(data.message, 'success');
+        $('#bookingModal').modal('hide');
+        flatpickr("#bookingDate", {}).clear();
+        fetchDailyInventoryStatus(document.getElementById('statusDate').value); // Refresh calendar view
+    } catch (error) {
+        // handled by apiCall
+    }
+}
+
+async function openBookingHistoryModal(assetId, assetName) {
+    $('#historyModalAssetName').text(assetName);
+    const tableBody = $('#bookingHistoryTableBody');
+    tableBody.html('<tr><td colspan="4">Chargement...</td></tr>');
+    $('#bookingHistoryModal').modal('show');
+
+    try {
+        const data = await apiCall('get_booking_history', 'GET', { asset_id: assetId });
+        tableBody.empty();
+        if (data.history.length > 0) {
+            data.history.forEach(h => {
+                const ts = new Date(h.action_timestamp).toLocaleString('fr-FR');
+                tableBody.append(`
+                    <tr>
+                        <td>${ts}</td>
+                        <td>${h.action_type}</td>
+                        <td>${h.prenom} ${h.nom}</td>
+                        <td>${h.prenom} ${h.nom}</td>
+                    </tr>
+                `);
+            });
+        } else {
+            tableBody.append('<tr><td colspan="4">Aucun historique trouvé.</td></tr>');
+        }
+    } catch(error) {
+        tableBody.html('<tr><td colspan="4" class="text-danger">Erreur de chargement de l\'historique.</td></tr>');
+    }
+}
+
+async function fetchDailyInventoryStatus(date) {
+    if (!date) date = new Date().toISOString().slice(0, 10);
+    if (date instanceof Date) date = date.toISOString().slice(0, 10);
+
+    const tableBody = $('#dailyStatusTableBody');
+    tableBody.html('<tr><td colspan="4" class="text-center">Chargement...</td></tr>');
+    
+    try {
+        const data = await apiCall('get_daily_inventory_status', 'GET', { date: date });
+        tableBody.empty();
+        if (data.status.length > 0) {
+            data.status.forEach(item => {
+                const bookedBy = item.daily_status === 'booked' ? `${item.booked_by_prenom} ${item.booked_by_nom}` : 'N/A';
+                const statusClass = item.daily_status === 'booked' ? 'text-danger font-weight-bold' : 'text-success';
+                tableBody.append(`
+                    <tr>
+                        <td>${item.asset_name}</td>
+                        <td>${item.asset_type}</td>
+                        <td class="${statusClass}">${item.daily_status.charAt(0).toUpperCase() + item.daily_status.slice(1)}</td>
+                        <td>${bookedBy}</td>
+                    </tr>
+                `);
+            });
+        } else {
+            tableBody.append('<tr><td colspan="4" class="text-center">Aucun actif trouvé.</td></tr>');
+        }
+    } catch(error) {
+         tableBody.html('<tr><td colspan="4" class="text-center text-danger">Erreur de chargement du statut.</td></tr>');
+    }
 }
 </script>
 
