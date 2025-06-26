@@ -47,8 +47,10 @@ $currentUserId = $currentUser['user_id'];
         .notification.show { transform: translateX(0); }
         .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; }
         .booking-info { font-size: 0.85em; color: #e83e8c; font-weight: bold; }
-        .modal-body .form-control.flatpickr-input { background-color: #fff !important; }
         #all-bookings-table th { white-space: nowrap; }
+        .category-list { list-style-type: none; padding-left: 0; }
+        .category-list li { background: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+        .category-actions button { margin-left: 5px; }
     </style>
 </head>
 <body>
@@ -66,6 +68,7 @@ $currentUserId = $currentUser['user_id'];
             <div class="tab" data-tab="all_bookings"><i class="fas fa-calendar-alt"></i> Planning Réservations</div>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
             <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
+            <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
         </div>
     </div>
 
@@ -97,17 +100,10 @@ $currentUserId = $currentUser['user_id'];
                 <table class="table table-striped table-hover">
                     <thead class="thead-dark">
                         <tr>
-                            <th>Date</th>
-                            <th>Actif</th>
-                            <th>Code-barres</th>
-                            <th>Réservé par</th>
-                            <th>Mission</th>
-                            <th>Statut</th>
-                            <th>Action</th>
+                            <th>Date</th><th>Actif</th><th>Code-barres</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th>
                         </tr>
                     </thead>
-                    <tbody id="all-bookings-table">
-                        </tbody>
+                    <tbody id="all-bookings-table"></tbody>
                 </table>
             </div>
         </div>
@@ -116,9 +112,7 @@ $currentUserId = $currentUser['user_id'];
     <div id="scanner" class="tab-content">
         <div class="card">
              <h3 class="text-center mb-4">Scanner un Code-barres</h3>
-             <div class="scanner-container">
-                <video id="video" autoplay playsinline></video>
-             </div>
+             <div class="scanner-container"><video id="video" autoplay playsinline></video></div>
              <div class="text-center mt-3">
                 <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
                 <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
@@ -130,117 +124,83 @@ $currentUserId = $currentUser['user_id'];
          <div class="card">
             <h3>Ajouter un Nouvel Actif</h3>
             <form id="addAssetForm">
-                 <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="asset_type">Type d'actif *</label>
-                        <select id="asset_type" class="form-control" required>
-                            <option value="tool" selected>🔧 Outil</option>
-                            <option value="vehicle">🚗 Véhicule</option>
-                        </select>
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="barcode">Code-barres / ID Unique *</label>
-                        <input type="text" class="form-control" id="barcode" placeholder="Ex: TOOL001, 123456789" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="asset_name">Nom de l'actif *</label>
-                    <input type="text" class="form-control" id="asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required>
-                </div>
-                 <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="brand">Marque</label>
-                        <input type="text" class="form-control" id="brand" placeholder="Ex: DeWalt, Renault">
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="category_id">Catégorie</label>
-                        <select id="category_id" class="form-control"></select>
-                    </div>
-                </div>
-                <div id="tool_fields">
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="serial_or_plate_tool">Numéro de série</label>
-                            <input type="text" class="form-control" id="serial_or_plate_tool" placeholder="Ex: SN12345678">
+                </form>
+        </div>
+    </div>
+
+    <div id="manage_categories" class="tab-content">
+        <div class="row">
+            <div class="col-lg-5">
+                <div class="card">
+                    <h3><i class="fas fa-plus-circle"></i> Créer une Catégorie</h3>
+                    <form id="addCategoryForm">
+                        <div class="form-group">
+                            <label for="new_category_name">Nom de la Catégorie *</label>
+                            <input type="text" class="form-control" id="new_category_name" placeholder="Ex: Perceuses, Fourgonnettes" required>
                         </div>
-                        <div class="form-group col-md-6">
-                            <label for="position_or_info_tool">Position / Emplacement</label>
-                            <input type="text" class="form-control" id="position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3">
-                        </div>
-                    </div>
-                </div>
-                <div id="vehicle_fields" style="display: none;">
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="serial_or_plate_vehicle">Plaque d'immatriculation</label>
-                            <input type="text" class="form-control" id="serial_or_plate_vehicle" placeholder="Ex: AA-123-BB">
-                        </div>
-                         <div class="form-group col-md-6">
-                            <label for="fuel_level">Niveau de carburant</label>
-                            <select id="fuel_level" class="form-control">
-                                <option value="">Non spécifié</option>
-                                <option value="full">Plein</option>
-                                <option value="three-quarter">3/4</option>
-                                <option value="half">Moitié</option>
-                                <option value="quarter">1/4</option>
-                                <option value="empty">Vide</option>
+                        <div class="form-group">
+                            <label for="new_category_type">Type de Catégorie *</label>
+                            <select id="new_category_type" class="form-control" required>
+                                <option value="tool">Outil</option>
+                                <option value="vehicle">Véhicule</option>
                             </select>
                         </div>
+                        <button type="submit" class="btn btn-primary">Créer</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card">
+                    <h3><i class="fas fa-tags"></i> Catégories Existantes</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Outils</h4>
+                            <ul id="toolCategoriesList" class="category-list"></ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Véhicules</h4>
+                            <ul id="vehicleCategoriesList" class="category-list"></ul>
+                        </div>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>
-            </form>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="bookingModal" tabindex="-1" role="dialog">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Réserver <span id="bookingModalAssetName"></span></h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-      </div>
-      <div class="modal-body">
-        <form id="bookingForm">
-            <input type="hidden" id="bookingModalAssetId">
-            <div class="form-group">
-                <label for="booking_date">Date de réservation *</label>
-                <input type="text" id="booking_date" class="form-control" placeholder="Sélectionnez une date..." required>
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Réserver <span id="bookingModalAssetName"></span></h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+            <div class="modal-body">
+                <form id="bookingForm"><input type="hidden" id="bookingModalAssetId"><div class="form-group"><label for="booking_date">Date de réservation *</label><input type="text" id="booking_date" class="form-control" placeholder="Sélectionnez une date..." required></div><div class="form-group"><label for="booking_mission">Mission / Motif</label><textarea id="booking_mission" class="form-control" rows="3" placeholder="Description de la mission..."></textarea></div></form>
             </div>
-            <div class="form-group">
-                <label for="booking_mission">Mission / Motif</label>
-                <textarea id="booking_mission" class="form-control" rows="3" placeholder="Description de la mission..."></textarea>
-            </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
-        <button type="button" class="btn btn-primary" id="saveBookingBtn">Réserver</button>
-      </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-primary" id="saveBookingBtn">Réserver</button></div>
+        </div>
     </div>
-  </div>
 </div>
 
 <div class="modal fade" id="maintenanceModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Gérer la Maintenance</h5>
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Mettre <strong id="maintenanceModalAssetName"></strong> en maintenance ?</p>
-                <p class="text-muted small">L'actif ne pourra plus être réservé ou utilisé jusqu'à ce qu'il soit à nouveau marqué comme disponible.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-warning" id="setMaintenanceBtn">Mettre en Maintenance</button>
-            </div>
+            <div class="modal-header"><h5 class="modal-title">Gérer la Maintenance</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+            <div class="modal-body"><p>Mettre <strong id="maintenanceModalAssetName"></strong> en maintenance ?</p><p class="text-muted small">L'actif ne pourra plus être réservé ou utilisé.</p></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-warning" id="setMaintenanceBtn">Mettre en Maintenance</button></div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="modifyCategoryModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Modifier la Catégorie</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+      <div class="modal-body">
+        <form id="modifyCategoryForm"><input type="hidden" id="modifyCategoryId"><div class="form-group"><label for="modifyCategoryName">Nouveau nom de la catégorie *</label><input type="text" id="modifyCategoryName" class="form-control" required></div></form>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-primary" id="saveCategoryUpdateBtn">Sauvegarder</button></div>
+    </div>
+  </div>
+</div>
 
 <div class="loading-overlay" style="display: none;">
     <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
@@ -264,37 +224,41 @@ let allBookings = [];
 let codeReader = null;
 let datePicker = null;
 
-// --- DOM ELEMENTS ---
+// --- DOM ELEMENTS & TEMPLATES ---
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
+const addAssetFormContent = `<div class="form-row"><div class="form-group col-md-6"><label for="asset_type">Type d'actif *</label><select id="asset_type" class="form-control" required><option value="tool" selected>🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="barcode" placeholder="Ex: TOOL001, 123456789" required></div></div><div class="form-group"><label for="asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required></div><div class="form-row"><div class="form-group col-md-6"><label for="brand">Marque</label><input type="text" class="form-control" id="brand" placeholder="Ex: DeWalt, Renault"></div><div class="form-group col-md-6"><label for="category_id">Catégorie</label><select id="category_id" class="form-control"></select></div></div><div id="tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="serial_or_plate_tool" placeholder="Ex: SN12345678"></div><div class="form-group col-md-6"><label for="position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3"></div></div></div><div id="vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="serial_or_plate_vehicle" placeholder="Ex: AA-123-BB"></div><div class="form-group col-md-6"><label for="fuel_level">Niveau de carburant</label><select id="fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>`;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
+    document.getElementById('addAssetForm').innerHTML = addAssetFormContent;
     setupEventListeners();
     loadingOverlay.style.display = 'flex';
     await fetchInitialData();
-    loadingOverlay.style.display = 'none';
     renderAll();
     initializeDatePicker();
+    loadingOverlay.style.display = 'none';
 });
 
 async function fetchInitialData() {
     try {
         const [inventoryData, bookingsData, categoriesData] = await Promise.all([
-            apiCall('get_inventory'),
-            apiCall('get_all_bookings'),
-            apiCall('get_categories')
+            apiCall('get_inventory', 'GET'),
+            apiCall('get_all_bookings', 'GET'),
+            apiCall('get_categories', 'GET')
         ]);
         inventory = inventoryData.inventory || [];
         allBookings = bookingsData.bookings || [];
         assetCategories = categoriesData.categories || [];
+        assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
     } catch (error) { /* Handled by apiCall */ }
 }
 
 function renderAll() {
     renderInventory();
     renderAllBookingsTable();
-    populateCategoryDropdown('tool'); // Initial population
+    renderCategoriesList();
+    populateCategoryDropdown(document.getElementById('asset_type').value || 'tool');
 }
 
 // --- API & HELPERS ---
@@ -314,11 +278,10 @@ async function apiCall(action, method = 'POST', body = null) {
     if (body) options.body = JSON.stringify(body);
     let url = `${HANDLER_URL}?action=${action}`;
     if (method === 'GET') {
-        url = `${HANDLER_URL}?action=${action}`;
+        options.method = 'GET';
         if (body) url += '&' + new URLSearchParams(body).toString();
         delete options.body;
     }
-    
     try {
         const response = await fetch(url, options);
         const data = await response.json();
@@ -335,21 +298,17 @@ async function apiCall(action, method = 'POST', body = null) {
 
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', (e) => showTab(e.currentTarget.dataset.tab));
-    });
-    // Search and filter
+    document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
     document.getElementById('searchInput').addEventListener('keyup', renderInventory);
     document.getElementById('filterType').addEventListener('change', renderInventory);
     document.getElementById('filterStatus').addEventListener('change', renderInventory);
-    // Add Asset Form
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('asset_type').addEventListener('change', toggleAssetFields);
-    // Scanner
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
-    // Booking
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
+    document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
+    document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
 }
 
 function showTab(tabName) {
@@ -358,12 +317,94 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
     if (tabName !== 'scanner' && codeReader) stopScanning();
-    if (tabName === 'all_bookings' || tabName === 'inventory') {
+    if (['all_bookings', 'inventory', 'manage_categories'].includes(tabName)) {
         loadingOverlay.style.display = 'flex';
         fetchInitialData().then(() => {
             renderAll();
             loadingOverlay.style.display = 'none';
         });
+    }
+}
+
+// --- CATEGORY MANAGEMENT ---
+function renderCategoriesList() {
+    const toolList = document.getElementById('toolCategoriesList');
+    const vehicleList = document.getElementById('vehicleCategoriesList');
+    toolList.innerHTML = '';
+    vehicleList.innerHTML = '';
+
+    assetCategories.forEach(cat => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>${cat.category_name}</span>
+            <div class="category-actions">
+                <button class="btn btn-outline-primary btn-sm" onclick="openModifyCategoryModal(${cat.category_id}, '${cat.category_name.replace(/'/g, "\\'")}')"><i class="fas fa-pencil-alt"></i></button>
+                <button class="btn btn-outline-danger btn-sm" onclick="handleDeleteCategory(${cat.category_id}, '${cat.category_name.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
+        if (cat.category_type === 'tool') toolList.appendChild(li);
+        else vehicleList.appendChild(li);
+    });
+    if (toolList.innerHTML === '') toolList.innerHTML = '<li>Aucune catégorie d\'outil.</li>';
+    if (vehicleList.innerHTML === '') vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
+}
+
+async function handleCreateCategory(e) {
+    e.preventDefault();
+    const form = e.target;
+    const categoryData = {
+        category_name: document.getElementById('new_category_name').value,
+        category_type: document.getElementById('new_category_type').value
+    };
+    loadingOverlay.style.display = 'flex';
+    try {
+        await apiCall('add_category', 'POST', categoryData);
+        showNotification('Catégorie créée !', 'success');
+        form.reset();
+        await fetchInitialData();
+        renderAll();
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+function openModifyCategoryModal(categoryId, currentName) {
+    document.getElementById('modifyCategoryId').value = categoryId;
+    document.getElementById('modifyCategoryName').value = currentName;
+    $('#modifyCategoryModal').modal('show');
+}
+
+async function handleUpdateCategory() {
+    const categoryData = {
+        category_id: document.getElementById('modifyCategoryId').value,
+        category_name: document.getElementById('modifyCategoryName').value
+    };
+    if (!categoryData.category_name.trim()) {
+        showNotification("Le nom ne peut pas être vide.", "error");
+        return;
+    }
+    loadingOverlay.style.display = 'flex';
+    try {
+        await apiCall('update_category', 'POST', categoryData);
+        showNotification('Catégorie mise à jour !', 'success');
+        $('#modifyCategoryModal').modal('hide');
+        await fetchInitialData();
+        renderAll();
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+async function handleDeleteCategory(categoryId, categoryName) {
+    if (!confirm(`Voulez-vous vraiment supprimer la catégorie "${categoryName}" ? Tous les actifs de cette catégorie seront non-catégorisés.`)) return;
+    loadingOverlay.style.display = 'flex';
+    try {
+        await apiCall('delete_category', 'POST', { category_id: categoryId });
+        showNotification('Catégorie supprimée.', 'success');
+        await fetchInitialData();
+        renderAll();
+    } finally {
+        loadingOverlay.style.display = 'none';
     }
 }
 
@@ -571,17 +612,14 @@ async function processScanResult(barcode) {
 
             case 'prompt_booking':
                 const asset = data.asset;
-                // Use a standard confirm dialog
                 if(confirm(`"${asset.asset_name}" n'est pas réservé pour aujourd'hui. Voulez-vous le réserver et le sortir maintenant ?`)) {
-                    // Pre-fill booking modal for today and open it
                     $('#bookingModalAssetId').val(asset.asset_id);
                     $('#bookingModalAssetName').text(asset.asset_name);
-                    datePicker.set('disable', []); // Reset disabled dates
-                    datePicker.setDate(new Date(), true); // Set to today
+                    datePicker.set('disable', []);
+                    datePicker.setDate(new Date(), true);
                     $('#booking_mission').val('Sortie via scan');
                     $('#bookingModal').modal('show');
                     
-                    // Special handler that books and then immediately re-scans to checkout
                     $('#saveBookingBtn').off('click').one('click', async function() {
                         const bookingData = { asset_id: $('#bookingModalAssetId').val(), booking_date: $('#booking_date').val(), mission: $('#booking_mission').val() };
                         if (!bookingData.booking_date) { showNotification("Date invalide.", "error"); return; }
@@ -591,11 +629,9 @@ async function processScanResult(barcode) {
                             await apiCall('book_asset', 'POST', bookingData);
                             $('#bookingModal').modal('hide');
                             document.getElementById('bookingForm').reset();
-                            // After successful booking, immediately try to check it out
                             await processScanResult(barcode);
                         } finally {
                             loadingOverlay.style.display = 'none';
-                            // Restore the default booking handler after this special action
                              $('#saveBookingBtn').off('click').on('click', handleSaveBooking);
                         }
                     });
@@ -613,7 +649,6 @@ async function processScanResult(barcode) {
         /* error handled by apiCall */
     } finally {
         loadingOverlay.style.display = 'none';
-        // Ensure the default booking button handler is restored if modal was cancelled
         $('#bookingModal').on('hidden.bs.modal', function () {
             $('#saveBookingBtn').off('click').on('click', handleSaveBooking);
         });
@@ -644,7 +679,7 @@ async function setAssetAvailable(assetId) {
     await setMaintenanceStatus(assetId, 'available');
 }
 
-// --- ADD ASSET & CATEGORIES ---
+// --- ADD ASSET & CATEGORIES DROPDOWN ---
 function toggleAssetFields() {
     const type = document.getElementById('asset_type').value;
     document.getElementById('tool_fields').style.display = (type === 'tool') ? 'block' : 'none';
@@ -676,7 +711,7 @@ async function handleAddAsset(e) {
     };
     loadingOverlay.style.display = 'flex';
     try {
-        const data = await apiCall('add_asset', 'POST', assetData);
+        await apiCall('add_asset', 'POST', assetData);
         showNotification('Actif ajouté avec succès!', 'success');
         document.getElementById('addAssetForm').reset();
         toggleAssetFields();
