@@ -39,8 +39,20 @@ try {
         case 'delete_asset':
             deleteAsset($conn, $currentUser);
             break;
-        case 'add_category': // New action
+        case 'add_category':
             addCategory($conn, $currentUser);
+            break;
+        case 'get_asset_bookings':
+            getAssetBookings($conn);
+            break;
+        case 'book_asset':
+            bookAsset($conn, $currentUser);
+            break;
+        case 'get_booking_history':
+            getBookingHistory($conn, $currentUser);
+            break;
+        case 'get_daily_inventory_status':
+            getDailyInventoryStatus($conn);
             break;
         default:
             throw new Exception("Action non valide ou non spécifiée.");
@@ -48,7 +60,7 @@ try {
 } catch (PDOException $e) {
     // Catch database-specific errors
     error_log("Database Error in inventory-handler.php: " . $e->getMessage());
-    respondWithError("Erreur de base de données.", 500);
+    respondWithError("Erreur de base de données: " . $e->getMessage(), 500);
 } catch (Exception $e) {
     // Catch general application errors
     error_log("General Error in inventory-handler.php: " . $e->getMessage());
@@ -118,25 +130,10 @@ function checkBarcodeExists($conn) {
 }
 
 function addAsset($conn, $user) {
-    // --- TEMPORARY DEBUGGING CODE ---
-    $raw_input = file_get_contents('php://input');
-    // This line writes the raw request data to your server's error log.
-    error_log("Inventory App Debug - Raw Input: " . $raw_input);
-
-    $data = json_decode($raw_input, true);
-
-    // This block checks if the JSON was parsed successfully.
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $json_error = json_last_error_msg();
-        // This line writes the specific JSON error to your server's error log.
-        error_log("Inventory App Debug - JSON Decode Error: " . $json_error);
-        // This will send a more specific error message back to the browser.
-        throw new Exception("Erreur de décodage JSON: " . $json_error);
-    }
-    // --- END DEBUGGING CODE ---
+    $data = json_decode(file_get_contents('php://input'), true);
 
     if (!$data || !isset($data['barcode'], $data['asset_name'], $data['asset_type'])) {
-        throw new Exception("Données manquantes pour l'ajout de l'actif. L'entrée était vide ou malformée.");
+        throw new Exception("Données manquantes pour l'ajout de l'actif.");
     }
     $barcode = trim($data['barcode']);
     $asset_name = trim($data['asset_name']);
@@ -240,16 +237,9 @@ function deleteAsset($conn, $user) {
     }
 }
 
-// --- NEW FUNCTION ---
 function addCategory($conn, $user) {
-    // Optional: Restrict this action to admins if needed
-    // if ($user['role'] !== 'admin') {
-    //     respondWithError("Accès non autorisé.", 403);
-    // }
-
     $data = json_decode(file_get_contents('php://input'), true);
 
-    // Validation
     if (!$data || empty(trim($data['category_name'])) || empty($data['category_type'])) {
         throw new Exception("Le nom et le type de la catégorie sont obligatoires.");
     }
@@ -260,14 +250,12 @@ function addCategory($conn, $user) {
         throw new Exception("Type de catégorie non valide.");
     }
 
-    // Check for duplicates
     $stmt_check = $conn->prepare("SELECT COUNT(*) FROM AssetCategories WHERE category_name = ? AND category_type = ?");
     $stmt_check->execute([$name, $type]);
     if ($stmt_check->fetchColumn() > 0) {
         throw new Exception("Une catégorie avec ce nom et ce type existe déjà.");
     }
 
-    // Insertion
     $sql = "INSERT INTO AssetCategories (category_name, category_type) OUTPUT INSERTED.* VALUES (?, ?)";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$name, $type]);
@@ -279,3 +267,104 @@ function addCategory($conn, $user) {
         throw new Exception("Échec de la création de la catégorie.");
     }
 }
+
+function getAssetBookings($conn) {
+    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
+    if ($asset_id === 0) {
+        throw new Exception("ID d'actif non valide.");
+    }
+
+    $sql = "SELECT b.booking_date, u.prenom, u.nom 
+            FROM Bookings b
+            JOIN Users u ON b.user_id = u.user_id
+            WHERE b.asset_id = ? AND b.booking_date >= CAST(GETDATE() AS DATE)
+            ORDER BY b.booking_date ASC";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id]);
+    $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    respondWithSuccess(['bookings' => $bookings]);
+}
+
+function bookAsset($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!isset($data['asset_id'], $data['booking_date'])) {
+        throw new Exception("Données de réservation manquantes.");
+    }
+
+    $asset_id = intval($data['asset_id']);
+    $booking_date = $data['booking_date'];
+    $user_id = $user['user_id'];
+
+    // Check for existing booking on the same day
+    $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date = ?");
+    $stmt_check->execute([$asset_id, $booking_date]);
+    if ($stmt_check->fetchColumn() > 0) {
+        throw new Exception("Cet article est déjà réservé pour cette date.");
+    }
+
+    $conn->beginTransaction();
+
+    try {
+        // Insert booking
+        $sql_book = "INSERT INTO Bookings (asset_id, user_id, booking_date) VALUES (?, ?, ?)";
+        $stmt_book = $conn->prepare($sql_book);
+        $stmt_book->execute([$asset_id, $user_id, $booking_date]);
+        $booking_id = $conn->lastInsertId();
+
+        // Insert into history
+        $sql_history = "INSERT INTO BookingHistory (booking_id, asset_id, user_id, action_type, changed_by_user_id) VALUES (?, ?, ?, 'booked', ?)";
+        $stmt_history = $conn->prepare($sql_history);
+        $stmt_history->execute([$booking_id, $asset_id, $user_id, $user['user_id']]);
+
+        $conn->commit();
+        respondWithSuccess([], "Article réservé avec succès pour le " . date('d/m/Y', strtotime($booking_date)) . ".");
+
+    } catch (Exception $e) {
+        $conn->rollBack();
+        throw $e;
+    }
+}
+
+function getBookingHistory($conn, $user) {
+    if ($user['role'] !== 'admin') {
+        respondWithError("Accès non autorisé.", 403);
+    }
+
+    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
+    if ($asset_id === 0) {
+        throw new Exception("ID d'actif non valide.");
+    }
+    
+    $sql = "SELECT h.*, u.prenom, u.nom 
+            FROM BookingHistory h
+            JOIN Users u ON h.changed_by_user_id = u.user_id
+            WHERE h.asset_id = ?
+            ORDER BY h.action_timestamp DESC";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id]);
+    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    respondWithSuccess(['history' => $history]);
+}
+
+function getDailyInventoryStatus($conn) {
+    $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+
+    $sql = "SELECT 
+                i.asset_id, i.asset_name, i.asset_type,
+                CASE WHEN b.booking_id IS NOT NULL THEN 'booked' ELSE 'available' END as daily_status,
+                u.prenom as booked_by_prenom, u.nom as booked_by_nom
+            FROM Inventory i
+            LEFT JOIN Bookings b ON i.asset_id = b.asset_id AND b.booking_date = ?
+            LEFT JOIN Users u ON b.user_id = u.user_id
+            ORDER BY i.asset_name";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$date]);
+    $status = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    respondWithSuccess(['status' => $status]);
+}
+?>
