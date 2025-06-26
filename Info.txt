@@ -316,4 +316,7 @@ CREATE TABLE BookingHistory (
     action_timestamp DATETIME DEFAULT GETDATE(),
     changed_by_user_id INT
 );
+
+ALTER TABLE Bookings
+ADD mission_name NVARCHAR(500) NULL;
 -----------------------------------------------------------
