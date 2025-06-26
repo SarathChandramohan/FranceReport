@@ -294,3 +294,26 @@ CREATE TABLE Inventory (
 CREATE INDEX IDX_Inventory_AssetType ON Inventory (asset_type);
 CREATE INDEX IDX_Inventory_Status ON Inventory (status);
 CREATE INDEX IDX_Inventory_Barcode ON Inventory (barcode);
+
+CREATE TABLE Bookings (
+    booking_id INT IDENTITY(1,1) PRIMARY KEY,
+    asset_id INT NOT NULL,
+    user_id INT NOT NULL,
+    booking_date DATE NOT NULL,
+    status VARCHAR(50) DEFAULT 'booked',
+    created_at DATETIME DEFAULT GETDATE(),
+    CONSTRAINT FK_Bookings_Inventory FOREIGN KEY (asset_id) REFERENCES Inventory(asset_id) ON DELETE CASCADE,
+    CONSTRAINT FK_Bookings_Users FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+    CONSTRAINT UQ_Booking_Asset_Date UNIQUE (asset_id, booking_date)
+);
+
+CREATE TABLE BookingHistory (
+    history_id INT IDENTITY(1,1) PRIMARY KEY,
+    booking_id INT,
+    asset_id INT NOT NULL,
+    user_id INT,
+    action_type NVARCHAR(255) NOT NULL, -- e.g., 'booked', 'cancelled'
+    action_timestamp DATETIME DEFAULT GETDATE(),
+    changed_by_user_id INT
+);
+-----------------------------------------------------------
