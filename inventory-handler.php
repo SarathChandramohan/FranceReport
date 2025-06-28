@@ -263,24 +263,41 @@ function deleteCategory($conn, $user) {
 }
 
 
-// --- INVENTORY & OTHER FUNCTIONS (UNCHANGED) ---
+// --- INVENTORY & OTHER FUNCTIONS (SOME CHANGED) ---
 
+/**
+ * MODIFIED FUNCTION
+ * Fetches all inventory assets with additional details about today's booking
+ * and the next future booking date.
+ */
 function getInventory($conn) {
     $sql = "SELECT 
                 i.*, 
                 ac.category_name,
-                u.prenom AS assigned_to_prenom, 
-                u.nom AS assigned_to_nom,
+                u_assigned.prenom AS assigned_to_prenom, 
+                u_assigned.nom AS assigned_to_nom,
                 (
                     SELECT MIN(b.booking_date) 
                     FROM Bookings b 
                     WHERE b.asset_id = i.asset_id 
-                    AND b.booking_date >= CAST(GETDATE() AS DATE)
+                    AND b.booking_date > CAST(GETDATE() AS DATE) -- Strictly future bookings
                     AND b.status = 'booked'
-                ) as next_booking_date
+                ) as next_future_booking_date,
+                todays_booking.user_id AS todays_booking_user_id,
+                todays_booking.mission AS todays_booking_mission,
+                u_booking.prenom AS todays_booking_prenom,
+                u_booking.nom AS todays_booking_nom
             FROM Inventory i
             LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id
-            LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
+            LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id
+            OUTER APPLY (
+                SELECT TOP 1 b.user_id, b.mission
+                FROM Bookings b
+                WHERE b.asset_id = i.asset_id
+                AND b.booking_date = CAST(GETDATE() AS DATE)
+                AND b.status = 'booked'
+            ) AS todays_booking
+            LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id
             ORDER BY i.asset_name ASC";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
