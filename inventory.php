@@ -202,13 +202,17 @@ $currentUserId = $currentUser['user_id'];
     </div>
 </div>
 
-
 <div class="modal fade" id="bookingModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Réserver <span id="bookingModalAssetName"></span></h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
             <div class="modal-body">
-                <form id="bookingForm"><input type="hidden" id="bookingModalAssetId"><div class="form-group"><label for="booking_date">Date de réservation *</label><input type="text" id="booking_date" class="form-control" placeholder="Sélectionnez une date..." required></div><div class="form-group"><label for="booking_mission">Mission / Motif</label><textarea id="booking_mission" class="form-control" rows="3" placeholder="Description de la mission..."></textarea></div></form>
+                <form id="bookingForm">
+                    <input type="hidden" id="bookingModalAssetId">
+                    <div id="futureBookingsInfo" class="alert alert-info small" style="display: none; padding: 10px;"></div>
+                    <div class="form-group"><label for="booking_date">Date de réservation *</label><input type="text" id="booking_date" class="form-control" placeholder="Sélectionnez une date..." required></div>
+                    <div class="form-group"><label for="booking_mission">Mission / Motif</label><textarea id="booking_mission" class="form-control" rows="3" placeholder="Description de la mission..."></textarea></div>
+                </form>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-primary" id="saveBookingBtn">Réserver</button></div>
         </div>
@@ -263,7 +267,6 @@ let datePicker = null;
 // --- DOM ELEMENTS & TEMPLATES ---
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
-// CORRECTED: Added 'add_' prefix to all IDs and 'for' attributes
 const addAssetFormContent = `<div class="form-row"><div class="form-group col-md-6"><label for="add_asset_type">Type d'actif *</label><select id="add_asset_type" class="form-control" required><option value="tool" selected>🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="add_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="add_barcode" placeholder="Ex: TOOL001, 123456789" required></div></div><div class="form-group"><label for="add_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="add_asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required></div><div class="form-row"><div class="form-group col-md-6"><label for="add_brand">Marque</label><input type="text" class="form-control" id="add_brand" placeholder="Ex: DeWalt, Renault"></div><div class="form-group col-md-6"><label for="add_category_id">Catégorie</label><select id="add_category_id" class="form-control"></select></div></div><div id="add_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="add_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="add_serial_or_plate_tool" placeholder="Ex: SN12345678"></div><div class="form-group col-md-6"><label for="add_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="add_position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3"></div></div></div><div id="add_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="add_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="add_serial_or_plate_vehicle" placeholder="Ex: AA-123-BB"></div><div class="form-group col-md-6"><label for="add_fuel_level">Niveau de carburant</label><select id="add_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>`;
 const editAssetFormContent = `<input type="hidden" id="edit_asset_id"><div class="form-row"><div class="form-group col-md-6"><label for="edit_asset_type">Type d'actif *</label><select id="edit_asset_type" class="form-control" required><option value="tool">🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="edit_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="edit_barcode" required></div></div><div class="form-group"><label for="edit_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="edit_asset_name" required></div><div class="form-row"><div class="form-group col-md-6"><label for="edit_brand">Marque</label><input type="text" class="form-control" id="edit_brand"></div><div class="form-group col-md-6"><label for="edit_category_id">Catégorie</label><select id="edit_category_id" class="form-control"></select></div></div><div id="edit_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="edit_serial_or_plate_tool"></div><div class="form-group col-md-6"><label for="edit_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="edit_position_or_info_tool"></div></div></div><div id="edit_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="edit_serial_or_plate_vehicle"></div><div class="form-group col-md-6"><label for="edit_fuel_level">Niveau de carburant</label><select id="edit_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary" id="saveAssetUpdateBtn"><i class="fas fa-save"></i> Sauvegarder</button></div>`;
 
@@ -463,7 +466,7 @@ async function handleDeleteCategory(categoryId, categoryName) {
     }
 }
 
-// --- INVENTORY TAB ---
+// --- INVENTORY TAB (MODIFIED) ---
 function renderCategoryFilters() {
     const container = document.getElementById('categoryFilterContainer');
     const typeFilter = document.getElementById('filterType').value;
@@ -477,34 +480,85 @@ function renderCategoryFilters() {
     container.innerHTML = buttonsHTML;
 }
 
+/**
+ * MODIFIED FUNCTION
+ * Filters inventory based on search, type, category, and a new 'displayStatus'
+ * which treats assets booked for today as 'in-use'.
+ */
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('filterType').value;
     const statusFilter = document.getElementById('filterStatus').value;
+
     const filtered = inventory.filter(asset => {
         const s = ((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase();
         const matchesSearch = s.includes(searchTerm);
         const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
-        const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
         const matchesCategory = selectedCategoryId === 'all' || asset.category_id == selectedCategoryId;
+
+        // Determine the display status for filtering
+        let displayStatus = asset.status;
+        const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
+        if (asset.status === 'available' && isBookedForToday) {
+             displayStatus = 'in-use';
+        }
+        const matchesStatus = statusFilter === 'all' || displayStatus === statusFilter;
+
         return matchesSearch && matchesType && matchesStatus && matchesCategory;
     });
+
     inventoryGrid.innerHTML = '';
-    if (filtered.length === 0) { inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif ne correspond à vos critères.</h4></div>`; }
+    if (filtered.length === 0) {
+        inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif ne correspond à vos critères.</h4></div>`;
+    }
     filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
 }
 
+/**
+ * MODIFIED FUNCTION
+ * Creates an asset card with dynamic status display. An asset available in the DB but
+ * booked for today is displayed as 'in-use' with the booking details.
+ */
 function createAssetCard(asset) {
     const card = document.createElement('div');
-    card.className = `asset-card ${asset.asset_type} ${asset.status}`;
+    const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
+    
+    let displayStatus = asset.status;
+    let assignedToText = '';
+    let statusText = '';
+    let isVisuallyInUse = false;
+
+    if (asset.status === 'in-use') {
+        displayStatus = 'in-use';
+        isVisuallyInUse = true;
+        assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
+        statusText = 'En cours d\'utilisation';
+    } else if (asset.status === 'available' && isBookedForToday) {
+        displayStatus = 'in-use'; // Visually treat as 'in-use'
+        isVisuallyInUse = true;
+        assignedToText = `<strong>Réservé aujourd'hui par:</strong> ${asset.todays_booking_prenom || ''} ${asset.todays_booking_nom || ''}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
+        statusText = 'Réservé aujourd\'hui';
+    } else if (asset.status === 'maintenance') {
+        displayStatus = 'maintenance';
+        statusText = 'En maintenance';
+    } else {
+        displayStatus = 'available';
+        statusText = 'Disponible';
+    }
+    
+    card.className = `asset-card ${asset.asset_type} ${displayStatus}`;
     card.dataset.id = asset.asset_id;
 
-    const assignedTo = asset.status === 'in-use' ? `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>` : '';
-    const bookingInfo = asset.status === 'available' && asset.next_booking_date ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Proch. résa: ${new Date(asset.next_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` : '';
-    const details = asset.asset_type === 'tool' ? `<strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>` : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
+    const bookingInfo = asset.status === 'available' && !isBookedForToday && asset.next_future_booking_date 
+        ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` 
+        : '';
+    
+    const details = asset.asset_type === 'tool' 
+        ? `<strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>` 
+        : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
 
     let buttons = '';
-    if (asset.status === 'available') {
+    if (asset.status === 'available' && !isBookedForToday) {
         buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
         buttons += `<button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
     } else if (asset.status === 'maintenance') {
@@ -520,11 +574,11 @@ function createAssetCard(asset) {
         <div>
             <div class="asset-header">
                 <span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span>
-                <span class="asset-status status-${asset.status}">${asset.status.replace('-', ' ')}</span>
+                <span class="asset-status status-${displayStatus}">${statusText}</span>
             </div>
             <div class="asset-details">
                 <strong>Code-barres:</strong> ${asset.barcode}<br>
-                ${details} ${assignedTo}
+                ${details} ${assignedToText}
             </div>
             ${bookingInfo}
         </div>
@@ -537,7 +591,7 @@ function escapeSingleQuotes(str) {
     return str.replace(/'/g, "\\'");
 }
 
-// --- BOOKING & HISTORY MODALS ---
+// --- BOOKING & HISTORY MODALS (MODIFIED) ---
 function initializeDatePicker() {
     datePicker = flatpickr("#booking_date", {
         locale: "fr",
@@ -546,6 +600,10 @@ function initializeDatePicker() {
     });
 }
 
+/**
+ * MODIFIED FUNCTION
+ * Displays future booking dates as text inside the modal before showing it.
+ */
 async function openBookingModal(assetId) {
     const asset = inventory.find(a => a.asset_id == assetId);
     if (!asset) return;
@@ -553,10 +611,26 @@ async function openBookingModal(assetId) {
     $('#bookingModalAssetId').val(asset.asset_id);
     $('#bookingModalAssetName').text(asset.asset_name);
     
+    const futureBookingsDiv = document.getElementById('futureBookingsInfo');
+    futureBookingsDiv.style.display = 'none';
+    futureBookingsDiv.innerHTML = '';
+    
     loadingOverlay.style.display = 'flex';
     try {
         const data = await apiCall('get_asset_availability', 'GET', { asset_id: assetId });
         datePicker.set('disable', data.booked_dates);
+
+        if (data.booked_dates && data.booked_dates.length > 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const futureDates = data.booked_dates
+                .filter(d => d > todayStr)
+                .map(d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR'));
+
+            if (futureDates.length > 0) {
+                futureBookingsDiv.innerHTML = `<strong>Déjà réservé le:</strong> ${futureDates.join(', ')}`;
+                futureBookingsDiv.style.display = 'block';
+            }
+        }
         $('#bookingModal').modal('show');
     } finally {
         loadingOverlay.style.display = 'none';
@@ -737,7 +811,6 @@ async function processScanResult(barcode) {
             case 'asset_not_found':
                 if (confirm(data.message)) {
                     showTab('add_asset');
-                    // CORRECTED: Use the correct prefixed ID
                     $('#add_barcode').val(data.barcode);
                 }
                 break;
@@ -786,7 +859,7 @@ function toggleAssetFields(formPrefix) {
 
 function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
     const assetTypeElement = document.getElementById(`${formPrefix}_asset_type`);
-    if (!assetTypeElement) return; // Guard clause to prevent errors if element doesn't exist yet
+    if (!assetTypeElement) return;
     const assetType = assetTypeElement.value;
     const dropdown = document.getElementById(`${formPrefix}_category_id`);
     dropdown.innerHTML = '<option value="">-- Sans catégorie --</option>';
@@ -802,7 +875,6 @@ function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
 
 async function handleAddAsset(e) {
     e.preventDefault();
-    // CORRECTED: Use prefixed IDs to get values
     const type = document.getElementById('add_asset_type').value;
     const assetData = {
         barcode: document.getElementById('add_barcode').value,
