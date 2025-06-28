@@ -1,10 +1,11 @@
 <?php
-// planning.php (Final, Complete with Inventory features)
+// planning.php (Final, Complete with NEW Inventory Modal UI)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
 
 $user = getCurrentUser();
+// This page is for admins only. Redirect if not an admin.
 if ($user['role'] !== 'admin') {
     header('Location: dashboard.php');
     exit();
@@ -53,9 +54,10 @@ $default_color = $predefined_colors[0];
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
         .color-swatch { width:25px; height:25px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
         .color-swatch.selected { border-color: #333; }
-        #assigned_workers_pills .badge, #assigned_assets_pills .badge { margin: 2px; font-size: 0.6rem; }
-        .remove-assigned-worker, .remove-assigned-asset { cursor: pointer; }
-        .list-group-item.disabled { background-color: #f8f9fa; color: #6c757d; cursor: not-allowed; }
+        #assigned_workers_pills .badge, #assigned_assets_display .badge { margin: 2px; font-size: 0.6rem; }
+        .remove-assigned-worker { cursor: pointer; }
+        label.list-group-item.disabled { background-color: #f8f9fa; cursor: not-allowed; }
+        label.list-group-item.disabled, label.list-group-item.disabled span { color: #6c757d; }
     </style>
 </head>
 <body>
@@ -67,7 +69,6 @@ $default_color = $predefined_colors[0];
             <h5><i class="fas fa-users"></i> Ouvriers</h5>
             <div id="workerList"></div>
         </div>
-
         <div class="planning-col">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
@@ -119,15 +120,15 @@ $default_color = $predefined_colors[0];
                             <label>Cliquer pour assigner un ouvrier :</label>
                             <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
                         </div>
-                        
+
                         <hr>
-                        <div class="form-group" id="assign-assets-group" style="display:none;">
+                        <div class="form-group">
                             <input type="hidden" name="assigned_asset_ids" id="assigned_asset_ids_hidden">
                             <label>Matériel assigné</label>
-                            <div id="assigned_assets_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;"><span class="text-muted small p-2" id="no_assets_assigned_text">Aucun matériel assigné.</span></div>
-                            <label>Cliquer pour assigner du matériel :</label>
-                             <div class="mb-2"><input type="text" id="modal_asset_search" class="form-control form-control-sm" placeholder="Rechercher matériel..."></div>
-                            <div id="modal_available_assets" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+                            <div id="assigned_assets_display" class="d-flex flex-wrap align-items-center border rounded p-2 mb-2 bg-light" style="min-height: 50px;">
+                                <span class="text-muted small p-2">Aucun matériel assigné.</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-info" id="manageAssetsBtn">Gérer le Matériel</button>
                         </div>
 
                         <div id="modal_error_message" class="alert alert-danger mt-3" style="display: none;"></div>
@@ -142,6 +143,26 @@ $default_color = $predefined_colors[0];
         </div>
     </div>
     
+    <div class="modal fade" id="assetAssignmentModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assigner du Matériel</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="asset_assignment_search" class="form-control mb-3" placeholder="Rechercher...">
+                    <div id="asset_assignment_list" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                        </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" id="confirmAssetAssignmentBtn">Confirmer la Sélection</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="confirmationModal" tabindex="-1">
         <div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirmation</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body" id="confirmationModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-danger" id="confirmActionBtn">Confirmer</button></div></div></div>
     </div>
@@ -166,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const $loading = $('#loadingOverlay');
     const $planningContainer = $('#dailyPlanningContainer');
     const $workerList = $('#workerList');
-    const $modal = $('#missionFormModal');
+    const $missionModal = $('#missionFormModal');
     
     // --- HELPERS ---
     const showLoading = (show) => $loading.toggle(show);
@@ -289,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- MODAL WORKER & ASSET LOGIC ---
+    // --- MODAL WORKER LOGIC ---
     function renderAssignedWorkersInModal() {
         const $list = $('#assigned_workers_pills'), $hidden = $('#assigned_user_ids_hidden'), $placeholder = $('#no_workers_assigned_text');
         $list.find('.badge').remove();
@@ -305,31 +326,48 @@ document.addEventListener('DOMContentLoaded', function() {
         state.staff.forEach(w => { if (!assignedIds.has(String(w.user_id))) $list.append(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${w.user_id}" data-worker-name="${w.prenom} ${w.nom}">${w.prenom} ${w.nom}</a>`); });
     }
 
-    function renderAssignedAssetsInModal() {
-        const $list = $('#assigned_assets_pills'), $hidden = $('#assigned_asset_ids_hidden'), $placeholder = $('#no_assets_assigned_text');
-        $list.find('.badge').remove();
-        $placeholder.toggle(assignedAssetsInModal.length === 0);
-        assignedAssetsInModal.forEach(a => $list.append(`<span class="badge badge-info p-2 m-1">${a.name}<i class="fas fa-times ml-2 remove-assigned-asset" data-asset-id="${a.id}"></i></span>`));
-        $hidden.val(assignedAssetsInModal.map(a => a.id).join(','));
-    }
-    
+    // --- ASSET ASSIGNMENT LOGIC (NEW MODAL APPROACH) ---
     function getDatesFromModal() {
         const dates = [];
-        const isMulti = $('#multi_day_fields').is(':visible'), start = $('input[name="start_date"]').val(), end = $('input[name="end_date"]').val(), single = $('#assignment_date_form').val();
+        const isMulti = $('#multi_day_fields').is(':visible');
+        const start = $('#missionForm input[name="start_date"]').val();
+        const end = $('#missionForm input[name="end_date"]').val();
+        const single = $('#assignment_date_form').val();
         if (isMulti && start && end) {
-            for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) { dates.push(formatDate(new Date(d))); }
-        } else if(single) { dates.push(single); }
+            for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
+                dates.push(formatDate(new Date(d)));
+            }
+        } else if(single) {
+            dates.push(single);
+        }
         return dates;
     }
 
-    function renderAvailableAssetsInModal() {
-        const $list = $('#modal_available_assets');
+    function updateAssignedAssetsDisplay() {
+        const $display = $('#assigned_assets_display');
+        const $hiddenInput = $('#assigned_asset_ids_hidden');
+        $display.empty();
+
+        if (assignedAssetsInModal.length > 0) {
+            assignedAssetsInModal.forEach(asset => {
+                const pillHtml = $(`<span class="badge badge-info p-2 m-1">${asset.name}</span>`);
+                $display.append(pillHtml);
+            });
+        } else {
+            $display.html('<span class="text-muted small p-2">Aucun matériel assigné.</span>');
+        }
+        $hiddenInput.val(assignedAssetsInModal.map(a => a.id).join(','));
+    }
+
+    function populateAssetAssignmentModal() {
+        const $list = $('#asset_assignment_list');
         $list.empty();
+
         const assignedIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
         const missionDates = getDatesFromModal();
         const missionId = $('#mission_id_form').val();
         const currentMission = missionId ? state.missions.find(m => m.mission_id == missionId) : null;
-        
+
         const bookedAssetIds = new Set();
         state.bookings.forEach(b => {
             if (missionDates.includes(b.booking_date)) {
@@ -337,14 +375,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 bookedAssetIds.add(String(b.asset_id));
             }
         });
-
-        const searchTerm = $('#modal_asset_search').val().toLowerCase();
-        state.inventory.filter(a => a.asset_name.toLowerCase().includes(searchTerm)).forEach(asset => {
-            if (!assignedIds.has(String(asset.asset_id))) {
+        
+        const searchTerm = $('#asset_assignment_search').val().toLowerCase();
+        state.inventory
+            .filter(asset => asset.asset_name.toLowerCase().includes(searchTerm))
+            .forEach(asset => {
                 const isBooked = bookedAssetIds.has(String(asset.asset_id));
-                $list.append(`<a href="#" class="list-group-item list-group-item-action py-2 ${isBooked ? 'disabled' : ''}" data-asset-id="${asset.asset_id}" data-asset-name="${asset.asset_name}">${asset.asset_name} ${isBooked ? '<span class="badge badge-danger float-right">Réservé</span>' : ''}</a>`);
-            }
-        });
+                const isChecked = assignedIds.has(String(asset.asset_id));
+
+                const itemHtml = `
+                    <label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isBooked && !isChecked ? 'disabled' : ''}">
+                        <span>
+                            <input type="checkbox" class="mr-3" value="${asset.asset_id}" data-asset-name="${asset.asset_name}" ${isChecked ? 'checked' : ''} ${isBooked && !isChecked ? 'disabled' : ''}>
+                            ${asset.asset_name}
+                        </span>
+                        ${isBooked ? `<span class="badge badge-danger">Réservé</span>` : ''}
+                    </label>
+                `;
+                $list.append(itemHtml);
+            });
     }
 
     // --- EVENT HANDLERS ---
@@ -352,18 +401,22 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchInitialData(); });
     
     $('#addMultiDayMissionBtn').on('click', function() {
-        assignedWorkersInModal = []; assignedAssetsInModal = [];
-        $modal.find('form')[0].reset(); hideModalError();
+        assignedWorkersInModal = []; 
+        assignedAssetsInModal = [];
+        $missionModal.find('form')[0].reset(); 
+        hideModalError();
         $('#shift_type_buttons label').removeClass('active');
-        $modal.find('input[name="mission_id"]').val('');
+        $missionModal.find('input[name="mission_id"]').val('');
         $('#modalDateDisplay').hide();
         $('#multi_day_fields').show();
-        $('#assign-users-group, #assign-assets-group').show();
+        $('#assign-users-group').show();
         $('#deleteMissionBtn').hide();
-        $modal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
-        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
-        renderAssignedAssetsInModal(); renderAvailableAssetsInModal();
-        $modal.modal('show');
+        $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
+        
+        renderAssignedWorkersInModal(); 
+        renderAvailableWorkersInModal();
+        updateAssignedAssetsDisplay();
+        $missionModal.modal('show');
     });
 
     $planningContainer.on('click', '.add-mission-to-day-btn', function() { openModalForCreate($(this).closest('.day-header').data('date')); });
@@ -402,84 +455,97 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function openModalForCreate(date) {
-        assignedWorkersInModal = []; assignedAssetsInModal = [];
-        $modal.find('form')[0].reset(); hideModalError();
+        assignedWorkersInModal = []; 
+        assignedAssetsInModal = [];
+        $missionModal.find('form')[0].reset(); 
+        hideModalError();
         $('#shift_type_buttons label').removeClass('active');
-        $modal.find('input[name="mission_id"]').val('');
-        $modal.find('input[name="assignment_date"]').val(date);
+        $missionModal.find('input[name="mission_id"]').val('');
+        $missionModal.find('input[name="assignment_date"]').val(date);
         const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         $('#multi_day_fields').hide();
         $('#modalDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`).show();
-        $modal.find('#missionFormModalLabel').text('Nouvelle Mission');
-        $modal.find('#deleteMissionBtn').hide();
-        $('#assign-users-group, #assign-assets-group').show();
-        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
-        renderAssignedAssetsInModal(); renderAvailableAssetsInModal();
-        $modal.modal('show');
+        $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
+        $missionModal.find('#deleteMissionBtn').hide();
+        $('#assign-users-group').show();
+        
+        renderAssignedWorkersInModal(); 
+        renderAvailableWorkersInModal();
+        updateAssignedAssetsDisplay();
+        $missionModal.modal('show');
     }
     
     $planningContainer.on('click', '.mission-card-body', function() {
         const mission = state.missions.find(m => m.mission_id == $(this).closest('.mission-card').data('mission-id'));
         if (!mission) return;
 
-        $modal.find('form')[0].reset(); hideModalError();
+        $missionModal.find('form')[0].reset(); 
+        hideModalError();
         assignedWorkersInModal = []; // Not editing workers here
         assignedAssetsInModal = mission.assigned_assets || [];
         
         $('#shift_type_buttons label').removeClass('active');
-        $modal.find('input[name="mission_id"]').val(mission.mission_id);
-        $modal.find('input[name="assignment_date"]').val(mission.assignment_date);
+        $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
+        $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
         const displayDate = new Date(mission.assignment_date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         $('#multi_day_fields').hide();
         $('#modalDateDisplay').html(`Modifier la mission du: <strong>${displayDate}</strong>`).show();
-        $modal.find('input[name="mission_text"]').val(mission.mission_text);
-        $modal.find('input[name="start_time"]').val(mission.start_time);
-        $modal.find('input[name="end_time"]').val(mission.end_time);
-        $modal.find('input[name="location"]').val(mission.location);
-        $modal.find(`input[name="shift_type"][value="${mission.shift_type}"]`).prop('checked', true).parent().addClass('active');
-        $modal.find('input[name="color"]').val(mission.color || DEFAULT_COLOR);
+        $missionModal.find('input[name="mission_text"]').val(mission.mission_text);
+        $missionModal.find('input[name="start_time"]').val(mission.start_time);
+        $missionModal.find('input[name="end_time"]').val(mission.end_time);
+        $missionModal.find('input[name="location"]').val(mission.location);
+        $missionModal.find(`input[name="shift_type"][value="${mission.shift_type}"]`).prop('checked', true).parent().addClass('active');
+        $missionModal.find('input[name="color"]').val(mission.color || DEFAULT_COLOR);
         $('.color-swatch.selected').removeClass('selected');
         $(`.color-swatch[data-color="${mission.color || DEFAULT_COLOR}"]`).addClass('selected');
-        $modal.find('#missionFormModalLabel').text('Modifier la Mission');
-        $modal.find('#deleteMissionBtn').show();
+        $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
+        $missionModal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
-        $('#assign-assets-group').show();
-        renderAssignedAssetsInModal();
-        renderAvailableAssetsInModal();
-        $modal.modal('show');
+        
+        updateAssignedAssetsDisplay();
+        $missionModal.modal('show');
     });
     
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const dis = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', dis).val(dis ? '' : $('#mission_start_time').val()); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
-    // Modal assignment listeners
+    // Worker assignment listeners
     $('#modal_available_workers').on('click', '.list-group-item', function(e) { e.preventDefault(); assignedWorkersInModal.push({ id: $(this).data('worker-id'), name: $(this).data('worker-name') }); renderAssignedWorkersInModal(); $(this).remove(); });
     $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() { const id = $(this).data('worker-id'); assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(id)); renderAssignedWorkersInModal(); renderAvailableWorkersInModal(); });
-    $('#modal_available_assets').on('click', '.list-group-item:not(.disabled)', function(e) { e.preventDefault(); assignedAssetsInModal.push({ id: $(this).data('asset-id'), name: $(this).data('asset-name') }); renderAssignedAssetsInModal(); $(this).remove(); });
-    $('#assigned_assets_pills').on('click', '.remove-assigned-asset', function() { const id = $(this).data('asset-id'); assignedAssetsInModal = assignedAssetsInModal.filter(a => String(a.id) !== String(id)); renderAssignedAssetsInModal(); renderAvailableAssetsInModal(); });
-    $('#modal_asset_search').on('keyup', renderAvailableAssetsInModal);
-    $('#missionForm input[name="start_date"], #missionForm input[name="end_date"]').on('change', renderAvailableAssetsInModal);
 
+    // Asset assignment modal listeners
+    $('#manageAssetsBtn').on('click', function() { populateAssetAssignmentModal(); $('#assetAssignmentModal').modal('show'); });
+    $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
+    $('#confirmAssetAssignmentBtn').on('click', function() {
+        assignedAssetsInModal = [];
+        $('#asset_assignment_list input[type="checkbox"]:checked').each(function() {
+            assignedAssetsInModal.push({ id: $(this).val(), name: $(this).data('asset-name') });
+        });
+        updateAssignedAssetsDisplay();
+        $('#assetAssignmentModal').modal('hide');
+    });
+
+    // Main form submit
     $('#missionForm').on('submit', async function(e) {
         e.preventDefault();
         hideModalError();
         const formData = Object.fromEntries(new FormData(this).entries());
         if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) { showModalError("Veuillez assigner au moins un ouvrier."); return; }
-        if (formData.assigned_user_ids) formData.assigned_user_ids = formData.assigned_user_ids.split(',');
-        if (formData.assigned_asset_ids) formData.assigned_asset_ids = formData.assigned_asset_ids.split(','); else formData.assigned_asset_ids = [];
+        if (formData.assigned_user_ids) formData.assigned_user_ids = formData.assigned_user_ids.split(',').filter(id => id);
+        if (formData.assigned_asset_ids) formData.assigned_asset_ids = formData.assigned_asset_ids.split(',').filter(id => id); else formData.assigned_asset_ids = [];
         
         showLoading(true);
         try {
             await apiCall('save_mission', 'POST', formData);
             state.shouldRefreshOnModalClose = true;
-            $modal.modal('hide');
+            $missionModal.modal('hide');
         } catch (error) { showModalError(error.message); } finally { showLoading(false); }
     });
     
-    $modal.on('hidden.bs.modal', function () {
+    $missionModal.on('hidden.bs.modal', function () {
         hideModalError();
-        assignedAssetsInModal = []; assignedWorkersInModal = [];
-        $('#assign-users-group, #assign-assets-group').hide();
+        assignedAssetsInModal = []; 
+        assignedWorkersInModal = [];
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
     });
 
@@ -494,7 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); const workerName = $(this).closest('li').text().trim(); showConfirmation(`Retirer ${workerName} de cette mission ?`, async () => { showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { mission_id: missionId, worker_id: workerId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
-    $('#deleteMissionBtn').on('click', function() { const missionId = $('#mission_id_form').val(); if (!missionId) return; $modal.modal('hide'); showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => { showLoading(true); try { await apiCall('delete_mission_group', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
+    $('#deleteMissionBtn').on('click', function() { const missionId = $('#mission_id_form').val(); if (!missionId) return; $missionModal.modal('hide'); showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => { showLoading(true); try { await apiCall('delete_mission_group', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
 
     // --- Init ---
     fetchInitialData();
