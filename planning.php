@@ -1,5 +1,5 @@
 <?php
-// planning.php (Final version with new conditional asset modal UI)
+// planning.php (Final version with fix for getDatesFromModal error)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
@@ -152,7 +152,7 @@ $default_color = $predefined_colors[0];
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <input type="text" id="asset_assignment_search" class="form-control mb-3" placeholder="Rechercher...">
+                    <input type="text" id="asset_assignment_search" class="form-control mb-3" placeholder="Rechercher par nom ou n° de série...">
                     <div id="asset_assignment_list" class="list-group" style="max-height: 400px; overflow-y: auto;">
                         </div>
                 </div>
@@ -201,6 +201,26 @@ document.addEventListener('DOMContentLoaded', function() {
         let day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
         d.setHours(0, 0, 0, 0);
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    // *** FIXED: ADDED MISSING FUNCTION ***
+    function getDatesFromModal() {
+        const dates = [];
+        const isMulti = $('#multi_day_fields').is(':visible');
+        const start = $('#missionForm input[name="start_date"]').val();
+        const end = $('#missionForm input[name="end_date"]').val();
+        const single = $('#assignment_date_form').val();
+
+        if (isMulti && start && end) {
+            // This case is for multi-day creation, where asset management is disabled by UI logic.
+            for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
+                dates.push(formatDate(new Date(d)));
+            }
+        } else if (single) {
+            // This handles single-day creation and edits.
+            dates.push(single);
+        }
+        return dates;
     }
 
     // --- API CALLS ---
@@ -340,6 +360,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const $list = $('#asset_assignment_list'); $list.empty();
         const assignedIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
         const missionDates = getDatesFromModal();
+        if (missionDates.length === 0) {
+            $list.html('<div class="alert alert-warning">Veuillez sélectionner une date pour la mission avant de gérer le matériel.</div>');
+            return;
+        }
         const missionId = $('#mission_id_form').val();
         const currentMission = missionId ? state.missions.find(m => m.mission_id == missionId) : null;
         const bookedAssetIds = new Set();
