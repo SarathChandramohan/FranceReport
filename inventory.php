@@ -51,6 +51,8 @@ $currentUserId = $currentUser['user_id'];
         .category-list { list-style-type: none; padding-left: 0; }
         .category-list li { background: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
         .category-actions button { margin-left: 5px; }
+        #categoryFilterContainer { display: flex; flex-wrap: wrap; gap: 10px; }
+        #categoryFilterContainer .btn { border-radius: 20px; padding: 5px 15px; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -75,7 +77,7 @@ $currentUserId = $currentUser['user_id'];
     <div id="inventory" class="tab-content active">
         <div class="card position-relative">
             <h3 class="mb-3">Liste des Actifs</h3>
-             <div class="d-flex justify-content-start align-items-center mb-4 flex-wrap">
+             <div class="d-flex justify-content-start align-items-center mb-3 flex-wrap">
                 <input type="text" class="form-control mr-sm-2 mb-2" id="searchInput" placeholder="Rechercher..." style="max-width: 300px;">
                 <select id="filterType" class="form-control mr-sm-2 mb-2" style="max-width: 150px;">
                     <option value="all">Tous les types</option>
@@ -89,6 +91,7 @@ $currentUserId = $currentUser['user_id'];
                     <option value="maintenance">En maintenance</option>
                 </select>
             </div>
+            <div id="categoryFilterContainer" class="mb-4"></div>
             <div id="inventoryGrid" class="inventory-grid"></div>
         </div>
     </div>
@@ -221,6 +224,7 @@ const CURRENT_USER_ID = <?php echo $currentUserId; ?>;
 let inventory = [];
 let assetCategories = [];
 let allBookings = [];
+let selectedCategoryId = 'all'; // State for the new category filter
 let codeReader = null;
 let datePicker = null;
 
@@ -255,6 +259,7 @@ async function fetchInitialData() {
 }
 
 function renderAll() {
+    renderCategoryFilters();
     renderInventory();
     renderAllBookingsTable();
     renderCategoriesList();
@@ -300,8 +305,25 @@ async function apiCall(action, method = 'POST', body = null) {
 function setupEventListeners() {
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
     document.getElementById('searchInput').addEventListener('keyup', renderInventory);
-    document.getElementById('filterType').addEventListener('change', renderInventory);
+    
+    // Updated listener for type filter
+    document.getElementById('filterType').addEventListener('change', () => {
+        selectedCategoryId = 'all'; // Reset category filter
+        renderCategoryFilters();
+        renderInventory();
+    });
+    
     document.getElementById('filterStatus').addEventListener('change', renderInventory);
+
+    // New listener for the category filter container (using event delegation)
+    document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
+        if (e.target.matches('.btn[data-category-id]')) {
+            selectedCategoryId = e.target.dataset.categoryId;
+            renderCategoryFilters(); // Re-render to update active button style
+            renderInventory();     // Re-render the inventory grid
+        }
+    });
+    
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('asset_type').addEventListener('change', toggleAssetFields);
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
@@ -409,6 +431,28 @@ async function handleDeleteCategory(categoryId, categoryName) {
 }
 
 // --- INVENTORY TAB ---
+function renderCategoryFilters() {
+    const container = document.getElementById('categoryFilterContainer');
+    const typeFilter = document.getElementById('filterType').value;
+
+    const relevantCategories = assetCategories.filter(cat => typeFilter === 'all' || cat.category_type === typeFilter);
+
+    if (relevantCategories.length < 1) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'flex';
+    let buttonsHTML = `<button class="btn ${selectedCategoryId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="all">Toutes les catégories</button>`;
+    
+    relevantCategories.forEach(cat => {
+        buttonsHTML += `<button class="btn ${selectedCategoryId == cat.category_id ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="${cat.category_id}">${cat.category_name}</button>`;
+    });
+
+    container.innerHTML = buttonsHTML;
+}
+
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('filterType').value;
@@ -419,7 +463,8 @@ function renderInventory() {
         const matchesSearch = s.includes(searchTerm);
         const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
         const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
-        return matchesSearch && matchesType && matchesStatus;
+        const matchesCategory = selectedCategoryId === 'all' || asset.category_id == selectedCategoryId;
+        return matchesSearch && matchesType && matchesStatus && matchesCategory;
     });
 
     inventoryGrid.innerHTML = '';
@@ -428,6 +473,7 @@ function renderInventory() {
     }
     filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
 }
+
 
 function createAssetCard(asset) {
     const card = document.createElement('div');
