@@ -31,7 +31,8 @@ $currentUserId = $currentUser['user_id'];
         .asset-card.maintenance { border-left-color: #ffc107; background-color: #ffc1071a; }
         .asset-card.in-use { border-left-color: #dc3545; background-color: #dc35461a; }
         .asset-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
-        .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; margin-right: 10px; }
+        .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; margin-right: 10px; cursor: pointer; transition: color 0.2s; }
+        .asset-title:hover { color: #0056b3; }
         .asset-status { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; white-space: nowrap; }
         .status-available { background: #d4edda; color: #155724; }
         .status-in-use { background: #f8d7da; color: #721c24; }
@@ -171,6 +172,37 @@ $currentUserId = $currentUser['user_id'];
     </div>
 </div>
 
+<div class="modal fade" id="editAssetModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifier l'Actif</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editAssetForm"></form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Historique pour : <span id="historyModalAssetName"></span></h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body" id="historyModalBody">
+                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <div class="modal fade" id="bookingModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -224,7 +256,7 @@ const CURRENT_USER_ID = <?php echo $currentUserId; ?>;
 let inventory = [];
 let assetCategories = [];
 let allBookings = [];
-let selectedCategoryId = 'all'; // State for the new category filter
+let selectedCategoryId = 'all'; 
 let codeReader = null;
 let datePicker = null;
 
@@ -232,10 +264,13 @@ let datePicker = null;
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
 const addAssetFormContent = `<div class="form-row"><div class="form-group col-md-6"><label for="asset_type">Type d'actif *</label><select id="asset_type" class="form-control" required><option value="tool" selected>🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="barcode" placeholder="Ex: TOOL001, 123456789" required></div></div><div class="form-group"><label for="asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required></div><div class="form-row"><div class="form-group col-md-6"><label for="brand">Marque</label><input type="text" class="form-control" id="brand" placeholder="Ex: DeWalt, Renault"></div><div class="form-group col-md-6"><label for="category_id">Catégorie</label><select id="category_id" class="form-control"></select></div></div><div id="tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="serial_or_plate_tool" placeholder="Ex: SN12345678"></div><div class="form-group col-md-6"><label for="position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3"></div></div></div><div id="vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="serial_or_plate_vehicle" placeholder="Ex: AA-123-BB"></div><div class="form-group col-md-6"><label for="fuel_level">Niveau de carburant</label><select id="fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>`;
+const editAssetFormContent = `<input type="hidden" id="edit_asset_id"><div class="form-row"><div class="form-group col-md-6"><label for="edit_asset_type">Type d'actif *</label><select id="edit_asset_type" class="form-control" required><option value="tool">🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="edit_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="edit_barcode" required></div></div><div class="form-group"><label for="edit_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="edit_asset_name" required></div><div class="form-row"><div class="form-group col-md-6"><label for="edit_brand">Marque</label><input type="text" class="form-control" id="edit_brand"></div><div class="form-group col-md-6"><label for="edit_category_id">Catégorie</label><select id="edit_category_id" class="form-control"></select></div></div><div id="edit_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="edit_serial_or_plate_tool"></div><div class="form-group col-md-6"><label for="edit_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="edit_position_or_info_tool"></div></div></div><div id="edit_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="edit_serial_or_plate_vehicle"></div><div class="form-group col-md-6"><label for="edit_fuel_level">Niveau de carburant</label><select id="edit_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary" id="saveAssetUpdateBtn"><i class="fas fa-save"></i> Sauvegarder</button></div>`;
+
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('addAssetForm').innerHTML = addAssetFormContent;
+    document.getElementById('editAssetForm').innerHTML = editAssetFormContent;
     setupEventListeners();
     loadingOverlay.style.display = 'flex';
     await fetchInitialData();
@@ -263,7 +298,7 @@ function renderAll() {
     renderInventory();
     renderAllBookingsTable();
     renderCategoriesList();
-    populateCategoryDropdown(document.getElementById('asset_type').value || 'tool');
+    populateCategoryDropdowns('add');
 }
 
 // --- API & HELPERS ---
@@ -306,28 +341,33 @@ function setupEventListeners() {
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
     document.getElementById('searchInput').addEventListener('keyup', renderInventory);
     
-    // Updated listener for type filter
     document.getElementById('filterType').addEventListener('change', () => {
-        selectedCategoryId = 'all'; // Reset category filter
+        selectedCategoryId = 'all'; 
         renderCategoryFilters();
         renderInventory();
     });
     
     document.getElementById('filterStatus').addEventListener('change', renderInventory);
 
-    // New listener for the category filter container (using event delegation)
     document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
         if (e.target.matches('.btn[data-category-id]')) {
             selectedCategoryId = e.target.dataset.categoryId;
-            renderCategoryFilters(); // Re-render to update active button style
-            renderInventory();     // Re-render the inventory grid
+            renderCategoryFilters();
+            renderInventory();
         }
     });
     
+    // Add/Edit Forms
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
-    document.getElementById('asset_type').addEventListener('change', toggleAssetFields);
+    document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
+    document.getElementById('asset_type').addEventListener('change', () => toggleAssetFields('add'));
+    document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
+    
+    // Scanner
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
+    
+    // Modals
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
     document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
@@ -352,20 +392,12 @@ function showTab(tabName) {
 function renderCategoriesList() {
     const toolList = document.getElementById('toolCategoriesList');
     const vehicleList = document.getElementById('vehicleCategoriesList');
-    toolList.innerHTML = '';
+    toolList.innerHTML = ''; 
     vehicleList.innerHTML = '';
-
     assetCategories.forEach(cat => {
         const li = document.createElement('li');
-        li.innerHTML = `
-            <span>${cat.category_name}</span>
-            <div class="category-actions">
-                <button class="btn btn-outline-primary btn-sm" onclick="openModifyCategoryModal(${cat.category_id}, '${cat.category_name.replace(/'/g, "\\'")}')"><i class="fas fa-pencil-alt"></i></button>
-                <button class="btn btn-outline-danger btn-sm" onclick="handleDeleteCategory(${cat.category_id}, '${cat.category_name.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button>
-            </div>
-        `;
-        if (cat.category_type === 'tool') toolList.appendChild(li);
-        else vehicleList.appendChild(li);
+        li.innerHTML = `<span>${cat.category_name}</span><div class="category-actions"><button class="btn btn-outline-primary btn-sm" onclick="openModifyCategoryModal(${cat.category_id}, '${escapeSingleQuotes(cat.category_name)}')"><i class="fas fa-pencil-alt"></i></button><button class="btn btn-outline-danger btn-sm" onclick="handleDeleteCategory(${cat.category_id}, '${escapeSingleQuotes(cat.category_name)}')"><i class="fas fa-trash"></i></button></div>`;
+        if (cat.category_type === 'tool') toolList.appendChild(li); else vehicleList.appendChild(li);
     });
     if (toolList.innerHTML === '') toolList.innerHTML = '<li>Aucune catégorie d\'outil.</li>';
     if (vehicleList.innerHTML === '') vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
@@ -434,22 +466,13 @@ async function handleDeleteCategory(categoryId, categoryName) {
 function renderCategoryFilters() {
     const container = document.getElementById('categoryFilterContainer');
     const typeFilter = document.getElementById('filterType').value;
-
     const relevantCategories = assetCategories.filter(cat => typeFilter === 'all' || cat.category_type === typeFilter);
-
-    if (relevantCategories.length < 1) {
-        container.innerHTML = '';
-        container.style.display = 'none';
-        return;
-    }
-    
+    if (relevantCategories.length < 1) { container.innerHTML = ''; container.style.display = 'none'; return; }
     container.style.display = 'flex';
     let buttonsHTML = `<button class="btn ${selectedCategoryId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="all">Toutes les catégories</button>`;
-    
     relevantCategories.forEach(cat => {
         buttonsHTML += `<button class="btn ${selectedCategoryId == cat.category_id ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="${cat.category_id}">${cat.category_name}</button>`;
     });
-
     container.innerHTML = buttonsHTML;
 }
 
@@ -457,7 +480,6 @@ function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('filterType').value;
     const statusFilter = document.getElementById('filterStatus').value;
-
     const filtered = inventory.filter(asset => {
         const s = ((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase();
         const matchesSearch = s.includes(searchTerm);
@@ -466,14 +488,10 @@ function renderInventory() {
         const matchesCategory = selectedCategoryId === 'all' || asset.category_id == selectedCategoryId;
         return matchesSearch && matchesType && matchesStatus && matchesCategory;
     });
-
     inventoryGrid.innerHTML = '';
-    if (filtered.length === 0) {
-        inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif ne correspond à vos critères.</h4></div>`;
-    }
+    if (filtered.length === 0) { inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif ne correspond à vos critères.</h4></div>`; }
     filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
 }
-
 
 function createAssetCard(asset) {
     const card = document.createElement('div');
@@ -482,31 +500,25 @@ function createAssetCard(asset) {
 
     const assignedTo = asset.status === 'in-use' ? `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>` : '';
     const bookingInfo = asset.status === 'available' && asset.next_booking_date ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Proch. résa: ${new Date(asset.next_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` : '';
-    
-    const details = asset.asset_type === 'tool' ? `
-        <strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br>
-        <strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>
-    ` : `
-        <strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br>
-        <strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>
-    `;
+    const details = asset.asset_type === 'tool' ? `<strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>` : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
 
     let buttons = '';
     if (asset.status === 'available') {
         buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
-        buttons += `<button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${asset.asset_name.replace(/'/g, "\\'")}')"><i class="fas fa-tools"></i> Maint.</button>`;
+        buttons += `<button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
     } else if (asset.status === 'maintenance') {
         buttons += `<button class="btn btn-info btn-small" onclick="setAssetAvailable(${asset.asset_id})"><i class="fas fa-check-circle"></i> Rendre Dispo.</button>`;
     }
 
     if (IS_ADMIN) {
-        buttons += `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${asset.asset_name.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button>`;
+        buttons += `<button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button>`;
+        buttons += `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
     }
 
     card.innerHTML = `
         <div>
             <div class="asset-header">
-                <span class="asset-title"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span>
+                <span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span>
                 <span class="asset-status status-${asset.status}">${asset.status.replace('-', ' ')}</span>
             </div>
             <div class="asset-details">
@@ -519,7 +531,12 @@ function createAssetCard(asset) {
     return card;
 }
 
-// --- BOOKING LOGIC ---
+function escapeSingleQuotes(str) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/'/g, "\\'");
+}
+
+// --- BOOKING & HISTORY MODALS ---
 function initializeDatePicker() {
     datePicker = flatpickr("#booking_date", {
         locale: "fr",
@@ -568,6 +585,38 @@ async function handleSaveBooking() {
         loadingOverlay.style.display = 'none';
     }
 }
+
+async function openHistoryModal(assetId, assetName) {
+    $('#historyModalAssetName').text(assetName);
+    const modalBody = $('#historyModalBody');
+    modalBody.html('<div class="text-center"><div class="spinner-border text-primary"></div></div>');
+    $('#historyModal').modal('show');
+
+    try {
+        const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
+        if (data.history.length === 0) {
+            modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation pour cet actif.</p>');
+            return;
+        }
+
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
+        data.history.forEach(rec => {
+            tableHtml += `
+                <tr>
+                    <td>${new Date(rec.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                    <td>${rec.prenom} ${rec.nom}</td>
+                    <td>${rec.mission || 'N/A'}</td>
+                    <td><span class="badge badge-info">${rec.status}</span></td>
+                </tr>`;
+        });
+        tableHtml += '</tbody></table></div>';
+        modalBody.html(tableHtml);
+
+    } catch (error) {
+        modalBody.html('<p class="text-danger text-center">Erreur lors du chargement de l\'historique.</p>');
+    }
+}
+
 
 // --- ALL BOOKINGS TAB ---
 function renderAllBookingsTable() {
@@ -725,20 +774,25 @@ async function setAssetAvailable(assetId) {
     await setMaintenanceStatus(assetId, 'available');
 }
 
-// --- ADD ASSET & CATEGORIES DROPDOWN ---
-function toggleAssetFields() {
-    const type = document.getElementById('asset_type').value;
-    document.getElementById('tool_fields').style.display = (type === 'tool') ? 'block' : 'none';
-    document.getElementById('vehicle_fields').style.display = (type === 'vehicle') ? 'block' : 'none';
-    populateCategoryDropdown(type);
+// --- ADD/EDIT ASSET & CATEGORIES DROPDOWN ---
+function toggleAssetFields(formPrefix) {
+    const type = document.getElementById(`${formPrefix}_asset_type`).value;
+    document.getElementById(`${formPrefix}_tool_fields`).style.display = (type === 'tool') ? 'block' : 'none';
+    document.getElementById(`${formPrefix}_vehicle_fields`).style.display = (type === 'vehicle') ? 'block' : 'none';
+    populateCategoryDropdowns(formPrefix);
 }
 
-function populateCategoryDropdown(assetType) {
-    const dropdown = document.getElementById('category_id');
+function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
+    const assetType = document.getElementById(`${formPrefix}_asset_type`).value;
+    const dropdown = document.getElementById(`${formPrefix}_category_id`);
     dropdown.innerHTML = '<option value="">-- Sans catégorie --</option>';
     if (assetCategories && assetCategories.length > 0) {
-        assetCategories.filter(cat => cat.category_type === assetType)
+        assetCategories
+            .filter(cat => cat.category_type === assetType)
             .forEach(cat => dropdown.add(new Option(cat.category_name, cat.category_id)));
+    }
+    if (selectedCategoryId) {
+        dropdown.value = selectedCategoryId;
     }
 }
 
@@ -760,7 +814,7 @@ async function handleAddAsset(e) {
         await apiCall('add_asset', 'POST', assetData);
         showNotification('Actif ajouté avec succès!', 'success');
         document.getElementById('addAssetForm').reset();
-        toggleAssetFields();
+        toggleAssetFields('add');
         await fetchInitialData();
         renderAll();
         showTab('inventory');
@@ -776,6 +830,66 @@ async function handleDeleteAsset(assetId, assetName) {
         showNotification('Actif supprimé avec succès!', 'success');
         await fetchInitialData();
         renderAll();
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+function openEditModal(assetId) {
+    const asset = inventory.find(a => a.asset_id == assetId);
+    if (!asset) { showNotification("Actif non trouvé.", "error"); return; }
+
+    // Populate common fields
+    $('#edit_asset_id').val(asset.asset_id);
+    $('#edit_asset_type').val(asset.asset_type);
+    $('#edit_asset_name').val(asset.asset_name);
+    $('#edit_barcode').val(asset.barcode);
+    $('#edit_brand').val(asset.brand);
+
+    // Trigger field toggle and populate categories
+    toggleAssetFields('edit');
+    populateCategoryDropdowns('edit', asset.category_id);
+
+    // Populate type-specific fields
+    if (asset.asset_type === 'tool') {
+        $('#edit_serial_or_plate_tool').val(asset.serial_or_plate);
+        $('#edit_position_or_info_tool').val(asset.position_or_info);
+    } else { // vehicle
+        $('#edit_serial_or_plate_vehicle').val(asset.serial_or_plate);
+        $('#edit_fuel_level').val(asset.fuel_level);
+    }
+
+    $('#editAssetModal').modal('show');
+}
+
+async function handleUpdateAsset(e) {
+    e.preventDefault();
+    const type = document.getElementById('edit_asset_type').value;
+    const assetData = {
+        asset_id: document.getElementById('edit_asset_id').value,
+        barcode: document.getElementById('edit_barcode').value,
+        asset_type: type,
+        asset_name: document.getElementById('edit_asset_name').value,
+        brand: document.getElementById('edit_brand').value,
+        category_id: document.getElementById('edit_category_id').value || null,
+        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('edit_serial_or_plate_vehicle').value,
+        position_or_info: type === 'tool' ? document.getElementById('edit_position_or_info_tool').value : null,
+        fuel_level: type === 'vehicle' ? document.getElementById('edit_fuel_level').value : null,
+    };
+
+    loadingOverlay.style.display = 'flex';
+    try {
+        const result = await apiCall('update_asset', 'POST', assetData);
+        showNotification('Actif mis à jour avec succès!', 'success');
+        
+        // Update the asset in the local inventory array for instant UI update
+        const index = inventory.findIndex(a => a.asset_id == result.asset.asset_id);
+        if (index !== -1) {
+            inventory[index] = result.asset;
+        }
+        renderInventory(); // Re-render the grid
+        
+        $('#editAssetModal').modal('hide');
     } finally {
         loadingOverlay.style.display = 'none';
     }
