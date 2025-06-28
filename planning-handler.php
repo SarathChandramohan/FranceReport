@@ -276,7 +276,7 @@ function deleteMissionGroup($conn, $data) {
 /**
  * Assigns a worker to an existing mission group.
  */
-function assignWorkerToMission($conn, $creator_id, $data) { //
+function assignWorkerToMission($conn, $creator_id, $data) {
     $worker_id = $data['worker_id'];
     $mission_id = $data['mission_id'];
     
@@ -300,7 +300,7 @@ function assignWorkerToMission($conn, $creator_id, $data) { //
 /**
  * Removes a single worker from a mission group.
  */
-function removeWorkerFromMission($conn, $data) { //
+function removeWorkerFromMission($conn, $data) {
     $worker_id = $data['worker_id'];
     $mission_id = $data['mission_id'];
     
@@ -321,7 +321,7 @@ function removeWorkerFromMission($conn, $data) { //
 /**
  * Toggles the validation status for an entire mission group.
  */
-function toggleMissionValidation($conn, $data) { //
+function toggleMissionValidation($conn, $data) {
     $mission_id = $data['mission_id'];
     $conn->beginTransaction();
 
