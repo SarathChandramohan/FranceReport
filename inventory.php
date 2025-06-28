@@ -263,7 +263,8 @@ let datePicker = null;
 // --- DOM ELEMENTS & TEMPLATES ---
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
-const addAssetFormContent = `<div class="form-row"><div class="form-group col-md-6"><label for="asset_type">Type d'actif *</label><select id="asset_type" class="form-control" required><option value="tool" selected>🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="barcode" placeholder="Ex: TOOL001, 123456789" required></div></div><div class="form-group"><label for="asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required></div><div class="form-row"><div class="form-group col-md-6"><label for="brand">Marque</label><input type="text" class="form-control" id="brand" placeholder="Ex: DeWalt, Renault"></div><div class="form-group col-md-6"><label for="category_id">Catégorie</label><select id="category_id" class="form-control"></select></div></div><div id="tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="serial_or_plate_tool" placeholder="Ex: SN12345678"></div><div class="form-group col-md-6"><label for="position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3"></div></div></div><div id="vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="serial_or_plate_vehicle" placeholder="Ex: AA-123-BB"></div><div class="form-group col-md-6"><label for="fuel_level">Niveau de carburant</label><select id="fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>`;
+// CORRECTED: Added 'add_' prefix to all IDs and 'for' attributes
+const addAssetFormContent = `<div class="form-row"><div class="form-group col-md-6"><label for="add_asset_type">Type d'actif *</label><select id="add_asset_type" class="form-control" required><option value="tool" selected>🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="add_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="add_barcode" placeholder="Ex: TOOL001, 123456789" required></div></div><div class="form-group"><label for="add_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="add_asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required></div><div class="form-row"><div class="form-group col-md-6"><label for="add_brand">Marque</label><input type="text" class="form-control" id="add_brand" placeholder="Ex: DeWalt, Renault"></div><div class="form-group col-md-6"><label for="add_category_id">Catégorie</label><select id="add_category_id" class="form-control"></select></div></div><div id="add_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="add_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="add_serial_or_plate_tool" placeholder="Ex: SN12345678"></div><div class="form-group col-md-6"><label for="add_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="add_position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3"></div></div></div><div id="add_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="add_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="add_serial_or_plate_vehicle" placeholder="Ex: AA-123-BB"></div><div class="form-group col-md-6"><label for="add_fuel_level">Niveau de carburant</label><select id="add_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>`;
 const editAssetFormContent = `<input type="hidden" id="edit_asset_id"><div class="form-row"><div class="form-group col-md-6"><label for="edit_asset_type">Type d'actif *</label><select id="edit_asset_type" class="form-control" required><option value="tool">🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="edit_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="edit_barcode" required></div></div><div class="form-group"><label for="edit_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="edit_asset_name" required></div><div class="form-row"><div class="form-group col-md-6"><label for="edit_brand">Marque</label><input type="text" class="form-control" id="edit_brand"></div><div class="form-group col-md-6"><label for="edit_category_id">Catégorie</label><select id="edit_category_id" class="form-control"></select></div></div><div id="edit_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="edit_serial_or_plate_tool"></div><div class="form-group col-md-6"><label for="edit_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="edit_position_or_info_tool"></div></div></div><div id="edit_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="edit_serial_or_plate_vehicle"></div><div class="form-group col-md-6"><label for="edit_fuel_level">Niveau de carburant</label><select id="edit_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary" id="saveAssetUpdateBtn"><i class="fas fa-save"></i> Sauvegarder</button></div>`;
 
 
@@ -360,7 +361,7 @@ function setupEventListeners() {
     // Add/Edit Forms
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
-    document.getElementById('asset_type').addEventListener('change', () => toggleAssetFields('add'));
+    document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
     document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
     
     // Scanner
@@ -736,7 +737,8 @@ async function processScanResult(barcode) {
             case 'asset_not_found':
                 if (confirm(data.message)) {
                     showTab('add_asset');
-                    $('#barcode').val(data.barcode);
+                    // CORRECTED: Use the correct prefixed ID
+                    $('#add_barcode').val(data.barcode);
                 }
                 break;
         }
@@ -783,7 +785,9 @@ function toggleAssetFields(formPrefix) {
 }
 
 function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
-    const assetType = document.getElementById(`${formPrefix}_asset_type`).value;
+    const assetTypeElement = document.getElementById(`${formPrefix}_asset_type`);
+    if (!assetTypeElement) return; // Guard clause to prevent errors if element doesn't exist yet
+    const assetType = assetTypeElement.value;
     const dropdown = document.getElementById(`${formPrefix}_category_id`);
     dropdown.innerHTML = '<option value="">-- Sans catégorie --</option>';
     if (assetCategories && assetCategories.length > 0) {
@@ -798,16 +802,17 @@ function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
 
 async function handleAddAsset(e) {
     e.preventDefault();
-    const type = document.getElementById('asset_type').value;
+    // CORRECTED: Use prefixed IDs to get values
+    const type = document.getElementById('add_asset_type').value;
     const assetData = {
-        barcode: document.getElementById('barcode').value,
+        barcode: document.getElementById('add_barcode').value,
         asset_type: type,
-        asset_name: document.getElementById('asset_name').value,
-        brand: document.getElementById('brand').value,
-        category_id: document.getElementById('category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('serial_or_plate_tool').value : document.getElementById('serial_or_plate_vehicle').value,
-        position_or_info: type === 'tool' ? document.getElementById('position_or_info_tool').value : null,
-        fuel_level: type === 'vehicle' ? document.getElementById('fuel_level').value : null,
+        asset_name: document.getElementById('add_asset_name').value,
+        brand: document.getElementById('add_brand').value,
+        category_id: document.getElementById('add_category_id').value || null,
+        serial_or_plate: type === 'tool' ? document.getElementById('add_serial_or_plate_tool').value : document.getElementById('add_serial_or_plate_vehicle').value,
+        position_or_info: type === 'tool' ? document.getElementById('add_position_or_info_tool').value : null,
+        fuel_level: type === 'vehicle' ? document.getElementById('add_fuel_level').value : null,
     };
     loadingOverlay.style.display = 'flex';
     try {
