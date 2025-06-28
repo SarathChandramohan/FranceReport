@@ -1,11 +1,10 @@
 <?php
-// planning.php (Final, Complete with NEW Inventory Modal UI)
+// planning.php (Final version with new conditional asset modal UI)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
 
 $user = getCurrentUser();
-// This page is for admins only. Redirect if not an admin.
 if ($user['role'] !== 'admin') {
     header('Location: dashboard.php');
     exit();
@@ -57,7 +56,7 @@ $default_color = $predefined_colors[0];
         #assigned_workers_pills .badge, #assigned_assets_display .badge { margin: 2px; font-size: 0.6rem; }
         .remove-assigned-worker { cursor: pointer; }
         label.list-group-item.disabled { background-color: #f8f9fa; cursor: not-allowed; }
-        label.list-group-item.disabled, label.list-group-item.disabled span { color: #6c757d; }
+        label.list-group-item.disabled, label.list-group-item.disabled span, label.list-group-item.disabled small { color: #6c757d; }
     </style>
 </head>
 <body>
@@ -112,23 +111,25 @@ $default_color = $predefined_colors[0];
                         </div>
                         <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
                         
-                        <hr>
-                        <div class="form-group" id="assign-users-group" style="display:none;">
+                        <div id="assign-users-group" style="display:none;">
+                             <hr>
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
                             <label>Ouvriers assignés *</label>
                             <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;"><span class="text-muted small p-2" id="no_workers_assigned_text">Aucun ouvrier assigné.</span></div>
                             <label>Cliquer pour assigner un ouvrier :</label>
                             <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
                         </div>
-
-                        <hr>
-                        <div class="form-group">
-                            <input type="hidden" name="assigned_asset_ids" id="assigned_asset_ids_hidden">
-                            <label>Matériel assigné</label>
-                            <div id="assigned_assets_display" class="d-flex flex-wrap align-items-center border rounded p-2 mb-2 bg-light" style="min-height: 50px;">
-                                <span class="text-muted small p-2">Aucun matériel assigné.</span>
+                        
+                        <div id="asset-management-container" style="display: none;">
+                            <hr>
+                            <div class="form-group">
+                                <input type="hidden" name="assigned_asset_ids" id="assigned_asset_ids_hidden">
+                                <label>Matériel assigné</label>
+                                <div id="assigned_assets_display" class="d-flex flex-wrap align-items-center border rounded p-2 mb-2 bg-light" style="min-height: 50px;">
+                                    <span class="text-muted small p-2">Aucun matériel assigné.</span>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-info" id="manageAssetsBtn">Gérer le Matériel</button>
                             </div>
-                            <button type="button" class="btn btn-sm btn-info" id="manageAssetsBtn">Gérer le Matériel</button>
                         </div>
 
                         <div id="modal_error_message" class="alert alert-danger mt-3" style="display: none;"></div>
@@ -259,13 +260,10 @@ document.addEventListener('DOMContentLoaded', function() {
             dayDate.setDate(dayDate.getDate() + i);
             const dateStr = formatDate(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
-
             const $dayHeader = $(`<div class="day-header" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-mission-to-day-btn" title="Ajouter une mission"><i class="fas fa-plus-circle"></i></button></div>`);
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
             const $dayContent = $(`<div class="day-content p-2" data-date="${dateStr}"></div>`).appendTo($dayColumn);
-            
             $planningContainer.append($dayColumn);
-
             const dayMissions = state.missions.filter(m => m.assignment_date === dateStr);
             if (dayMissions.length > 0) {
                 dayMissions.forEach(mission => $dayContent.append(createMissionCard(mission)));
@@ -281,7 +279,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const workersHtml = assignedNames.map((name, i) => `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${assignedIds[i]}"></i></li>`).join('');
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
-
         return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
                 <div class="mission-card-body">
@@ -302,7 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 mission.assigned_user_ids.split(',').forEach(id => workerAssignmentCounts.set(id, (workerAssignmentCounts.get(id) || 0) + 1));
             }
         });
-
         $workerList.empty();
         state.staff.forEach(worker => {
             const count = workerAssignmentCounts.get(String(worker.user_id)) || 0;
@@ -318,56 +314,34 @@ document.addEventListener('DOMContentLoaded', function() {
         assignedWorkersInModal.forEach(w => $list.append(`<span class="badge badge-primary p-2 m-1">${w.name}<i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${w.id}"></i></span>`));
         $hidden.val(assignedWorkersInModal.map(w => w.id).join(','));
     }
-    
     function renderAvailableWorkersInModal() {
-        const $list = $('#modal_available_workers');
-        $list.empty();
+        const $list = $('#modal_available_workers'); $list.empty();
         const assignedIds = new Set(assignedWorkersInModal.map(w => String(w.id)));
         state.staff.forEach(w => { if (!assignedIds.has(String(w.user_id))) $list.append(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${w.user_id}" data-worker-name="${w.prenom} ${w.nom}">${w.prenom} ${w.nom}</a>`); });
     }
 
-    // --- ASSET ASSIGNMENT LOGIC (NEW MODAL APPROACH) ---
-    function getDatesFromModal() {
-        const dates = [];
-        const isMulti = $('#multi_day_fields').is(':visible');
-        const start = $('#missionForm input[name="start_date"]').val();
-        const end = $('#missionForm input[name="end_date"]').val();
-        const single = $('#assignment_date_form').val();
-        if (isMulti && start && end) {
-            for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
-                dates.push(formatDate(new Date(d)));
-            }
-        } else if(single) {
-            dates.push(single);
-        }
-        return dates;
-    }
-
+    // --- NEW ASSET ASSIGNMENT LOGIC ---
     function updateAssignedAssetsDisplay() {
         const $display = $('#assigned_assets_display');
         const $hiddenInput = $('#assigned_asset_ids_hidden');
         $display.empty();
-
         if (assignedAssetsInModal.length > 0) {
             assignedAssetsInModal.forEach(asset => {
-                const pillHtml = $(`<span class="badge badge-info p-2 m-1">${asset.name}</span>`);
-                $display.append(pillHtml);
+                const displayText = asset.serial ? `${asset.name} (${asset.serial})` : asset.name;
+                $display.append(`<span class="badge badge-info p-2 m-1">${displayText}</span>`);
             });
         } else {
             $display.html('<span class="text-muted small p-2">Aucun matériel assigné.</span>');
         }
         $hiddenInput.val(assignedAssetsInModal.map(a => a.id).join(','));
     }
-
+    
     function populateAssetAssignmentModal() {
-        const $list = $('#asset_assignment_list');
-        $list.empty();
-
+        const $list = $('#asset_assignment_list'); $list.empty();
         const assignedIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
         const missionDates = getDatesFromModal();
         const missionId = $('#mission_id_form').val();
         const currentMission = missionId ? state.missions.find(m => m.mission_id == missionId) : null;
-
         const bookedAssetIds = new Set();
         state.bookings.forEach(b => {
             if (missionDates.includes(b.booking_date)) {
@@ -375,25 +349,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 bookedAssetIds.add(String(b.asset_id));
             }
         });
-        
         const searchTerm = $('#asset_assignment_search').val().toLowerCase();
-        state.inventory
-            .filter(asset => asset.asset_name.toLowerCase().includes(searchTerm))
-            .forEach(asset => {
-                const isBooked = bookedAssetIds.has(String(asset.asset_id));
-                const isChecked = assignedIds.has(String(asset.asset_id));
-
-                const itemHtml = `
-                    <label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isBooked && !isChecked ? 'disabled' : ''}">
-                        <span>
-                            <input type="checkbox" class="mr-3" value="${asset.asset_id}" data-asset-name="${asset.asset_name}" ${isChecked ? 'checked' : ''} ${isBooked && !isChecked ? 'disabled' : ''}>
-                            ${asset.asset_name}
-                        </span>
-                        ${isBooked ? `<span class="badge badge-danger">Réservé</span>` : ''}
-                    </label>
-                `;
-                $list.append(itemHtml);
-            });
+        state.inventory.filter(asset => (asset.asset_name.toLowerCase() + (asset.serial_or_plate || '')).includes(searchTerm)).forEach(asset => {
+            const isBooked = bookedAssetIds.has(String(asset.asset_id));
+            const isChecked = assignedIds.has(String(asset.asset_id));
+            const serialText = asset.serial_or_plate || '';
+            const itemHtml = `<label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isBooked && !isChecked ? 'disabled' : ''}">
+                <span><input type="checkbox" class="mr-3" value="${asset.asset_id}" data-asset-name="${asset.asset_name}" data-asset-serial="${serialText}" ${isChecked ? 'checked' : ''} ${isBooked && !isChecked ? 'disabled' : ''}>
+                ${asset.asset_name} <small class="text-muted ml-2">${serialText}</small></span>
+                ${isBooked ? `<span class="badge badge-danger">Réservé</span>` : ''}</label>`;
+            $list.append(itemHtml);
+        });
     }
 
     // --- EVENT HANDLERS ---
@@ -401,20 +367,17 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchInitialData(); });
     
     $('#addMultiDayMissionBtn').on('click', function() {
-        assignedWorkersInModal = []; 
-        assignedAssetsInModal = [];
-        $missionModal.find('form')[0].reset(); 
-        hideModalError();
+        assignedWorkersInModal = []; assignedAssetsInModal = [];
+        $missionModal.find('form')[0].reset(); hideModalError();
         $('#shift_type_buttons label').removeClass('active');
         $missionModal.find('input[name="mission_id"]').val('');
         $('#modalDateDisplay').hide();
         $('#multi_day_fields').show();
         $('#assign-users-group').show();
+        $('#asset-management-container').hide(); // Hide for multi-day
         $('#deleteMissionBtn').hide();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
-        
-        renderAssignedWorkersInModal(); 
-        renderAvailableWorkersInModal();
+        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
@@ -455,10 +418,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function openModalForCreate(date) {
-        assignedWorkersInModal = []; 
-        assignedAssetsInModal = [];
-        $missionModal.find('form')[0].reset(); 
-        hideModalError();
+        assignedWorkersInModal = []; assignedAssetsInModal = [];
+        $missionModal.find('form')[0].reset(); hideModalError();
         $('#shift_type_buttons label').removeClass('active');
         $missionModal.find('input[name="mission_id"]').val('');
         $missionModal.find('input[name="assignment_date"]').val(date);
@@ -468,9 +429,8 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
         $missionModal.find('#deleteMissionBtn').hide();
         $('#assign-users-group').show();
-        
-        renderAssignedWorkersInModal(); 
-        renderAvailableWorkersInModal();
+        $('#asset-management-container').show(); // Show for single-day create
+        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     }
@@ -478,12 +438,9 @@ document.addEventListener('DOMContentLoaded', function() {
     $planningContainer.on('click', '.mission-card-body', function() {
         const mission = state.missions.find(m => m.mission_id == $(this).closest('.mission-card').data('mission-id'));
         if (!mission) return;
-
-        $missionModal.find('form')[0].reset(); 
-        hideModalError();
-        assignedWorkersInModal = []; // Not editing workers here
+        $missionModal.find('form')[0].reset(); hideModalError();
+        assignedWorkersInModal = []; 
         assignedAssetsInModal = mission.assigned_assets || [];
-        
         $('#shift_type_buttons label').removeClass('active');
         $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
@@ -501,31 +458,29 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
         $missionModal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
-        
+        $('#asset-management-container').show(); // Show for edit
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
     
+    // --- EVENT LISTENERS CONTINUED ---
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const dis = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', dis).val(dis ? '' : $('#mission_start_time').val()); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
-    // Worker assignment listeners
     $('#modal_available_workers').on('click', '.list-group-item', function(e) { e.preventDefault(); assignedWorkersInModal.push({ id: $(this).data('worker-id'), name: $(this).data('worker-name') }); renderAssignedWorkersInModal(); $(this).remove(); });
     $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() { const id = $(this).data('worker-id'); assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(id)); renderAssignedWorkersInModal(); renderAvailableWorkersInModal(); });
-
-    // Asset assignment modal listeners
+    
     $('#manageAssetsBtn').on('click', function() { populateAssetAssignmentModal(); $('#assetAssignmentModal').modal('show'); });
     $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
     $('#confirmAssetAssignmentBtn').on('click', function() {
         assignedAssetsInModal = [];
         $('#asset_assignment_list input[type="checkbox"]:checked').each(function() {
-            assignedAssetsInModal.push({ id: $(this).val(), name: $(this).data('asset-name') });
+            assignedAssetsInModal.push({ id: $(this).val(), name: $(this).data('asset-name'), serial: $(this).data('asset-serial') });
         });
         updateAssignedAssetsDisplay();
         $('#assetAssignmentModal').modal('hide');
     });
 
-    // Main form submit
     $('#missionForm').on('submit', async function(e) {
         e.preventDefault();
         hideModalError();
@@ -533,7 +488,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) { showModalError("Veuillez assigner au moins un ouvrier."); return; }
         if (formData.assigned_user_ids) formData.assigned_user_ids = formData.assigned_user_ids.split(',').filter(id => id);
         if (formData.assigned_asset_ids) formData.assigned_asset_ids = formData.assigned_asset_ids.split(',').filter(id => id); else formData.assigned_asset_ids = [];
-        
         showLoading(true);
         try {
             await apiCall('save_mission', 'POST', formData);
@@ -544,15 +498,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $missionModal.on('hidden.bs.modal', function () {
         hideModalError();
-        assignedAssetsInModal = []; 
-        assignedWorkersInModal = [];
+        assignedAssetsInModal = []; assignedWorkersInModal = [];
+        $('#asset-management-container').hide();
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
     });
 
-    // --- CONFIRMATION & DELETE LOGIC ---
-    const $confirmationModal = $('#confirmationModal');
-    const $confirmBtn = $('#confirmActionBtn');
-
+    const $confirmationModal = $('#confirmationModal'), $confirmBtn = $('#confirmActionBtn');
     function showConfirmation(body, onConfirm) {
         $confirmationModal.find('#confirmationModalBody').text(body);
         $confirmBtn.off('click').on('click', () => { onConfirm(); $confirmationModal.modal('hide'); });
@@ -562,7 +513,6 @@ document.addEventListener('DOMContentLoaded', function() {
     $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); const workerName = $(this).closest('li').text().trim(); showConfirmation(`Retirer ${workerName} de cette mission ?`, async () => { showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { mission_id: missionId, worker_id: workerId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
     $('#deleteMissionBtn').on('click', function() { const missionId = $('#mission_id_form').val(); if (!missionId) return; $missionModal.modal('hide'); showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => { showLoading(true); try { await apiCall('delete_mission_group', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
 
-    // --- Init ---
     fetchInitialData();
 });
 </script>
