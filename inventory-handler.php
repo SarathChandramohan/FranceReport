@@ -1,5 +1,5 @@
 <?php
-// inventory-handler.php (REWORKED - FULL CODE with Category Management)
+// inventory-handler.php (REWORKED - FULL CODE with Edit & History)
 
 require_once 'session-management.php';
 requireLogin();
@@ -17,6 +17,9 @@ try {
             break;
         case 'add_asset':
             addAsset($conn, $currentUser);
+            break;
+        case 'update_asset': // New Action
+            updateAsset($conn, $currentUser);
             break;
         case 'delete_asset':
             deleteAsset($conn, $currentUser);
@@ -37,6 +40,9 @@ try {
             break;
         case 'get_asset_availability':
             getAssetAvailability($conn);
+            break;
+        case 'get_asset_history': // New Action
+            getAssetHistory($conn);
             break;
         case 'cancel_booking':
             cancelBooking($conn, $currentUser);
@@ -83,7 +89,96 @@ function respondWithError($message, $code = 400) {
     exit;
 }
 
-// --- CATEGORY FUNCTIONS ---
+
+// --- INVENTORY & ASSET FUNCTIONS ---
+
+function updateAsset($conn, $user) {
+    if ($user['role'] !== 'admin') respondWithError("Accès non autorisé.", 403);
+
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!$data || !isset($data['asset_id'], $data['barcode'], $data['asset_name'], $data['asset_type'])) {
+        throw new Exception("Données manquantes pour la mise à jour.");
+    }
+
+    $asset_id = $data['asset_id'];
+    $barcode = trim($data['barcode']);
+    $asset_name = trim($data['asset_name']);
+
+    if (empty($barcode) || empty($asset_name)) {
+        throw new Exception("Le code-barres et le nom de l'actif sont obligatoires.");
+    }
+
+    // Check if the new barcode is already used by another asset
+    $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Inventory WHERE barcode = ? AND asset_id != ?");
+    $stmt_check->execute([$barcode, $asset_id]);
+    if ($stmt_check->fetchColumn() > 0) {
+        throw new Exception("Ce code-barres est déjà utilisé par un autre actif.");
+    }
+
+    $sql = "UPDATE Inventory SET 
+                barcode = ?, 
+                asset_type = ?, 
+                category_id = ?, 
+                asset_name = ?, 
+                brand = ?, 
+                serial_or_plate = ?, 
+                position_or_info = ?, 
+                fuel_level = ?,
+                last_modified = GETDATE()
+            WHERE asset_id = ?";
+
+    $params = [
+        $barcode,
+        $data['asset_type'],
+        empty($data['category_id']) ? null : $data['category_id'],
+        $asset_name,
+        empty($data['brand']) ? null : trim($data['brand']),
+        empty($data['serial_or_plate']) ? null : trim($data['serial_or_plate']),
+        empty($data['position_or_info']) ? null : trim($data['position_or_info']),
+        empty($data['fuel_level']) ? null : $data['fuel_level'],
+        $asset_id
+    ];
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
+
+    // Fetch and return the updated asset data
+    $select_stmt = $conn->prepare("SELECT i.*, ac.category_name, u.prenom AS assigned_to_prenom, u.nom AS assigned_to_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id WHERE i.asset_id = ?");
+    $select_stmt->execute([$asset_id]);
+    $updatedAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($updatedAsset) {
+        respondWithSuccess(['asset' => $updatedAsset], "Actif mis à jour avec succès.");
+    } else {
+        throw new Exception("Échec de la mise à jour de l'actif.");
+    }
+}
+
+function getAssetHistory($conn) {
+    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
+    if (!$asset_id) {
+        throw new Exception("ID de l'actif manquant.");
+    }
+
+    $sql = "SELECT 
+                b.booking_date, 
+                b.mission, 
+                b.status, 
+                u.prenom, 
+                u.nom 
+            FROM Bookings b 
+            JOIN Users u ON b.user_id = u.user_id 
+            WHERE b.asset_id = ? AND b.status IN ('active', 'completed')
+            ORDER BY b.booking_date DESC";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id]);
+    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    respondWithSuccess(['history' => $history]);
+}
+
+// --- CATEGORY FUNCTIONS (UNCHANGED) ---
 function getAssetCategories($conn) {
     $stmt = $conn->prepare("SELECT category_id, category_name, category_type FROM AssetCategories ORDER BY category_name");
     $stmt->execute();
@@ -168,7 +263,7 @@ function deleteCategory($conn, $user) {
 }
 
 
-// --- INVENTORY & OTHER FUNCTIONS ---
+// --- INVENTORY & OTHER FUNCTIONS (UNCHANGED) ---
 
 function getInventory($conn) {
     $sql = "SELECT 
