@@ -301,3 +301,14 @@ ALTER TABLE Bookings
 ALTER COLUMN user_id INT NULL;
 
 -----------------------------------------------------------
+
+-- Add the mission_group_id to link missions and bookings reliably
+ALTER TABLE Planning_Assignments ADD mission_group_id UNIQUEIDENTIFIER;
+ALTER TABLE Bookings ADD mission_group_id UNIQUEIDENTIFIER;
+
+-- Make the user_id in Bookings nullable to allow for mission-based (non-user) reservations
+ALTER TABLE Bookings ALTER COLUMN user_id INT NULL;
+
+-- Add indexes for better performance
+CREATE INDEX IX_Planning_Assignments_MissionGroupId ON Planning_Assignments(mission_group_id);
+CREATE INDEX IX_Bookings_MissionGroupId ON Bookings(mission_group_id);
