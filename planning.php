@@ -308,12 +308,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',') : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
-        // *** BUGFIX: Each remove button now has the correct worker ID to identify the user to be removed. ***
         const workersHtml = assignedNames.map((name, i) => `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${assignedIds[i]}"></i></li>`).join('');
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
         
-        // *** BUGFIX: Card now stores `data-mission-group-id` and `data-assignment-date` for unique identification. ***
         return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-group-id="${mission.mission_group_id}" data-assignment-date="${mission.assignment_date}">
                 ${actionsHtml}
                 <div class="mission-card-body">
@@ -390,8 +388,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const bookedAssetIds = new Set();
         
         state.bookings.forEach(b => {
-            // An asset is considered booked if it's in a booking on one of the mission dates,
-            // AND the booking is NOT for the mission we are currently editing.
             if (missionDates.includes(b.booking_date) && b.mission_group_id !== currentMissionGroupId) {
                 bookedAssetIds.add(String(b.asset_id));
             }
@@ -429,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
-    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionGroupId = $(this).closest('.mission-card').data('mission-group-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_group_id: missionGroupId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
+    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionGroupId = $(this).closest('.mission-card').attr('data-mission-group-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_group_id: missionGroupId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
     
     async function handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
@@ -439,10 +435,14 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(true);
         try {
             if ($missionCard.length > 0) {
-                 // *** BUGFIX: Sending correct IDs to the robust backend function. ***
-                const missionGroupId = $missionCard.data('mission-group-id');
-                const assignmentDate = $missionCard.data('assignment-date');
-                await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_group_id: missionGroupId, assignment_date: assignmentDate });
+                 // *** BUGFIX: Using .attr() instead of .data() for reliability in reading dynamically set attributes. ***
+                const missionGroupId = $missionCard.attr('data-mission-group-id');
+                const assignmentDate = $missionCard.attr('data-assignment-date');
+                await apiCall('assign_worker_to_mission', 'POST', { 
+                    worker_id: state.draggedWorker.id, 
+                    mission_group_id: missionGroupId, 
+                    assignment_date: assignmentDate 
+                });
             } else {
                 const date = $target.closest('.day-content').data('date');
                 const dropData = new FormData();
@@ -456,7 +456,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 await apiCall('save_mission', 'POST', dropData);
             }
             await fetchInitialData(false);
-        } catch (error) { alert(`Erreur: ${error.message}`); } finally { state.draggedWorker = null; showLoading(false); }
+        } catch (error) { 
+            alert(`Erreur: ${error.message}`); 
+        } finally { 
+            state.draggedWorker = null; 
+            showLoading(false); 
+        }
     }
 
     function setupModalStaticContent() {
@@ -477,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isMultiDay) {
             $('#assign-users-group').show();
-            $('#asset-management-container').hide(); // Hide asset mgmt for multi-day creation for simplicity
+            $('#asset-management-container').hide();
         } else {
             $missionModal.find('input[name="assignment_date"]').val(date);
             const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -492,11 +497,10 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.modal('show');
     }
     
-    // *** BUGFIX: Click handler now finds mission by group ID and date. ***
     $planningContainer.on('click', '.mission-card-body', function() {
         const card = $(this).closest('.mission-card');
-        const missionGroupId = card.data('mission-group-id');
-        const assignmentDate = card.data('assignment-date');
+        const missionGroupId = card.attr('data-mission-group-id');
+        const assignmentDate = card.attr('data-assignment-date');
         const mission = state.missions.find(m => m.mission_group_id == missionGroupId && m.assignment_date == assignmentDate);
 
         if (!mission) {
@@ -510,11 +514,10 @@ document.addEventListener('DOMContentLoaded', function() {
         assignedWorkersInModal = (mission.assigned_user_ids || '').split(',').map((id, index) => ({
             id: id,
             name: (mission.assigned_user_names || '').split(', ')[index]
-        })).filter(u => u.id);
+        })).filter(u => u.id && u.name);
         
         assignedAssetsInModal = mission.assigned_assets || [];
         
-        // *** BUGFIX: Setting the correct `mission_group_id` in the form. ***
         $missionModal.find('input[name="mission_group_id"]').val(mission.mission_group_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
         
@@ -607,12 +610,11 @@ document.addEventListener('DOMContentLoaded', function() {
         $confirmationModal.modal('show');
     }
     
-    // *** BUGFIX: Event handler now sends all required IDs to the backend. ***
     $planningContainer.on('click', '.remove-worker-btn', function(e) { 
         e.stopPropagation(); 
         const card = $(this).closest('.mission-card');
-        const missionGroupId = card.data('mission-group-id');
-        const assignmentDate = card.data('assignment-date');
+        const missionGroupId = card.attr('data-mission-group-id');
+        const assignmentDate = card.attr('data-assignment-date');
         const workerId = $(this).data('worker-id');
         const workerName = $(this).closest('li').text().trim(); 
 
@@ -633,7 +635,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }); 
     });
     
-    // *** BUGFIX: Delete button now sends the correct mission group ID. ***
     $('#deleteMissionBtn').on('click', function() { 
         const missionGroupId = $('#mission_group_id_form').val(); 
         if (!missionGroupId) return; 
