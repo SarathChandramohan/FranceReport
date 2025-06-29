@@ -2,9 +2,8 @@
 /**
  * planning-handler.php
  * * Final Corrected Version
- * This version fixes the 404 error when saving a mission with assets.
- * The fix involves providing a valid user ID (the creator of the mission) when inserting
- * a new record into the Bookings table, satisfying the NOT NULL database constraint.
+ * This version aligns with the updated database schema to permanently fix the workflow.
+ * It correctly inserts NULL for the user_id in the Bookings table for mission-based reservations.
  */
 
 require_once 'db-connection.php';
@@ -219,13 +218,13 @@ function saveMission($conn, $creator_id, $data) {
             respondWithError("Conflit: L'actif '{$conflict['asset_name']}' est déjà réservé le {$conflict['booking_date']}.");
         }
 
-        // *** THIS IS THE FIX ***
-        // Changed from inserting NULL for user_id to inserting the creator's ID.
-        // This prevents a database error if the user_id column does not allow NULLs.
-        $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, 'booked')");
+        // *** THIS IS THE CORRECTED LOGIC ***
+        // We now insert NULL for the user_id, as the booking is for the mission, not an individual.
+        // This is supported by the database change in Step 1.
+        $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, NULL, ?, ?, 'booked')");
         foreach ($dates as $mission_date) {
             foreach ($assigned_asset_ids as $asset_id) {
-                $stmt_book->execute([$asset_id, $creator_id, $mission_date, $data['mission_text']]);
+                $stmt_book->execute([$asset_id, $mission_date, $data['mission_text']]);
             }
         }
     }
@@ -233,6 +232,8 @@ function saveMission($conn, $creator_id, $data) {
     $conn->commit();
     respondWithSuccess('Mission enregistrée avec succès.');
 }
+
+// The rest of the functions below are unchanged and correct.
 
 function deleteMissionGroup($conn, $data) {
     $mission_id = $data['mission_id'];
