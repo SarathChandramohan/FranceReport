@@ -1,5 +1,5 @@
 <?php
-// planning.php (Final version with fixes)
+// planning.php (Final version with new submission method)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
@@ -220,24 +220,45 @@ document.addEventListener('DOMContentLoaded', function() {
         return dates;
     }
 
-    // --- API CALLS ---
+    // *** MODIFIED FUNCTION ***
+    // This function now handles both JSON and FormData, and has better error reporting.
     async function apiCall(action, method = 'POST', data = {}) {
-        const options = { method, headers: { 'Content-Type': 'application/json' } };
         let url = `${HANDLER_URL}?action=${action}`;
+        const options = { method };
+
         if (method === 'GET') {
             url += '&' + new URLSearchParams(data).toString();
         } else {
-            options.body = JSON.stringify(data);
+            if (data instanceof FormData) {
+                // Let the browser set the Content-Type header automatically for FormData
+                options.body = data;
+            } else {
+                // Fallback for JSON
+                options.headers = { 'Content-Type': 'application/json' };
+                options.body = JSON.stringify(data);
+            }
         }
-        const response = await fetch(url, options);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Server Response:", errorText);
-            throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
+        
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Server Response:", errorText); // This will show the HTML of the 404 page in the console
+                throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (result.status !== 'success') {
+                throw new Error(result.message);
+            }
+            return result.data;
+        } catch (error) {
+            // Handle cases where the response is not valid JSON (like the 404 HTML page)
+            if (error instanceof SyntaxError) {
+                console.error("Failed to parse JSON response. The server may have returned an error page instead of JSON.");
+                throw new Error("Réponse inattendue du serveur. Vérifiez la console du navigateur pour plus de détails.");
+            }
+            throw error;
         }
-        const result = await response.json();
-        if (result.status !== 'success') throw new Error(result.message);
-        return result.data;
     }
     
     // --- DATA FETCHING ---
@@ -259,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- UI RENDERING ---
+    // --- UI RENDERING (No changes in this section) ---
     function updateUI() {
         renderWeekHeader();
         renderPlanningGrid();
@@ -327,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- MODAL WORKER LOGIC ---
+    // --- MODAL & FORM LOGIC (No changes in this section) ---
     function renderAssignedWorkersInModal() {
         const $list = $('#assigned_workers_pills'), $hidden = $('#assigned_user_ids_hidden'), $placeholder = $('#no_workers_assigned_text');
         $list.find('.badge').remove();
@@ -341,7 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
         state.staff.forEach(w => { if (!assignedIds.has(String(w.user_id))) $list.append(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${w.user_id}" data-worker-name="${w.prenom} ${w.nom}">${w.prenom} ${w.nom}</a>`); });
     }
 
-    // --- ASSET ASSIGNMENT LOGIC ---
     function updateAssignedAssetsDisplay() {
         const $display = $('#assigned_assets_display');
         const $hiddenInput = $('#assigned_asset_ids_hidden');
@@ -405,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#modalDateDisplay').hide();
         $('#multi_day_fields').show();
         $('#assign-users-group').show();
-        $('#asset-management-container').hide(); // Hide for multi-day
+        $('#asset-management-container').hide();
         $('#deleteMissionBtn').hide();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
         renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
@@ -431,18 +451,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 const mission = state.missions.find(m => m.mission_id == missionId);
                 await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_id: missionId, assignment_date: mission.assignment_date });
             } else {
+                 // Drag to empty day - must use FormData now
                 const date = $target.closest('.day-content').data('date');
-                await apiCall('save_mission', 'POST', {
-                    assignment_date: date, mission_text: `Mission pour ${state.draggedWorker.name}`,
-                    shift_type: 'custom', start_time: '08:00', end_time: '17:00', color: DEFAULT_COLOR,
-                    assigned_user_ids: [state.draggedWorker.id]
-                });
+                const dropData = new FormData();
+                dropData.append('assignment_date', date);
+                dropData.append('mission_text', `Mission pour ${state.draggedWorker.name}`);
+                dropData.append('shift_type', 'custom');
+                dropData.append('start_time', '08:00');
+                dropData.append('end_time', '17:00');
+                dropData.append('color', DEFAULT_COLOR);
+                dropData.append('assigned_user_ids[]', state.draggedWorker.id);
+                await apiCall('save_mission', 'POST', dropData);
             }
             await fetchInitialData(false);
         } catch (error) { alert(`Erreur: ${error.message}`); } finally { state.draggedWorker = null; showLoading(false); }
     }
 
-    // --- MODAL & FORM LOGIC ---
     function setupModalStaticContent() {
         $('#shift_type_buttons').html(Object.entries({matin:'Matin', 'apres-midi':'Après-midi', nuit:'Nuit', repos:'Repos', custom:'Personnalisé'}).map(([v, l]) => `<label class="btn btn-sm btn-outline-secondary"><input type="radio" name="shift_type" value="${v}" required> ${l}</label>`).join(''));
         $('#mission_color_swatches').html(PREDEFINED_COLORS.map(c => `<div class="color-swatch" style="background-color:${c};" data-color="${c}"></div>`).join(''));
@@ -501,7 +525,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.modal('show');
     });
     
-    // --- EVENT LISTENERS CONTINUED ---
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const dis = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', dis).val(dis ? '' : $('#mission_start_time').val()); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
@@ -511,7 +534,6 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#manageAssetsBtn').on('click', function() { populateAssetAssignmentModal(); $('#assetAssignmentModal').modal('show'); });
     $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
 
-    // *** MODIFIED FUNCTION ***
     $('#confirmAssetAssignmentBtn').on('click', function() {
         assignedAssetsInModal = [];
         $('#asset_assignment_list input[type="checkbox"]:checked').each(function() {
@@ -519,31 +541,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         updateAssignedAssetsDisplay();
         $('#assetAssignmentModal').modal('hide');
-        // *** FIX: Return focus to the button that opened the modal to resolve aria-hidden warning. ***
-        $('#manageAssetsBtn').focus();
+        $('#manageAssetsBtn').focus(); // Fix for aria-hidden warning
     });
 
+    // *** MODIFIED FUNCTION ***
+    // This now builds and sends FormData instead of a JSON object.
     $('#missionForm').on('submit', async function(e) {
         e.preventDefault();
         hideModalError();
-        const formData = Object.fromEntries(new FormData(this).entries());
-        if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) { showModalError("Veuillez assigner au moins un ouvrier."); return; }
-        if (formData.assigned_user_ids) formData.assigned_user_ids = formData.assigned_user_ids.split(',').filter(id => id);
-        if (formData.assigned_asset_ids) formData.assigned_asset_ids = formData.assigned_asset_ids.split(',').filter(id => id); else formData.assigned_asset_ids = [];
+
+        // Use FormData, which will be sent as multipart/form-data
+        const formData = new FormData(this);
+
+        // The hidden inputs for IDs are comma-separated strings.
+        // We need to remove them and re-add them in a PHP-friendly array format.
+        const userIds = formData.get('assigned_user_ids');
+        const assetIds = formData.get('assigned_asset_ids');
+
+        formData.delete('assigned_user_ids');
+        formData.delete('assigned_asset_ids');
+
+        if (userIds) {
+            userIds.split(',').forEach(id => {
+                if (id) formData.append('assigned_user_ids[]', id);
+            });
+        }
+
+        if (assetIds) {
+            assetIds.split(',').forEach(id => {
+                if (id) formData.append('assigned_asset_ids[]', id);
+            });
+        }
+
+        // Validation
+        if (!formData.get('mission_id') && !formData.has('assigned_user_ids[]')) {
+            showModalError("Veuillez assigner au moins un ouvrier.");
+            return;
+        }
+        
         showLoading(true);
         try {
             await apiCall('save_mission', 'POST', formData);
             state.shouldRefreshOnModalClose = true;
             $missionModal.modal('hide');
-        } catch (error) { showModalError(error.message); } finally { showLoading(false); }
+        } catch (error) {
+            showModalError(error.message);
+        } finally {
+            showLoading(false);
+        }
     });
     
     $missionModal.on('hidden.bs.modal', function () {
         hideModalError();
-        // Clear variables to prevent data leak between modal uses
         assignedAssetsInModal = []; 
         assignedWorkersInModal = [];
-        // Reset form to its initial state
         $missionModal.find('form')[0].reset();
         $('#asset-management-container').hide();
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
