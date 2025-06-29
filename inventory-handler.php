@@ -57,11 +57,61 @@ function respondWithError($message, $code = 400) {
     exit;
 }
 
-/**
- * MODIFIED FUNCTION
- * Processes a barcode scan for checking out or returning an asset.
- * Now handles team-based checkouts for missions.
- */
+function getAllBookings($conn) {
+    // Fetch individual bookings
+    $sql_individual = "
+        SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, u.user_id 
+        FROM Bookings b 
+        JOIN Inventory a ON b.asset_id = a.asset_id 
+        JOIN Users u ON b.user_id = u.user_id 
+        WHERE b.booking_date >= CAST(GETDATE() AS DATE) 
+        AND b.status IN ('booked', 'active') 
+        AND b.user_id IS NOT NULL
+        ORDER BY b.booking_date ASC, a.asset_name ASC";
+    $stmt_individual = $conn->prepare($sql_individual);
+    $stmt_individual->execute();
+    $individual_bookings = $stmt_individual->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fetch mission bookings
+    $sql_mission = "
+        SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
+        FROM Bookings b 
+        JOIN Inventory a ON b.asset_id = a.asset_id 
+        WHERE b.booking_date >= CAST(GETDATE() AS DATE) 
+        AND b.status IN ('booked', 'active') 
+        AND b.user_id IS NULL
+        ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
+    $stmt_mission = $conn->prepare($sql_mission);
+    $stmt_mission->execute();
+    $mission_bookings = $stmt_mission->fetchAll(PDO::FETCH_ASSOC);
+
+    $bookings = [
+        'individual' => $individual_bookings,
+        'mission' => $mission_bookings
+    ];
+
+    respondWithSuccess(['bookings' => $bookings]);
+}
+
+function cancelBooking($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $booking_id = isset($data['booking_id']) ? $data['booking_id'] : 0;
+    if (!$booking_id) throw new Exception("ID de réservation manquant.");
+    $stmt_check = $conn->prepare("SELECT user_id FROM Bookings WHERE booking_id = ?");
+    $stmt_check->execute([$booking_id]);
+    $booking_user_id = $stmt_check->fetchColumn();
+    if ($user['role'] !== 'admin' && $user['user_id'] != $booking_user_id) {
+        respondWithError("Vous n'êtes pas autorisé à annuler cette réservation.", 403);
+    }
+    $stmt = $conn->prepare("UPDATE Bookings SET status = 'cancelled' WHERE booking_id = ? AND status = 'booked'");
+    $stmt->execute([$booking_id]);
+    if ($stmt->rowCount() > 0) {
+        respondWithSuccess([], "Réservation annulée.");
+    } else {
+        throw new Exception("Impossible d'annuler. La réservation est peut-être déjà en cours ou annulée.");
+    }
+}
+
 function processScan($conn, $user) {
     $data = json_decode(file_get_contents('php://input'), true);
     $barcode = isset($data['barcode']) ? trim($data['barcode']) : '';
@@ -81,15 +131,11 @@ function processScan($conn, $user) {
     $today = date('Y-m-d');
     $current_user_id = $user['user_id'];
 
-    // --- LOGIC FOR RETURNING AN ASSET ---
     if ($asset['status'] === 'in-use') {
         if ($asset['assigned_to_user_id'] == $current_user_id) {
             $conn->beginTransaction();
-            // Update any active booking for this asset to 'completed'
             $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active'");
             $stmt_update_booking->execute([$asset['asset_id']]);
-            
-            // Make the asset available again
             $stmt_update_inventory = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL, last_modified = GETDATE() WHERE asset_id = ?");
             $stmt_update_inventory->execute([$asset['asset_id']]);
             $conn->commit();
@@ -103,9 +149,7 @@ function processScan($conn, $user) {
         }
     }
 
-    // --- LOGIC FOR CHECKING OUT AN ASSET ---
     if ($asset['status'] === 'available') {
-        // Find a booking for today. Use LEFT JOIN on Users as user_id can be NULL for missions.
         $stmt_booking = $conn->prepare("
             SELECT b.*, u.prenom, u.nom
             FROM Bookings b
@@ -119,7 +163,6 @@ function processScan($conn, $user) {
             $is_authorized = false;
             $mission_text = $booking['mission'];
 
-            // Case A: Personal Booking (user_id is not null)
             if (!empty($booking['user_id'])) {
                 if ($booking['user_id'] == $current_user_id) {
                     $is_authorized = true;
@@ -127,7 +170,6 @@ function processScan($conn, $user) {
                     throw new Exception("Action impossible. L'actif est réservé par " . $booking['prenom'] . " " . $booking['nom'] . " pour aujourd'hui.");
                 }
             }
-            // Case B: Mission/Team Booking (user_id is null)
             else if (!empty($booking['mission_group_id'])) {
                 $stmt_check_permission = $conn->prepare("
                     SELECT COUNT(*) FROM Planning_Assignments
@@ -140,37 +182,27 @@ function processScan($conn, $user) {
                      throw new Exception("Vous n'êtes pas assigné à la mission pour laquelle cet outil est réservé.");
                 }
             } else {
-                 // Fallback for old data or misconfiguration
                  throw new Exception("Cette réservation de mission est mal configurée (ID de groupe manquant).");
             }
 
-            // If authorized, proceed with the checkout
             if ($is_authorized) {
                 $conn->beginTransaction();
-                
-                // Set booking to active
                 $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ?");
                 $stmt_update_booking->execute([$booking['booking_id']]);
-
-                // Update inventory: set status to 'in-use' and assign to the user who performed the scan
                 $stmt_update_inventory = $conn->prepare("
                     UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ?, assigned_mission = ?, last_modified = GETDATE()
                     WHERE asset_id = ?
                 ");
                 $stmt_update_inventory->execute([$current_user_id, $mission_text, $asset['asset_id']]);
-                
                 $conn->commit();
                 respondWithSuccess(['scan_code' => 'checkout_success', 'asset' => $asset], "Sortie de l'actif enregistrée.");
             }
         } else {
-            // No booking found for today, prompt user to create one
             respondWithSuccess(['scan_code' => 'prompt_booking', 'asset' => $asset], "Aucune réservation pour aujourd'hui. Veuillez en créer une.");
         }
     }
 }
 
-
-// --- OTHER UNCHANGED FUNCTIONS ---
 
 function getInventory($conn) {
     $sql = "SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id ORDER BY i.asset_name ASC";
@@ -287,28 +319,6 @@ function getAssetAvailability($conn) {
     $stmt->execute([$asset_id]);
     $dates = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
     respondWithSuccess(['booked_dates' => $dates]);
-}
-
-function getAllBookings($conn) {
-    $sql = "SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, u.user_id FROM Bookings b JOIN Inventory a ON b.asset_id = a.asset_id JOIN Users u ON b.user_id = u.user_id WHERE b.booking_date >= CAST(GETDATE() AS DATE) AND b.status IN ('booked', 'active') ORDER BY b.booking_date ASC, a.asset_name ASC";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute();
-    $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    respondWithSuccess(['bookings' => $bookings]);
-}
-
-function cancelBooking($conn, $user) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    $booking_id = isset($data['booking_id']) ? $data['booking_id'] : 0;
-    if (!$booking_id) throw new Exception("ID de réservation manquant.");
-    $stmt_check = $conn->prepare("SELECT user_id FROM Bookings WHERE booking_id = ?");
-    $stmt_check->execute([$booking_id]);
-    $booking_user_id = $stmt_check->fetchColumn();
-    if ($user['role'] !== 'admin' && $user['user_id'] != $booking_user_id) respondWithError("Vous n'êtes pas autorisé à annuler cette réservation.", 403);
-    $stmt = $conn->prepare("UPDATE Bookings SET status = 'cancelled' WHERE booking_id = ? AND status = 'booked'");
-    $stmt->execute([$booking_id]);
-    if ($stmt->rowCount() > 0) respondWithSuccess([], "Réservation annulée.");
-    else throw new Exception("Impossible d'annuler cette réservation.");
 }
 
 function updateMaintenanceStatus($conn, $user) {
