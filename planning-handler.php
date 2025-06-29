@@ -1,5 +1,5 @@
 <?php
-// planning-handler.php (MODIFIED - Hardened)
+// planning-handler.php (Final version with new input method)
 
 require_once 'db-connection.php';
 require_once 'session-management.php';
@@ -30,26 +30,30 @@ try {
     
     global $conn;
     $action = $_REQUEST['action'] ?? '';
-    $input = json_decode(file_get_contents('php://input'), true) ?? [];
+    
+    // *** MODIFIED LOGIC ***
+    // Data now comes from $_POST because the frontend sends it as form-data.
+    // $_REQUEST is used for the action to support both GET and POST.
+    $input = $_POST;
 
     switch ($action) {
         case 'get_initial_data':
             getInitialData($conn);
             break;
         case 'save_mission':
+            // Pass the $input array which now holds the $_POST data.
             saveMission($conn, $currentUser['user_id'], $input);
             break;
         case 'delete_mission_group':
-            deleteMissionGroup($conn, $input);
-            break;
         case 'assign_worker_to_mission':
-            assignWorkerToMission($conn, $currentUser['user_id'], $input);
-            break;
         case 'remove_worker_from_mission':
-            removeWorkerFromMission($conn, $input);
-            break;
         case 'toggle_mission_validation':
-            toggleMissionValidation($conn, $input);
+            // These actions may still use JSON, so we handle that.
+             $json_input = json_decode(file_get_contents('php://input'), true) ?? [];
+             if ($action === 'delete_mission_group') deleteMissionGroup($conn, $json_input);
+             if ($action === 'assign_worker_to_mission') assignWorkerToMission($conn, $currentUser['user_id'], $json_input);
+             if ($action === 'remove_worker_from_mission') removeWorkerFromMission($conn, $json_input);
+             if ($action === 'toggle_mission_validation') toggleMissionValidation($conn, $json_input);
             break;
         default:
             respondWithError('Action non valide.', 400);
@@ -132,7 +136,10 @@ function getInitialData($conn) {
     ]);
 }
 
+// *** MODIFIED FUNCTION ***
+// This function now expects data from $_POST.
 function saveMission($conn, $creator_id, $data) {
+    // When PHP receives form-data with keys like 'name[]', it automatically creates an array.
     $mission_id = $data['mission_id'] ?? null;
     $assigned_users = $data['assigned_user_ids'] ?? [];
     $assigned_asset_ids = $data['assigned_asset_ids'] ?? [];
@@ -160,7 +167,6 @@ function saveMission($conn, $creator_id, $data) {
         $dates[] = $data['assignment_date'];
     }
 
-    // *** FIX: Added robust check to ensure dates are present before proceeding with any action. ***
     if (empty($dates)) {
         $conn->rollBack();
         respondWithError('La date de la mission est manquante ou invalide.');
@@ -172,7 +178,6 @@ function saveMission($conn, $creator_id, $data) {
         $orig_props = $stmt_orig_find->fetch(PDO::FETCH_ASSOC);
 
         if ($orig_props) {
-            // This logic correctly finds all assignments matching the original mission's properties to update them as a group.
             $stmt_all_dates = $conn->prepare("SELECT DISTINCT assignment_date FROM Planning_Assignments WHERE mission_text = ? AND shift_type = ? AND ISNULL(start_time, '00:00:00') = ISNULL(?, '00:00:00') AND ISNULL(location, '') = ISNULL(?, '')");
             $stmt_all_dates->execute([$orig_props['mission_text'], $orig_props['shift_type'], $orig_props['start_time'], $orig_props['location']]);
             $old_dates = $stmt_all_dates->fetchAll(PDO::FETCH_COLUMN);
@@ -181,12 +186,12 @@ function saveMission($conn, $creator_id, $data) {
                 $placeholders = implode(',', array_fill(0, count($old_dates), '?'));
                 $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission = ? AND booking_date IN ($placeholders)");
                 $stmt_delete_bookings->execute(array_merge([$orig_props['mission_text']], $old_dates));
+
+                $update_placeholders = implode(',', array_fill(0, count($old_dates), '?'));
+                $stmt_update = $conn->prepare("UPDATE Planning_Assignments SET mission_text = ?, start_time = ?, end_time = ?, location = ?, shift_type = ?, color = ? WHERE mission_text = ? AND shift_type = ? AND ISNULL(start_time, '00:00:00') = ISNULL(?, '00:00:00') AND ISNULL(location, '') = ISNULL(?, '') AND assignment_date IN ($update_placeholders)");
+                $params = [$data['mission_text'], $data['start_time'] ?: null, $data['end_time'] ?: null, $data['location'] ?: null, $data['shift_type'], $data['color'], $orig_props['mission_text'], $orig_props['shift_type'], $orig_props['start_time'], $orig_props['location']];
+                $stmt_update->execute(array_merge($params, $old_dates));
             }
-
-             $stmt_update = $conn->prepare("UPDATE Planning_Assignments SET mission_text = ?, start_time = ?, end_time = ?, location = ?, shift_type = ?, color = ? WHERE mission_text = ? AND shift_type = ? AND ISNULL(start_time, '00:00:00') = ISNULL(?, '00:00:00') AND ISNULL(location, '') = ISNULL(?, '') AND assignment_date IN (" . implode(',', array_fill(0, count($old_dates), '?')) . ")");
-             $params = [$data['mission_text'], $data['start_time'] ?: null, $data['end_time'] ?: null, $data['location'] ?: null, $data['shift_type'], $data['color'], $orig_props['mission_text'], $orig_props['shift_type'], $orig_props['start_time'], $orig_props['location']];
-             $stmt_update->execute(array_merge($params, $old_dates));
-
         }
     } else { // This is a CREATE
         if (empty($assigned_users)) { $conn->rollBack(); respondWithError('Veuillez assigner au moins un ouvrier.'); }
@@ -199,7 +204,6 @@ function saveMission($conn, $creator_id, $data) {
         }
     }
     
-    // This logic now runs safely for both CREATE and EDIT because we validated $dates above.
     if (!empty($assigned_asset_ids)) {
         $date_ph = implode(',', array_fill(0, count($dates), '?'));
         $asset_ph = implode(',', array_fill(0, count($assigned_asset_ids), '?'));
