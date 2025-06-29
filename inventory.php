@@ -54,6 +54,7 @@ $currentUserId = $currentUser['user_id'];
         .category-actions button { margin-left: 5px; }
         #categoryFilterContainer { display: flex; flex-wrap: wrap; gap: 10px; }
         #categoryFilterContainer .btn { border-radius: 20px; padding: 5px 15px; font-size: 0.9em; }
+        .nav-tabs .nav-link { font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -99,16 +100,40 @@ $currentUserId = $currentUser['user_id'];
 
     <div id="all_bookings" class="tab-content">
         <div class="card">
-            <h3><i class="fas fa-calendar-alt"></i> Planning des Réservations (À partir d'aujourd'hui)</h3>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th>Date</th><th>Actif</th><th>Code-barres</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="all-bookings-table"></tbody>
-                </table>
+            <h3><i class="fas fa-calendar-alt"></i> Planning des Réservations</h3>
+            <ul class="nav nav-tabs mt-3" id="booking-type-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link active" id="individual-bookings-tab" data-toggle="tab" href="#individual-bookings" role="tab" aria-controls="individual-bookings" aria-selected="true"><i class="fas fa-user mr-1"></i> Individuelles</a>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" id="mission-bookings-tab" data-toggle="tab" href="#mission-bookings" role="tab" aria-controls="mission-bookings" aria-selected="false"><i class="fas fa-users mr-1"></i> Par Mission</a>
+                </li>
+            </ul>
+            <div class="tab-content" id="booking-type-tabs-content">
+                <div class="tab-pane fade show active" id="individual-bookings" role="tabpanel" aria-labelledby="individual-bookings-tab">
+                    <div class="table-responsive mt-3">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Date</th><th>Actif</th><th>Code-barres</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="individual-bookings-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="mission-bookings" role="tabpanel" aria-labelledby="mission-bookings-tab">
+                     <div class="table-responsive mt-3">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Date</th><th>Mission</th><th>Actif</th><th>Code-barres</th><th>Statut</th><th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mission-bookings-table"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -259,7 +284,7 @@ const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false
 const CURRENT_USER_ID = <?php echo $currentUserId; ?>;
 let inventory = [];
 let assetCategories = [];
-let allBookings = [];
+let allBookings = { individual: [], mission: [] };
 let selectedCategoryId = 'all'; 
 let codeReader = null;
 let datePicker = null;
@@ -283,6 +308,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadingOverlay.style.display = 'none';
 });
 
+/**
+ * [FIXED] This function is now more robust.
+ * It safely parses the booking data and logs errors to the console for easier debugging.
+ */
 async function fetchInitialData() {
     try {
         const [inventoryData, bookingsData, categoriesData] = await Promise.all([
@@ -290,17 +319,31 @@ async function fetchInitialData() {
             apiCall('get_all_bookings', 'GET'),
             apiCall('get_categories', 'GET')
         ]);
+        
         inventory = inventoryData.inventory || [];
-        allBookings = bookingsData.bookings || [];
+
+        // Safely parse the nested booking data.
+        if (bookingsData && bookingsData.bookings) {
+            allBookings.individual = bookingsData.bookings.individual || [];
+            allBookings.mission = bookingsData.bookings.mission || [];
+        } else {
+            console.error("La structure des données de réservation est incorrecte.", bookingsData);
+            allBookings.individual = [];
+            allBookings.mission = [];
+        }
+
         assetCategories = categoriesData.categories || [];
         assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
-    } catch (error) { /* Handled by apiCall */ }
+    } catch (error) {
+        console.error("Erreur lors du chargement des données initiales:", error);
+        showNotification("Impossible de charger les données.", "error");
+    }
 }
 
 function renderAll() {
     renderCategoryFilters();
     renderInventory();
-    renderAllBookingsTable();
+    renderAllBookingsTables();
     renderCategoriesList();
     populateCategoryDropdowns('add');
 }
@@ -328,9 +371,12 @@ async function apiCall(action, method = 'POST', body = null) {
     }
     try {
         const response = await fetch(url, options);
+        if (!response.ok) {
+            throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
+        }
         const data = await response.json();
-        if (!response.ok || data.status !== 'success') {
-            throw new Error(data.message || `Erreur serveur ${response.status}`);
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Une erreur inconnue est survenue.');
         }
         return data;
     } catch (error) {
@@ -343,21 +389,20 @@ async function apiCall(action, method = 'POST', body = null) {
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
-    document.getElementById('searchInput').addEventListener('keyup', renderInventory);
     
+    // [FIXED] Centralized filter logic for instant response
+    document.getElementById('searchInput').addEventListener('input', updateFiltersAndRender);
     document.getElementById('filterType').addEventListener('change', () => {
-        selectedCategoryId = 'all'; 
-        renderCategoryFilters();
-        renderInventory();
+        selectedCategoryId = 'all'; // Reset category when type changes
+        updateFiltersAndRender();
+        renderCategoryFilters(); // Also redraw category buttons
     });
-    
-    document.getElementById('filterStatus').addEventListener('change', renderInventory);
-
+    document.getElementById('filterStatus').addEventListener('change', updateFiltersAndRender);
     document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
         if (e.target.matches('.btn[data-category-id]')) {
             selectedCategoryId = e.target.dataset.categoryId;
-            renderCategoryFilters();
-            renderInventory();
+            updateFiltersAndRender();
+            renderCategoryFilters(); // Redraw buttons to show active state
         }
     });
     
@@ -392,7 +437,6 @@ function showTab(tabName) {
     }
 }
 
-// --- CATEGORY MANAGEMENT ---
 function renderCategoriesList() {
     const toolList = document.getElementById('toolCategoriesList');
     const vehicleList = document.getElementById('vehicleCategoriesList');
@@ -466,7 +510,7 @@ async function handleDeleteCategory(categoryId, categoryName) {
     }
 }
 
-// --- INVENTORY TAB (MODIFIED) ---
+// --- INVENTORY TAB (FILTER LOGIC IMPROVED) ---
 function renderCategoryFilters() {
     const container = document.getElementById('categoryFilterContainer');
     const typeFilter = document.getElementById('filterType').value;
@@ -475,15 +519,20 @@ function renderCategoryFilters() {
     container.style.display = 'flex';
     let buttonsHTML = `<button class="btn ${selectedCategoryId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="all">Toutes les catégories</button>`;
     relevantCategories.forEach(cat => {
-        buttonsHTML += `<button class="btn ${selectedCategoryId == cat.category_id ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="${cat.category_id}">${cat.category_name}</button>`;
+        buttonsHTML += `<button class="btn ${String(selectedCategoryId) === String(cat.category_id) ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="${cat.category_id}">${cat.category_name}</button>`;
     });
     container.innerHTML = buttonsHTML;
 }
 
 /**
- * MODIFIED FUNCTION
- * Filters inventory based on search, type, category, and a new 'displayStatus'
- * which treats assets booked for today as 'in-use'.
+ * [NEW] Centralized function to handle all filtering updates.
+ */
+function updateFiltersAndRender() {
+    renderInventory();
+}
+
+/**
+ * [FIXED] Comparison for category is now type-safe.
  */
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -494,9 +543,9 @@ function renderInventory() {
         const s = ((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase();
         const matchesSearch = s.includes(searchTerm);
         const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
-        const matchesCategory = selectedCategoryId === 'all' || asset.category_id == selectedCategoryId;
+        // Using String() for a type-safe comparison.
+        const matchesCategory = selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId;
 
-        // Determine the display status for filtering
         let displayStatus = asset.status;
         const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
         if (asset.status === 'available' && isBookedForToday) {
@@ -514,29 +563,19 @@ function renderInventory() {
     filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
 }
 
-/**
- * MODIFIED FUNCTION
- * Creates an asset card with dynamic status display. An asset available in the DB but
- * booked for today is displayed as 'in-use' with the booking details.
- */
 function createAssetCard(asset) {
     const card = document.createElement('div');
     const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
-    
     let displayStatus = asset.status;
     let assignedToText = '';
     let statusText = '';
-    let isVisuallyInUse = false;
-
     if (asset.status === 'in-use') {
         displayStatus = 'in-use';
-        isVisuallyInUse = true;
         assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
         statusText = 'En cours d\'utilisation';
     } else if (asset.status === 'available' && isBookedForToday) {
-        displayStatus = 'in-use'; // Visually treat as 'in-use'
-        isVisuallyInUse = true;
-        assignedToText = `<strong>Réservé aujourd'hui par:</strong> ${asset.todays_booking_prenom || ''} ${asset.todays_booking_nom || ''}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
+        displayStatus = 'in-use';
+        assignedToText = `<strong>Réservé aujourd'hui par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
         statusText = 'Réservé aujourd\'hui';
     } else if (asset.status === 'maintenance') {
         displayStatus = 'maintenance';
@@ -545,18 +584,14 @@ function createAssetCard(asset) {
         displayStatus = 'available';
         statusText = 'Disponible';
     }
-    
     card.className = `asset-card ${asset.asset_type} ${displayStatus}`;
     card.dataset.id = asset.asset_id;
-
     const bookingInfo = asset.status === 'available' && !isBookedForToday && asset.next_future_booking_date 
         ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` 
         : '';
-    
     const details = asset.asset_type === 'tool' 
         ? `<strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>` 
         : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
-
     let buttons = '';
     if (asset.status === 'available' && !isBookedForToday) {
         buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
@@ -564,12 +599,10 @@ function createAssetCard(asset) {
     } else if (asset.status === 'maintenance') {
         buttons += `<button class="btn btn-info btn-small" onclick="setAssetAvailable(${asset.asset_id})"><i class="fas fa-check-circle"></i> Rendre Dispo.</button>`;
     }
-
     if (IS_ADMIN) {
         buttons += `<button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button>`;
         buttons += `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
     }
-
     card.innerHTML = `
         <div>
             <div class="asset-header">
@@ -591,7 +624,6 @@ function escapeSingleQuotes(str) {
     return str.replace(/'/g, "\\'");
 }
 
-// --- BOOKING & HISTORY MODALS (MODIFIED) ---
 function initializeDatePicker() {
     datePicker = flatpickr("#booking_date", {
         locale: "fr",
@@ -599,33 +631,23 @@ function initializeDatePicker() {
         minDate: "today",
     });
 }
-
-/**
- * MODIFIED FUNCTION
- * Displays future booking dates as text inside the modal before showing it.
- */
 async function openBookingModal(assetId) {
     const asset = inventory.find(a => a.asset_id == assetId);
     if (!asset) return;
-
     $('#bookingModalAssetId').val(asset.asset_id);
     $('#bookingModalAssetName').text(asset.asset_name);
-    
     const futureBookingsDiv = document.getElementById('futureBookingsInfo');
     futureBookingsDiv.style.display = 'none';
     futureBookingsDiv.innerHTML = '';
-    
     loadingOverlay.style.display = 'flex';
     try {
         const data = await apiCall('get_asset_availability', 'GET', { asset_id: assetId });
         datePicker.set('disable', data.booked_dates);
-
         if (data.booked_dates && data.booked_dates.length > 0) {
             const todayStr = new Date().toISOString().split('T')[0];
             const futureDates = data.booked_dates
                 .filter(d => d > todayStr)
                 .map(d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR'));
-
             if (futureDates.length > 0) {
                 futureBookingsDiv.innerHTML = `<strong>Déjà réservé le:</strong> ${futureDates.join(', ')}`;
                 futureBookingsDiv.style.display = 'block';
@@ -636,7 +658,6 @@ async function openBookingModal(assetId) {
         loadingOverlay.style.display = 'none';
     }
 }
-
 async function handleSaveBooking() {
     const bookingData = {
         asset_id: $('#bookingModalAssetId').val(),
@@ -647,7 +668,6 @@ async function handleSaveBooking() {
         showNotification("Veuillez choisir une date.", "error");
         return;
     }
-
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('book_asset', 'POST', bookingData);
@@ -660,20 +680,17 @@ async function handleSaveBooking() {
         loadingOverlay.style.display = 'none';
     }
 }
-
 async function openHistoryModal(assetId, assetName) {
     $('#historyModalAssetName').text(assetName);
     const modalBody = $('#historyModalBody');
     modalBody.html('<div class="text-center"><div class="spinner-border text-primary"></div></div>');
     $('#historyModal').modal('show');
-
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
         if (data.history.length === 0) {
             modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation pour cet actif.</p>');
             return;
         }
-
         let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
         data.history.forEach(rec => {
             tableHtml += `
@@ -686,38 +703,60 @@ async function openHistoryModal(assetId, assetName) {
         });
         tableHtml += '</tbody></table></div>';
         modalBody.html(tableHtml);
-
     } catch (error) {
         modalBody.html('<p class="text-danger text-center">Erreur lors du chargement de l\'historique.</p>');
     }
 }
 
+// --- ALL BOOKINGS TAB (MODIFIED) ---
+function renderAllBookingsTables() {
+    const individualTable = document.getElementById('individual-bookings-table');
+    const missionTable = document.getElementById('mission-bookings-table');
+    individualTable.innerHTML = '';
+    missionTable.innerHTML = '';
 
-// --- ALL BOOKINGS TAB ---
-function renderAllBookingsTable() {
-    const tableBody = document.getElementById('all-bookings-table');
-    tableBody.innerHTML = '';
-    if (allBookings.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation future.</td></tr>';
-        return;
+    // Render Individual Bookings
+    if (!allBookings.individual || allBookings.individual.length === 0) {
+        individualTable.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation individuelle future.</td></tr>';
+    } else {
+        allBookings.individual.forEach(b => {
+            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                <td>${b.asset_name}</td>
+                <td>${b.barcode}</td>
+                <td>${b.prenom} ${b.nom}</td>
+                <td>${b.mission || 'N/A'}</td>
+                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
+                <td>
+                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
+                </td>`;
+            individualTable.appendChild(row);
+        });
     }
 
-    allBookings.forEach(b => {
-        const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-            <td>${b.asset_name}</td>
-            <td>${b.barcode}</td>
-            <td>${b.prenom} ${b.nom}</td>
-            <td>${b.mission || 'N/A'}</td>
-            <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
-            <td>
-                ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-            </td>`;
-        tableBody.appendChild(row);
-    });
+    // Render Mission Bookings
+    if (!allBookings.mission || allBookings.mission.length === 0) {
+        missionTable.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation de mission future.</td></tr>';
+    } else {
+        allBookings.mission.forEach(b => {
+            const canCancel = (b.status === 'booked' && IS_ADMIN); // Only admin can cancel mission bookings
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                <td>${b.mission || 'N/A'}</td>
+                <td>${b.asset_name}</td>
+                <td>${b.barcode}</td>
+                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
+                <td>
+                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
+                </td>`;
+            missionTable.appendChild(row);
+        });
+    }
 }
+
 
 async function handleCancelBooking(bookingId) {
     if (!confirm("Voulez-vous vraiment annuler cette réservation ?")) return;
@@ -732,7 +771,6 @@ async function handleCancelBooking(bookingId) {
     }
 }
 
-// --- SCANNER LOGIC ---
 function startScanning() {
     if (codeReader) {
       codeReader.reset();
@@ -825,7 +863,6 @@ async function processScanResult(barcode) {
     }
 }
 
-// --- MAINTENANCE & OTHER ACTIONS ---
 function openMaintenanceModal(assetId, assetName) {
     $('#maintenanceModalAssetName').text(assetName);
     $('#setMaintenanceBtn').off('click').on('click', () => setMaintenanceStatus(assetId, 'maintenance'));
@@ -849,7 +886,6 @@ async function setAssetAvailable(assetId) {
     await setMaintenanceStatus(assetId, 'available');
 }
 
-// --- ADD/EDIT ASSET & CATEGORIES DROPDOWN ---
 function toggleAssetFields(formPrefix) {
     const type = document.getElementById(`${formPrefix}_asset_type`).value;
     document.getElementById(`${formPrefix}_tool_fields`).style.display = (type === 'tool') ? 'block' : 'none';
@@ -915,27 +951,20 @@ async function handleDeleteAsset(assetId, assetName) {
 function openEditModal(assetId) {
     const asset = inventory.find(a => a.asset_id == assetId);
     if (!asset) { showNotification("Actif non trouvé.", "error"); return; }
-
-    // Populate common fields
     $('#edit_asset_id').val(asset.asset_id);
     $('#edit_asset_type').val(asset.asset_type);
     $('#edit_asset_name').val(asset.asset_name);
     $('#edit_barcode').val(asset.barcode);
     $('#edit_brand').val(asset.brand);
-
-    // Trigger field toggle and populate categories
     toggleAssetFields('edit');
     populateCategoryDropdowns('edit', asset.category_id);
-
-    // Populate type-specific fields
     if (asset.asset_type === 'tool') {
         $('#edit_serial_or_plate_tool').val(asset.serial_or_plate);
         $('#edit_position_or_info_tool').val(asset.position_or_info);
-    } else { // vehicle
+    } else { 
         $('#edit_serial_or_plate_vehicle').val(asset.serial_or_plate);
         $('#edit_fuel_level').val(asset.fuel_level);
     }
-
     $('#editAssetModal').modal('show');
 }
 
@@ -949,23 +978,19 @@ async function handleUpdateAsset(e) {
         asset_name: document.getElementById('edit_asset_name').value,
         brand: document.getElementById('edit_brand').value,
         category_id: document.getElementById('edit_category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('edit_serial_or_plate_vehicle').value,
+        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('add_serial_or_plate_vehicle').value,
         position_or_info: type === 'tool' ? document.getElementById('edit_position_or_info_tool').value : null,
         fuel_level: type === 'vehicle' ? document.getElementById('edit_fuel_level').value : null,
     };
-
     loadingOverlay.style.display = 'flex';
     try {
         const result = await apiCall('update_asset', 'POST', assetData);
         showNotification('Actif mis à jour avec succès!', 'success');
-        
-        // Update the asset in the local inventory array for instant UI update
         const index = inventory.findIndex(a => a.asset_id == result.asset.asset_id);
         if (index !== -1) {
             inventory[index] = result.asset;
         }
-        renderInventory(); // Re-render the grid
-        
+        renderInventory();
         $('#editAssetModal').modal('hide');
     } finally {
         loadingOverlay.style.display = 'none';
