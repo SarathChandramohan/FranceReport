@@ -104,7 +104,7 @@ $currentUserId = $currentUser['user_id'];
                 <table class="table table-striped table-hover">
                     <thead class="thead-dark">
                         <tr>
-                            <th>Date</th><th>Actif</th><th>Code-barres</th><th>Réservé par/pour</th><th>Mission</th><th>Statut</th><th>Action</th>
+                            <th>Date</th><th>Actif</th><th>Code-barres</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="all-bookings-table"></tbody>
@@ -466,7 +466,7 @@ async function handleDeleteCategory(categoryId, categoryName) {
     }
 }
 
-// --- INVENTORY TAB ---
+// --- INVENTORY TAB (MODIFIED) ---
 function renderCategoryFilters() {
     const container = document.getElementById('categoryFilterContainer');
     const typeFilter = document.getElementById('filterType').value;
@@ -480,11 +480,10 @@ function renderCategoryFilters() {
     container.innerHTML = buttonsHTML;
 }
 
-
 /**
- * *** MODIFIED FUNCTION ***
- * Filters inventory based on search, type, category, and a 'displayStatus'
- * which treats assets booked for today (via a mission) as 'in-use'.
+ * MODIFIED FUNCTION
+ * Filters inventory based on search, type, category, and a new 'displayStatus'
+ * which treats assets booked for today as 'in-use'.
  */
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -499,8 +498,7 @@ function renderInventory() {
 
         // Determine the display status for filtering
         let displayStatus = asset.status;
-        // *** MODIFIED LINE *** Check for a mission name instead of a user ID.
-        const isBookedForToday = asset.todays_booking_mission !== null && asset.todays_booking_mission !== undefined && asset.todays_booking_mission !== '';
+        const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
         if (asset.status === 'available' && isBookedForToday) {
              displayStatus = 'in-use';
         }
@@ -517,14 +515,13 @@ function renderInventory() {
 }
 
 /**
- * *** MODIFIED FUNCTION ***
- * Creates an asset card. If an asset is available but booked for a mission today,
- * it is displayed as 'in-use' with the mission details.
+ * MODIFIED FUNCTION
+ * Creates an asset card with dynamic status display. An asset available in the DB but
+ * booked for today is displayed as 'in-use' with the booking details.
  */
 function createAssetCard(asset) {
     const card = document.createElement('div');
-    // *** MODIFIED LINE *** Checks for a mission name.
-    const isBookedForToday = asset.todays_booking_mission !== null && asset.todays_booking_mission !== undefined && asset.todays_booking_mission !== '';
+    const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
     
     let displayStatus = asset.status;
     let assignedToText = '';
@@ -539,8 +536,7 @@ function createAssetCard(asset) {
     } else if (asset.status === 'available' && isBookedForToday) {
         displayStatus = 'in-use'; // Visually treat as 'in-use'
         isVisuallyInUse = true;
-        // *** MODIFIED LINE *** Displays the mission name.
-        assignedToText = `<strong>Réservé pour la mission :</strong><br>${asset.todays_booking_mission || 'N/A'}<br>`;
+        assignedToText = `<strong>Réservé aujourd'hui par:</strong> ${asset.todays_booking_prenom || ''} ${asset.todays_booking_nom || ''}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
         statusText = 'Réservé aujourd\'hui';
     } else if (asset.status === 'maintenance') {
         displayStatus = 'maintenance';
@@ -595,7 +591,7 @@ function escapeSingleQuotes(str) {
     return str.replace(/'/g, "\\'");
 }
 
-// --- BOOKING & HISTORY MODALS ---
+// --- BOOKING & HISTORY MODALS (MODIFIED) ---
 function initializeDatePicker() {
     datePicker = flatpickr("#booking_date", {
         locale: "fr",
@@ -604,6 +600,10 @@ function initializeDatePicker() {
     });
 }
 
+/**
+ * MODIFIED FUNCTION
+ * Displays future booking dates as text inside the modal before showing it.
+ */
 async function openBookingModal(assetId) {
     const asset = inventory.find(a => a.asset_id == assetId);
     if (!asset) return;
@@ -676,11 +676,10 @@ async function openHistoryModal(assetId, assetName) {
 
         let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
         data.history.forEach(rec => {
-            const userFullName = rec.prenom && rec.nom ? `${rec.prenom} ${rec.nom}` : 'N/A';
             tableHtml += `
                 <tr>
                     <td>${new Date(rec.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                    <td>${userFullName}</td>
+                    <td>${rec.prenom} ${rec.nom}</td>
                     <td>${rec.mission || 'N/A'}</td>
                     <td><span class="badge badge-info">${rec.status}</span></td>
                 </tr>`;
@@ -705,13 +704,12 @@ function renderAllBookingsTable() {
 
     allBookings.forEach(b => {
         const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-        const reservedBy = b.prenom && b.nom ? `${b.prenom} ${b.nom}` : 'Équipe de mission';
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
             <td>${b.asset_name}</td>
             <td>${b.barcode}</td>
-            <td>${reservedBy}</td>
+            <td>${b.prenom} ${b.nom}</td>
             <td>${b.mission || 'N/A'}</td>
             <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
             <td>
@@ -772,7 +770,7 @@ async function processScanResult(barcode) {
     loadingOverlay.style.display = 'flex';
     try {
         const data = await apiCall('process_scan', 'POST', { barcode });
-        showNotification(data.message, data.status); // Use status from response
+        showNotification(data.message, 'info');
 
         switch(data.scan_code) {
             case 'return_success':
@@ -964,9 +962,7 @@ async function handleUpdateAsset(e) {
         // Update the asset in the local inventory array for instant UI update
         const index = inventory.findIndex(a => a.asset_id == result.asset.asset_id);
         if (index !== -1) {
-            // Preserve the mission booking info which isn't returned by update_asset
-            const oldAsset = inventory[index];
-            inventory[index] = {...result.asset, todays_booking_mission: oldAsset.todays_booking_mission};
+            inventory[index] = result.asset;
         }
         renderInventory(); // Re-render the grid
         
