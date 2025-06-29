@@ -1,5 +1,5 @@
 <?php
-// planning-handler.php (Final version with serial number support)
+// planning-handler.php (MODIFIED)
 
 require_once 'db-connection.php';
 require_once 'session-management.php';
@@ -71,7 +71,6 @@ function getInitialData($conn) {
     $stmt_users->execute();
     $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
 
-    // MODIFIED: Added serial_or_plate to the SELECT statement
     $stmt_inventory = $conn->prepare("SELECT asset_id, asset_name, asset_type, status, serial_or_plate FROM Inventory WHERE status != 'maintenance' ORDER BY asset_name");
     $stmt_inventory->execute();
     $inventory = $stmt_inventory->fetchAll(PDO::FETCH_ASSOC);
@@ -107,7 +106,6 @@ function getInitialData($conn) {
            $bookings_map[$key][] = [
                'id' => $asset_map[$booking['asset_id']]['asset_id'],
                'name' => $asset_map[$booking['asset_id']]['asset_name'],
-               // MODIFIED: Include serial number in data structure
                'serial' => $asset_map[$booking['asset_id']]['serial_or_plate']
            ];
         }
@@ -154,7 +152,6 @@ function saveMission($conn, $creator_id, $data) {
     $dates = [];
     $is_multi_day = !empty($data['start_date']) && !empty($data['end_date']);
 
-    // Multi-day missions do not support asset allocation per user request
     if ($is_multi_day && !empty($assigned_asset_ids)) {
         respondWithError("L'assignation de matériel n'est pas supportée pour les missions sur plusieurs jours.");
     }
@@ -223,10 +220,14 @@ function saveMission($conn, $creator_id, $data) {
     }
 
     if (!empty($assigned_asset_ids) && !empty($dates)) {
-        $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, 'booked')");
+        // *** MODIFIED LINE ***
+        // user_id is set to NULL because the booking is for the mission team, not an individual.
+        $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, NULL, ?, ?, 'booked')");
         foreach ($dates as $mission_date) {
             foreach ($assigned_asset_ids as $asset_id) {
-                $stmt_book->execute([$asset_id, $creator_id, $mission_date, $data['mission_text']]);
+                // *** MODIFIED LINE ***
+                // The creator_id is no longer passed to the booking.
+                $stmt_book->execute([$asset_id, $mission_date, $data['mission_text']]);
             }
         }
     }
@@ -234,9 +235,6 @@ function saveMission($conn, $creator_id, $data) {
     $conn->commit();
     respondWithSuccess('Mission enregistrée avec succès.');
 }
-
-// All other functions (deleteMissionGroup, assignWorkerToMission, etc.) remain the same as the previous response.
-// I will include them for completeness.
 
 /**
  * Deletes a mission group and its associated asset bookings.
