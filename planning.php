@@ -203,7 +203,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     }
 
-    // *** FIXED: ADDED MISSING FUNCTION ***
     function getDatesFromModal() {
         const dates = [];
         const isMulti = $('#multi_day_fields').is(':visible');
@@ -212,12 +211,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const single = $('#assignment_date_form').val();
 
         if (isMulti && start && end) {
-            // This case is for multi-day creation, where asset management is disabled by UI logic.
             for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
                 dates.push(formatDate(new Date(d)));
             }
         } else if (single) {
-            // This handles single-day creation and edits.
             dates.push(single);
         }
         return dates;
@@ -348,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (assignedAssetsInModal.length > 0) {
             assignedAssetsInModal.forEach(asset => {
                 const displayText = asset.serial ? `${asset.name} (${asset.serial})` : asset.name;
-                $display.append(`<span class="badge badge-info p-2 m-1">${displayText}</span>`);
+                $display.append(`<span class="badge badge-info p-2 m-1">${displayText}<i class="fas fa-times ml-2 remove-assigned-asset" style="cursor:pointer;" data-asset-id="${asset.id}"></i></span>`);
             });
         } else {
             $display.html('<span class="text-muted small p-2">Aucun matériel assigné.</span>');
@@ -356,6 +353,12 @@ document.addEventListener('DOMContentLoaded', function() {
         $hiddenInput.val(assignedAssetsInModal.map(a => a.id).join(','));
     }
     
+    $('#assigned_assets_display').on('click', '.remove-assigned-asset', function() {
+        const assetIdToRemove = $(this).data('asset-id');
+        assignedAssetsInModal = assignedAssetsInModal.filter(asset => asset.id != assetIdToRemove);
+        updateAssignedAssetsDisplay();
+    });
+
     function populateAssetAssignmentModal() {
         const $list = $('#asset_assignment_list'); $list.empty();
         const assignedIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
@@ -459,30 +462,42 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.modal('show');
     }
     
+    // *** MODIFIED FUNCTION ***
     $planningContainer.on('click', '.mission-card-body', function() {
         const mission = state.missions.find(m => m.mission_id == $(this).closest('.mission-card').data('mission-id'));
         if (!mission) return;
-        $missionModal.find('form')[0].reset(); hideModalError();
+
+        // *** BUG FIX: The following line was incorrectly clearing the form data during an edit. It has been removed. ***
+        // $missionModal.find('form')[0].reset(); 
+        
+        hideModalError();
         assignedWorkersInModal = []; 
         assignedAssetsInModal = mission.assigned_assets || [];
         $('#shift_type_buttons label').removeClass('active');
+        
+        // Manually reset and populate fields instead of using reset()
         $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
+        
         const displayDate = new Date(mission.assignment_date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         $('#multi_day_fields').hide();
         $('#modalDateDisplay').html(`Modifier la mission du: <strong>${displayDate}</strong>`).show();
+        
         $missionModal.find('input[name="mission_text"]').val(mission.mission_text);
         $missionModal.find('input[name="start_time"]').val(mission.start_time);
         $missionModal.find('input[name="end_time"]').val(mission.end_time);
         $missionModal.find('input[name="location"]').val(mission.location);
         $missionModal.find(`input[name="shift_type"][value="${mission.shift_type}"]`).prop('checked', true).parent().addClass('active');
         $missionModal.find('input[name="color"]').val(mission.color || DEFAULT_COLOR);
+        
         $('.color-swatch.selected').removeClass('selected');
         $(`.color-swatch[data-color="${mission.color || DEFAULT_COLOR}"]`).addClass('selected');
+        
         $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
         $missionModal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
         $('#asset-management-container').show(); // Show for edit
+        
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
