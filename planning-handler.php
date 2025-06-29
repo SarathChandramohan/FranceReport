@@ -1,10 +1,10 @@
 <?php
 /**
  * planning-handler.php
- * * Corrected and refactored version.
- * This version resolves a bug causing an error when saving a mission with assigned assets.
- * The primary fix is clarifying the input handling logic to correctly process both
- * JSON and FormData requests based on the specific action being performed.
+ * * Final Corrected Version
+ * This version fixes the 404 error when saving a mission with assets.
+ * The fix involves providing a valid user ID (the creator of the mission) when inserting
+ * a new record into the Bookings table, satisfying the NOT NULL database constraint.
  */
 
 require_once 'db-connection.php';
@@ -37,14 +37,12 @@ try {
     global $conn;
     $action = $_REQUEST['action'] ?? '';
 
-    // The main routing logic has been refactored to handle input sources correctly.
     switch ($action) {
         case 'get_initial_data':
             getInitialData($conn);
             break;
 
         case 'save_mission':
-            // This action receives data as 'multipart/form-data', so we use $_POST.
             saveMission($conn, $currentUser['user_id'], $_POST);
             break;
         
@@ -52,7 +50,6 @@ try {
         case 'assign_worker_to_mission':
         case 'remove_worker_from_mission':
         case 'toggle_mission_validation':
-            // These actions receive data as 'application/json'.
             $json_input = json_decode(file_get_contents('php://input'), true);
             if ($json_input === null) {
                 respondWithError('Invalid JSON input received.');
@@ -147,7 +144,6 @@ function getInitialData($conn) {
 }
 
 function saveMission($conn, $creator_id, $data) {
-    // PHP automatically creates an array for form fields ending in [].
     $mission_id = $data['mission_id'] ?? null;
     $assigned_users = $data['assigned_user_ids'] ?? [];
     $assigned_asset_ids = $data['assigned_asset_ids'] ?? [];
@@ -187,18 +183,15 @@ function saveMission($conn, $creator_id, $data) {
         $orig_props = $stmt_orig_find->fetch(PDO::FETCH_ASSOC);
 
         if ($orig_props) {
-            // Find all dates for this recurring mission group to update them all
             $stmt_all_dates = $conn->prepare("SELECT DISTINCT assignment_date FROM Planning_Assignments WHERE mission_text = ? AND shift_type = ? AND ISNULL(start_time, '00:00:00') = ISNULL(?, '00:00:00') AND ISNULL(location, '') = ISNULL(?, '')");
             $stmt_all_dates->execute([$orig_props['mission_text'], $orig_props['shift_type'], $orig_props['start_time'], $orig_props['location']]);
             $old_dates = $stmt_all_dates->fetchAll(PDO::FETCH_COLUMN);
 
             if (!empty($old_dates)) {
-                // Delete old asset bookings before creating new ones
                 $placeholders = implode(',', array_fill(0, count($old_dates), '?'));
                 $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission = ? AND booking_date IN ($placeholders)");
                 $stmt_delete_bookings->execute(array_merge([$orig_props['mission_text']], $old_dates));
 
-                // Update the mission details for all occurrences
                 $update_placeholders = implode(',', array_fill(0, count($old_dates), '?'));
                 $stmt_update = $conn->prepare("UPDATE Planning_Assignments SET mission_text = ?, start_time = ?, end_time = ?, location = ?, shift_type = ?, color = ? WHERE mission_text = ? AND shift_type = ? AND ISNULL(start_time, '00:00:00') = ISNULL(?, '00:00:00') AND ISNULL(location, '') = ISNULL(?, '') AND assignment_date IN ($update_placeholders)");
                 $params = [$data['mission_text'], $data['start_time'] ?: null, $data['end_time'] ?: null, $data['location'] ?: null, $data['shift_type'], $data['color'], $orig_props['mission_text'], $orig_props['shift_type'], $orig_props['start_time'], $orig_props['location']];
@@ -216,9 +209,7 @@ function saveMission($conn, $creator_id, $data) {
         }
     }
     
-    // This part runs for both CREATE and EDIT to (re)create asset bookings
     if (!empty($assigned_asset_ids)) {
-        // Check for booking conflicts
         $date_ph = implode(',', array_fill(0, count($dates), '?'));
         $asset_ph = implode(',', array_fill(0, count($assigned_asset_ids), '?'));
         $stmt_check = $conn->prepare("SELECT b.booking_date, i.asset_name FROM Bookings b JOIN Inventory i ON b.asset_id = i.asset_id WHERE b.asset_id IN ($asset_ph) AND b.booking_date IN ($date_ph) AND b.status IN ('booked', 'active')");
@@ -228,11 +219,13 @@ function saveMission($conn, $creator_id, $data) {
             respondWithError("Conflit: L'actif '{$conflict['asset_name']}' est déjà réservé le {$conflict['booking_date']}.");
         }
 
-        // Create new bookings for the assigned assets
-        $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, NULL, ?, ?, 'booked')");
+        // *** THIS IS THE FIX ***
+        // Changed from inserting NULL for user_id to inserting the creator's ID.
+        // This prevents a database error if the user_id column does not allow NULLs.
+        $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, 'booked')");
         foreach ($dates as $mission_date) {
             foreach ($assigned_asset_ids as $asset_id) {
-                $stmt_book->execute([$asset_id, $mission_date, $data['mission_text']]);
+                $stmt_book->execute([$asset_id, $creator_id, $mission_date, $data['mission_text']]);
             }
         }
     }
