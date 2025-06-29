@@ -1,5 +1,5 @@
 <?php
-// planning.php (Final version with fix for getDatesFromModal error)
+// planning.php (Final version with fixes)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
@@ -230,7 +230,11 @@ document.addEventListener('DOMContentLoaded', function() {
             options.body = JSON.stringify(data);
         }
         const response = await fetch(url, options);
-        if (!response.ok) throw new Error(`Erreur réseau: ${response.statusText}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Server Response:", errorText);
+            throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
+        }
         const result = await response.json();
         if (result.status !== 'success') throw new Error(result.message);
         return result.data;
@@ -337,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
         state.staff.forEach(w => { if (!assignedIds.has(String(w.user_id))) $list.append(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${w.user_id}" data-worker-name="${w.prenom} ${w.nom}">${w.prenom} ${w.nom}</a>`); });
     }
 
-    // --- NEW ASSET ASSIGNMENT LOGIC ---
+    // --- ASSET ASSIGNMENT LOGIC ---
     function updateAssignedAssetsDisplay() {
         const $display = $('#assigned_assets_display');
         const $hiddenInput = $('#assigned_asset_ids_hidden');
@@ -456,26 +460,21 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
         $missionModal.find('#deleteMissionBtn').hide();
         $('#assign-users-group').show();
-        $('#asset-management-container').show(); // Show for single-day create
+        $('#asset-management-container').show();
         renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     }
     
-    // *** MODIFIED FUNCTION ***
     $planningContainer.on('click', '.mission-card-body', function() {
         const mission = state.missions.find(m => m.mission_id == $(this).closest('.mission-card').data('mission-id'));
         if (!mission) return;
-
-        // *** BUG FIX: The following line was incorrectly clearing the form data during an edit. It has been removed. ***
-        // $missionModal.find('form')[0].reset(); 
         
         hideModalError();
         assignedWorkersInModal = []; 
         assignedAssetsInModal = mission.assigned_assets || [];
         $('#shift_type_buttons label').removeClass('active');
         
-        // Manually reset and populate fields instead of using reset()
         $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
         
@@ -496,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
         $missionModal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
-        $('#asset-management-container').show(); // Show for edit
+        $('#asset-management-container').show();
         
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
@@ -511,6 +510,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $('#manageAssetsBtn').on('click', function() { populateAssetAssignmentModal(); $('#assetAssignmentModal').modal('show'); });
     $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
+
+    // *** MODIFIED FUNCTION ***
     $('#confirmAssetAssignmentBtn').on('click', function() {
         assignedAssetsInModal = [];
         $('#asset_assignment_list input[type="checkbox"]:checked').each(function() {
@@ -518,6 +519,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         updateAssignedAssetsDisplay();
         $('#assetAssignmentModal').modal('hide');
+        // *** FIX: Return focus to the button that opened the modal to resolve aria-hidden warning. ***
+        $('#manageAssetsBtn').focus();
     });
 
     $('#missionForm').on('submit', async function(e) {
@@ -537,7 +540,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     $missionModal.on('hidden.bs.modal', function () {
         hideModalError();
-        assignedAssetsInModal = []; assignedWorkersInModal = [];
+        // Clear variables to prevent data leak between modal uses
+        assignedAssetsInModal = []; 
+        assignedWorkersInModal = [];
+        // Reset form to its initial state
+        $missionModal.find('form')[0].reset();
         $('#asset-management-container').hide();
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
     });
