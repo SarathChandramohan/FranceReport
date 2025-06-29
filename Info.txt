@@ -295,4 +295,9 @@ CREATE INDEX IDX_Inventory_AssetType ON Inventory (asset_type);
 CREATE INDEX IDX_Inventory_Status ON Inventory (status);
 CREATE INDEX IDX_Inventory_Barcode ON Inventory (barcode);
 
+-- This command changes the user_id column in your Bookings table to allow NULL values.
+-- This is the correct data model for a booking that belongs to a mission instead of an individual.
+ALTER TABLE Bookings
+ALTER COLUMN user_id INT NULL;
+
 -----------------------------------------------------------
