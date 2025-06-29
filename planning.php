@@ -90,7 +90,7 @@ $default_color = $predefined_colors[0];
                         <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                     </div>
                     <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
-                        <input type="hidden" id="mission_id_form" name="mission_id">
+                        <input type="hidden" id="mission_group_id_form" name="mission_group_id">
                         <input type="hidden" id="assignment_date_form" name="assignment_date">
                         <div class="alert alert-info" id="modalDateDisplay"></div>
                         
@@ -111,7 +111,7 @@ $default_color = $predefined_colors[0];
                         </div>
                         <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
                         
-                        <div id="assign-users-group" style="display:none;">
+                        <div id="assign-users-group">
                              <hr>
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
                             <label>Ouvriers assignés *</label>
@@ -120,7 +120,7 @@ $default_color = $predefined_colors[0];
                             <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
                         </div>
                         
-                        <div id="asset-management-container" style="display: none;">
+                        <div id="asset-management-container">
                             <hr>
                             <div class="form-group">
                                 <input type="hidden" name="assigned_asset_ids" id="assigned_asset_ids_hidden">
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const end = $('#missionForm input[name="end_date"]').val();
         const single = $('#assignment_date_form').val();
 
-        if (isMulti && start && end) {
+        if (isMulti && start && end && new Date(start) <= new Date(end)) {
             for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
                 dates.push(formatDate(new Date(d)));
             }
@@ -220,8 +220,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return dates;
     }
 
-    // *** MODIFIED FUNCTION ***
-    // This function now handles both JSON and FormData, and has better error reporting.
     async function apiCall(action, method = 'POST', data = {}) {
         let url = `${HANDLER_URL}?action=${action}`;
         const options = { method };
@@ -230,10 +228,8 @@ document.addEventListener('DOMContentLoaded', function() {
             url += '&' + new URLSearchParams(data).toString();
         } else {
             if (data instanceof FormData) {
-                // Let the browser set the Content-Type header automatically for FormData
                 options.body = data;
             } else {
-                // Fallback for JSON
                 options.headers = { 'Content-Type': 'application/json' };
                 options.body = JSON.stringify(data);
             }
@@ -241,21 +237,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const response = await fetch(url, options);
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Server Response:", errorText); // This will show the HTML of the 404 page in the console
-                throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
-            }
             const result = await response.json();
-            if (result.status !== 'success') {
-                throw new Error(result.message);
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || `Erreur serveur ${response.status}`);
             }
             return result.data;
         } catch (error) {
-            // Handle cases where the response is not valid JSON (like the 404 HTML page)
+            console.error("API Error:", error);
             if (error instanceof SyntaxError) {
-                console.error("Failed to parse JSON response. The server may have returned an error page instead of JSON.");
-                throw new Error("Réponse inattendue du serveur. Vérifiez la console du navigateur pour plus de détails.");
+                throw new Error("Réponse inattendue du serveur. L'action a peut-être échoué.");
             }
             throw error;
         }
@@ -280,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- UI RENDERING (No changes in this section) ---
+    // --- UI RENDERING ---
     function updateUI() {
         renderWeekHeader();
         renderPlanningGrid();
@@ -318,10 +308,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',') : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
+        // *** BUGFIX: Each remove button now has the correct worker ID to identify the user to be removed. ***
         const workersHtml = assignedNames.map((name, i) => `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${assignedIds[i]}"></i></li>`).join('');
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
-        return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
+        
+        // *** BUGFIX: Card now stores `data-mission-group-id` and `data-assignment-date` for unique identification. ***
+        return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-group-id="${mission.mission_group_id}" data-assignment-date="${mission.assignment_date}">
                 ${actionsHtml}
                 <div class="mission-card-body">
                     <div class="mission-title">${mission.mission_text}</div>
@@ -348,12 +341,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- MODAL & FORM LOGIC (No changes in this section) ---
+    // --- MODAL & FORM LOGIC ---
     function renderAssignedWorkersInModal() {
         const $list = $('#assigned_workers_pills'), $hidden = $('#assigned_user_ids_hidden'), $placeholder = $('#no_workers_assigned_text');
         $list.find('.badge').remove();
         $placeholder.toggle(assignedWorkersInModal.length === 0);
-        assignedWorkersInModal.forEach(w => $list.append(`<span class="badge badge-primary p-2 m-1">${w.name}<i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${w.id}"></i></span>`));
+        assignedWorkersInModal.forEach(w => $list.append(`<span class="badge badge-primary p-2 m-1">${w.name}<i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${w.id}" style="cursor:pointer;"></i></span>`));
         $hidden.val(assignedWorkersInModal.map(w => w.id).join(','));
     }
     function renderAvailableWorkersInModal() {
@@ -387,28 +380,39 @@ document.addEventListener('DOMContentLoaded', function() {
         const $list = $('#asset_assignment_list'); $list.empty();
         const assignedIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
         const missionDates = getDatesFromModal();
+
         if (missionDates.length === 0) {
             $list.html('<div class="alert alert-warning">Veuillez sélectionner une date pour la mission avant de gérer le matériel.</div>');
             return;
         }
-        const missionId = $('#mission_id_form').val();
-        const currentMission = missionId ? state.missions.find(m => m.mission_id == missionId) : null;
+
+        const currentMissionGroupId = $('#mission_group_id_form').val();
         const bookedAssetIds = new Set();
+        
         state.bookings.forEach(b => {
-            if (missionDates.includes(b.booking_date)) {
-                if (currentMission && b.mission === currentMission.mission_text) return;
+            // An asset is considered booked if it's in a booking on one of the mission dates,
+            // AND the booking is NOT for the mission we are currently editing.
+            if (missionDates.includes(b.booking_date) && b.mission_group_id !== currentMissionGroupId) {
                 bookedAssetIds.add(String(b.asset_id));
             }
         });
+
         const searchTerm = $('#asset_assignment_search').val().toLowerCase();
-        state.inventory.filter(asset => (asset.asset_name.toLowerCase() + (asset.serial_or_plate || '')).includes(searchTerm)).forEach(asset => {
+        const filteredInventory = state.inventory.filter(asset => (asset.asset_name.toLowerCase() + (asset.serial_or_plate || '')).includes(searchTerm));
+
+        if (filteredInventory.length === 0) {
+            $list.html('<p class="text-muted text-center">Aucun matériel trouvé.</p>');
+            return;
+        }
+
+        filteredInventory.forEach(asset => {
             const isBooked = bookedAssetIds.has(String(asset.asset_id));
             const isChecked = assignedIds.has(String(asset.asset_id));
             const serialText = asset.serial_or_plate || '';
             const itemHtml = `<label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isBooked && !isChecked ? 'disabled' : ''}">
                 <span><input type="checkbox" class="mr-3" value="${asset.asset_id}" data-asset-name="${asset.asset_name}" data-asset-serial="${serialText}" ${isChecked ? 'checked' : ''} ${isBooked && !isChecked ? 'disabled' : ''}>
                 ${asset.asset_name} <small class="text-muted ml-2">${serialText}</small></span>
-                ${isBooked ? `<span class="badge badge-danger">Réservé</span>` : ''}</label>`;
+                ${isBooked ? `<span class="badge badge-danger">Déjà réservé</span>` : ''}</label>`;
             $list.append(itemHtml);
         });
     }
@@ -418,26 +422,14 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchInitialData(); });
     
     $('#addMultiDayMissionBtn').on('click', function() {
-        assignedWorkersInModal = []; assignedAssetsInModal = [];
-        $missionModal.find('form')[0].reset(); hideModalError();
-        $('#shift_type_buttons label').removeClass('active');
-        $missionModal.find('input[name="mission_id"]').val('');
-        $('#modalDateDisplay').hide();
-        $('#multi_day_fields').show();
-        $('#assign-users-group').show();
-        $('#asset-management-container').hide();
-        $('#deleteMissionBtn').hide();
-        $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
-        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
-        updateAssignedAssetsDisplay();
-        $missionModal.modal('show');
+        openModalForCreate(null, true);
     });
 
     $planningContainer.on('click', '.add-mission-to-day-btn', function() { openModalForCreate($(this).closest('.day-header').data('date')); });
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
-    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
+    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionGroupId = $(this).closest('.mission-card').data('mission-group-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_group_id: missionGroupId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
     
     async function handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
@@ -447,11 +439,11 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(true);
         try {
             if ($missionCard.length > 0) {
-                const missionId = $missionCard.data('mission-id');
-                const mission = state.missions.find(m => m.mission_id == missionId);
-                await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_id: missionId, assignment_date: mission.assignment_date });
+                 // *** BUGFIX: Sending correct IDs to the robust backend function. ***
+                const missionGroupId = $missionCard.data('mission-group-id');
+                const assignmentDate = $missionCard.data('assignment-date');
+                await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_group_id: missionGroupId, assignment_date: assignmentDate });
             } else {
-                 // Drag to empty day - must use FormData now
                 const date = $target.closest('.day-content').data('date');
                 const dropData = new FormData();
                 dropData.append('assignment_date', date);
@@ -472,34 +464,58 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#mission_color_swatches').html(PREDEFINED_COLORS.map(c => `<div class="color-swatch" style="background-color:${c};" data-color="${c}"></div>`).join(''));
     }
 
-    function openModalForCreate(date) {
+    function openModalForCreate(date, isMultiDay = false) {
         assignedWorkersInModal = []; assignedAssetsInModal = [];
         $missionModal.find('form')[0].reset(); hideModalError();
         $('#shift_type_buttons label').removeClass('active');
-        $missionModal.find('input[name="mission_id"]').val('');
-        $missionModal.find('input[name="assignment_date"]').val(date);
-        const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        $('#multi_day_fields').hide();
-        $('#modalDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`).show();
-        $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
+        $missionModal.find('input[name="mission_group_id"]').val('');
         $missionModal.find('#deleteMissionBtn').hide();
-        $('#assign-users-group').show();
-        $('#asset-management-container').show();
-        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
+        $missionModal.find('#missionFormModalLabel').text(isMultiDay ? 'Nouvelle Mission sur Plusieurs Jours' : 'Nouvelle Mission');
+        
+        $('#multi_day_fields').toggle(isMultiDay);
+        $('#modalDateDisplay').toggle(!isMultiDay);
+
+        if (isMultiDay) {
+            $('#assign-users-group').show();
+            $('#asset-management-container').hide(); // Hide asset mgmt for multi-day creation for simplicity
+        } else {
+            $missionModal.find('input[name="assignment_date"]').val(date);
+            const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            $('#modalDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`);
+            $('#assign-users-group').show();
+            $('#asset-management-container').show();
+        }
+
+        renderAssignedWorkersInModal(); 
+        renderAvailableWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     }
     
+    // *** BUGFIX: Click handler now finds mission by group ID and date. ***
     $planningContainer.on('click', '.mission-card-body', function() {
-        const mission = state.missions.find(m => m.mission_id == $(this).closest('.mission-card').data('mission-id'));
-        if (!mission) return;
+        const card = $(this).closest('.mission-card');
+        const missionGroupId = card.data('mission-group-id');
+        const assignmentDate = card.data('assignment-date');
+        const mission = state.missions.find(m => m.mission_group_id == missionGroupId && m.assignment_date == assignmentDate);
+
+        if (!mission) {
+            alert("Erreur: Impossible de trouver les détails de la mission.");
+            return;
+        }
         
         hideModalError();
-        assignedWorkersInModal = []; 
-        assignedAssetsInModal = mission.assigned_assets || [];
         $('#shift_type_buttons label').removeClass('active');
         
-        $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
+        assignedWorkersInModal = (mission.assigned_user_ids || '').split(',').map((id, index) => ({
+            id: id,
+            name: (mission.assigned_user_names || '').split(', ')[index]
+        })).filter(u => u.id);
+        
+        assignedAssetsInModal = mission.assigned_assets || [];
+        
+        // *** BUGFIX: Setting the correct `mission_group_id` in the form. ***
+        $missionModal.find('input[name="mission_group_id"]').val(mission.mission_group_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
         
         const displayDate = new Date(mission.assignment_date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -518,9 +534,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
         $missionModal.find('#deleteMissionBtn').show();
-        $('#assign-users-group').hide();
+        $('#assign-users-group').show();
         $('#asset-management-container').show();
         
+        renderAssignedWorkersInModal();
+        renderAvailableWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
@@ -541,40 +559,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         updateAssignedAssetsDisplay();
         $('#assetAssignmentModal').modal('hide');
-        $('#manageAssetsBtn').focus(); // Fix for aria-hidden warning
+        $('#manageAssetsBtn').focus();
     });
 
-    // *** MODIFIED FUNCTION ***
-    // This now builds and sends FormData instead of a JSON object.
     $('#missionForm').on('submit', async function(e) {
         e.preventDefault();
         hideModalError();
-
-        // Use FormData, which will be sent as multipart/form-data
         const formData = new FormData(this);
-
-        // The hidden inputs for IDs are comma-separated strings.
-        // We need to remove them and re-add them in a PHP-friendly array format.
         const userIds = formData.get('assigned_user_ids');
         const assetIds = formData.get('assigned_asset_ids');
 
         formData.delete('assigned_user_ids');
         formData.delete('assigned_asset_ids');
 
-        if (userIds) {
-            userIds.split(',').forEach(id => {
-                if (id) formData.append('assigned_user_ids[]', id);
-            });
-        }
+        if (userIds) { userIds.split(',').forEach(id => { if (id) formData.append('assigned_user_ids[]', id); }); }
+        if (assetIds) { assetIds.split(',').forEach(id => { if (id) formData.append('assigned_asset_ids[]', id); }); }
 
-        if (assetIds) {
-            assetIds.split(',').forEach(id => {
-                if (id) formData.append('assigned_asset_ids[]', id);
-            });
-        }
-
-        // Validation
-        if (!formData.get('mission_id') && !formData.has('assigned_user_ids[]')) {
+        if (!formData.get('mission_group_id') && !formData.has('assigned_user_ids[]')) {
             showModalError("Veuillez assigner au moins un ouvrier.");
             return;
         }
@@ -596,7 +597,6 @@ document.addEventListener('DOMContentLoaded', function() {
         assignedAssetsInModal = []; 
         assignedWorkersInModal = [];
         $missionModal.find('form')[0].reset();
-        $('#asset-management-container').hide();
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
     });
 
@@ -606,9 +606,51 @@ document.addEventListener('DOMContentLoaded', function() {
         $confirmBtn.off('click').on('click', () => { onConfirm(); $confirmationModal.modal('hide'); });
         $confirmationModal.modal('show');
     }
+    
+    // *** BUGFIX: Event handler now sends all required IDs to the backend. ***
+    $planningContainer.on('click', '.remove-worker-btn', function(e) { 
+        e.stopPropagation(); 
+        const card = $(this).closest('.mission-card');
+        const missionGroupId = card.data('mission-group-id');
+        const assignmentDate = card.data('assignment-date');
+        const workerId = $(this).data('worker-id');
+        const workerName = $(this).closest('li').text().trim(); 
 
-    $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); const workerName = $(this).closest('li').text().trim(); showConfirmation(`Retirer ${workerName} de cette mission ?`, async () => { showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { mission_id: missionId, worker_id: workerId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
-    $('#deleteMissionBtn').on('click', function() { const missionId = $('#mission_id_form').val(); if (!missionId) return; $missionModal.modal('hide'); showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => { showLoading(true); try { await apiCall('delete_mission_group', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
+        showConfirmation(`Retirer ${workerName} de cette mission ?`, async () => { 
+            showLoading(true); 
+            try { 
+                await apiCall('remove_worker_from_mission', 'POST', { 
+                    mission_group_id: missionGroupId, 
+                    assignment_date: assignmentDate,
+                    worker_id: workerId 
+                }); 
+                await fetchInitialData(false); 
+            } catch (error) { 
+                alert(`Erreur: ${error.message}`); 
+            } finally { 
+                showLoading(false); 
+            } 
+        }); 
+    });
+    
+    // *** BUGFIX: Delete button now sends the correct mission group ID. ***
+    $('#deleteMissionBtn').on('click', function() { 
+        const missionGroupId = $('#mission_group_id_form').val(); 
+        if (!missionGroupId) return; 
+        
+        $missionModal.modal('hide'); 
+        showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ? Cette action est irréversible.', async () => { 
+            showLoading(true); 
+            try { 
+                await apiCall('delete_mission_group', 'POST', { mission_group_id: missionGroupId }); 
+                await fetchInitialData(false); 
+            } catch (error) { 
+                alert(`Erreur: ${error.message}`); 
+            } finally { 
+                showLoading(false); 
+            } 
+        }); 
+    });
 
     fetchInitialData();
 });
