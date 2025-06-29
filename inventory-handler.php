@@ -5,10 +5,9 @@
  * This file contains all the logic for the inventory module.
  *
  * FIXES APPLIED:
- * 1.  [MEDIUM] Inconsistent Scan Authorization: Added `TOP 1` and `ORDER BY` to the booking
- * lookup query to ensure predictable behavior in rare cases of double-booking.
- * 2.  [AUDIT TRAIL] The `user_id` in the Bookings table is now updated to the person who
- * scans out the item, providing a clear audit trail.
+ * 1.  [MEDIUM] Inconsistent Scan Authorization: Added `TOP 1` and `ORDER BY` to the booking lookup query to ensure predictable behavior in rare cases of double-booking.
+ * 2.  [AUDIT TRAIL] The `user_id` in the Bookings table is now updated to the person who scans out the item, providing a clear audit trail.
+ * 3.  [IMPROVEMENT] The `processScan` function now uses the unique `mission_group_id` for authorization, making it more robust and preventing conflicts between missions with the same name.
  */
 
 require_once 'session-management.php';
@@ -99,22 +98,25 @@ function processScan($conn, $user) {
     }
     
     if ($asset['status'] === 'available') {
-        // **FIX: Inconsistent Scan Auth**: Added TOP 1 and ORDER BY to ensure deterministic behavior.
         $stmt_booking = $conn->prepare("SELECT TOP 1 * FROM Bookings WHERE asset_id = ? AND booking_date = ? AND status = 'booked' ORDER BY booking_id ASC");
         $stmt_booking->execute([$asset['asset_id'], $today]);
         $booking = $stmt_booking->fetch(PDO::FETCH_ASSOC);
 
         if ($booking) {
+            $mission_group_id = $booking['mission_group_id'];
             $mission_text = $booking['mission'];
-            
-            $stmt_team = $conn->prepare("SELECT assigned_user_id FROM Planning_Assignments WHERE mission_text = ? AND assignment_date = ?");
-            $stmt_team->execute([$mission_text, $today]);
-            $team_member_ids = $stmt_team->fetchAll(PDO::FETCH_COLUMN);
+            $team_member_ids = [];
 
+            // *** BUGFIX: Use the reliable mission_group_id for authorization check. ***
+            if (!empty($mission_group_id)) {
+                $stmt_team = $conn->prepare("SELECT assigned_user_id FROM Planning_Assignments WHERE mission_group_id = ? AND assignment_date = ?");
+                $stmt_team->execute([$mission_group_id, $today]);
+                $team_member_ids = $stmt_team->fetchAll(PDO::FETCH_COLUMN);
+            }
+            
             if (!empty($team_member_ids) && in_array($current_user_id, $team_member_ids)) {
                 $conn->beginTransaction();
                 
-                // **IMPROVEMENT**: Update booking with the user who took the item
                 $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'active', user_id = ? WHERE booking_id = ?");
                 $stmt_update_booking->execute([$current_user_id, $booking['booking_id']]);
                 
@@ -140,8 +142,6 @@ function getInventory($conn) {
     $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
     respondWithSuccess(['inventory' => $inventory]);
 }
-
-// All other functions from the original file are included below without changes.
 
 function updateAsset($conn, $user) {
     if ($user['role'] !== 'admin') respondWithError("Accès non autorisé.", 403);
