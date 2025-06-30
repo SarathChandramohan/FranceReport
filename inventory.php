@@ -322,7 +322,6 @@ async function fetchInitialData() {
             allBookings.individual = bookingsData.bookings.individual || [];
             allBookings.mission = bookingsData.bookings.mission || [];
         } else {
-            console.error("The booking data structure from the server is incorrect or missing.", bookingsData);
             allBookings.individual = [];
             allBookings.mission = [];
         }
@@ -695,68 +694,46 @@ async function openHistoryModal(assetId, assetName) {
 }
 
 /**
- * FINAL BUG FIX: Added an inline style to forcefully display the table rows.
- * The logs confirm the JS logic is correct, so the only remaining possibility is a CSS conflict.
- * This change overrides any other style that might be hiding the rows.
+ * FINAL DIAGNOSTIC: This function now ignores all real data and tries to add
+ * a simple, hardcoded row to the table. This will tell us if JavaScript is
+ * capable of modifying the table at all.
  */
 function renderAllBookingsTables() {
-    const individualTable = document.getElementById('individual-bookings-table');
-    const missionTable = document.getElementById('mission-bookings-table');
+    console.log("[DIAGNOSTIC] Starting simplified renderAllBookingsTables.");
     
-    individualTable.innerHTML = '';
-    missionTable.innerHTML = '';
-
-    // Render Individual Bookings
-    if (!allBookings.individual || allBookings.individual.length === 0) {
-        individualTable.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation individuelle.</td></tr>';
-    } else {
-        allBookings.individual.forEach(b => {
-            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-            const userName = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
-            const assetName = b.asset_name || '(Actif supprimé)';
-            const row = document.createElement('tr');
-            
-            // --- FIX APPLIED HERE ---
-            row.style.setProperty('display', 'table-row', 'important');
-
-            row.innerHTML = `
-                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                <td>${assetName}</td>
-                <td>${b.barcode || 'N/A'}</td>
-                <td>${userName}</td>
-                <td>${b.mission || 'N/A'}</td>
-                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
-                <td>
-                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-                </td>`;
-            individualTable.appendChild(row);
-        });
+    const individualTable = document.getElementById('individual-bookings-table');
+    if (!individualTable) {
+        console.error("[DIAGNOSTIC] Could not find individual-bookings-table");
+        return;
+    }
+    
+    individualTable.innerHTML = ''; // Clear it first
+    
+    try {
+        const staticRow = document.createElement('tr');
+        staticRow.innerHTML = '<td colspan="7" style="background-color: yellow; color: black; font-weight: bold;">DIAGNOSTIC TEST ROW: If you see this, the table is working.</td>';
+        individualTable.appendChild(staticRow);
+        console.log("[DIAGNOSTIC] Appended a static test row to the individual bookings table.");
+    } catch (e) {
+        console.error("[DIAGNOSTIC] Error appending static test row:", e);
     }
 
-    // Render Mission Bookings
-    if (!allBookings.mission || allBookings.mission.length === 0) {
-        missionTable.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation de mission.</td></tr>';
-    } else {
-        allBookings.mission.forEach(b => {
-            const canCancel = (b.status === 'booked' && IS_ADMIN);
-            const assetName = b.asset_name || '(Actif supprimé)';
-            const row = document.createElement('tr');
-
-            // --- FIX APPLIED HERE ---
-            row.style.setProperty('display', 'table-row', 'important');
-
-            row.innerHTML = `
-                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                <td>${b.mission || 'N/A'}</td>
-                <td>${assetName}</td>
-                <td>${b.barcode || 'N/A'}</td>
-                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
-                <td>
-                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-                </td>`;
-            missionTable.appendChild(row);
-        });
+    const missionTable = document.getElementById('mission-bookings-table');
+    if (!missionTable) {
+        console.error("[DIAGNOSTIC] Could not find mission-bookings-table");
+        return;
     }
+    missionTable.innerHTML = ''; // Clear it
+    try {
+        const staticMissionRow = document.createElement('tr');
+        staticMissionRow.innerHTML = '<td colspan="6" style="background-color: cyan; color: black; font-weight: bold;">MISSION TEST ROW: If you see this, the table is working.</td>';
+        missionTable.appendChild(staticMissionRow);
+        console.log("[DIAGNOSTIC] Appended a static test row to the mission bookings table.");
+    } catch (e) {
+        console.error("[DIAGNOSTIC] Error appending static mission test row:", e);
+    }
+
+    console.log("[DIAGNOSTIC] Finished simplified renderAllBookingsTables.");
 }
 
 
