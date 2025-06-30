@@ -308,10 +308,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadingOverlay.style.display = 'none';
 });
 
-/**
- * [DEBUGGING] Added extensive logging to `apiCall` and `fetchInitialData`
- * to diagnose the data flow from the backend.
- */
 async function fetchInitialData() {
     try {
         const [inventoryData, bookingsData, categoriesData] = await Promise.all([
@@ -320,18 +316,11 @@ async function fetchInitialData() {
             apiCall('get_categories', 'GET')
         ]);
         
-        // --- DEBUGGING START ---
-        console.log("[DEBUG] Data received for bookings:", bookingsData);
-        // --- DEBUGGING END ---
-        
         inventory = inventoryData.inventory || [];
 
         if (bookingsData && bookingsData.bookings && typeof bookingsData.bookings === 'object') {
-            console.log("[DEBUG] 'bookingsData.bookings' is a valid object. Processing...", bookingsData.bookings);
             allBookings.individual = bookingsData.bookings.individual || [];
             allBookings.mission = bookingsData.bookings.mission || [];
-            console.log("[DEBUG] Processed 'individual' bookings array. Count:", allBookings.individual.length, allBookings.individual);
-            console.log("[DEBUG] Processed 'mission' bookings array. Count:", allBookings.mission.length, allBookings.mission);
         } else {
             console.error("[DEBUG] The booking data structure from the server is incorrect or missing.", bookingsData);
             allBookings.individual = [];
@@ -378,24 +367,10 @@ async function apiCall(action, method = 'POST', body = null) {
     }
     try {
         const response = await fetch(url, options);
-
-        // --- DEBUGGING START ---
-        // We clone the response so we can read it twice (once as text, once as json)
-        const clonedResponse = response.clone();
-        const rawText = await clonedResponse.text();
-        console.log(`[DEBUG] Raw text response for action '${action}':`, rawText);
-        // --- DEBUGGING END ---
-
         if (!response.ok) {
             throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
         }
-        
-        const data = await response.json(); // Use the original response here
-        
-        // --- DEBUGGING START ---
-        console.log(`[DEBUG] Parsed JSON for action '${action}':`, data);
-        // --- DEBUGGING END ---
-        
+        const data = await response.json();
         if (data.status !== 'success') {
             throw new Error(data.message || 'Une erreur inconnue est survenue.');
         }
@@ -719,55 +694,81 @@ async function openHistoryModal(assetId, assetName) {
     }
 }
 
+/**
+ * [BUG FIX] Added ultra-detailed logging inside this function.
+ * This will help pinpoint any error happening during the rendering of a single row.
+ */
 function renderAllBookingsTables() {
+    console.log("[DEBUG] Starting renderAllBookingsTables function.");
+    
     const individualTable = document.getElementById('individual-bookings-table');
     const missionTable = document.getElementById('mission-bookings-table');
+    
+    if (!individualTable || !missionTable) {
+        console.error("[DEBUG] CRITICAL: Could not find table body elements ('individual-bookings-table' or 'mission-bookings-table').");
+        return;
+    }
+    
     individualTable.innerHTML = '';
     missionTable.innerHTML = '';
+
+    console.log(`[DEBUG] Rendering individual bookings. Found ${allBookings.individual.length} items.`);
 
     // Render Individual Bookings
     if (!allBookings.individual || allBookings.individual.length === 0) {
         individualTable.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation individuelle.</td></tr>';
     } else {
-        allBookings.individual.forEach(b => {
-            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-            const userName = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
-            const assetName = b.asset_name || '(Actif supprimé)';
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                <td>${assetName}</td>
-                <td>${b.barcode || 'N/A'}</td>
-                <td>${userName}</td>
-                <td>${b.mission || 'N/A'}</td>
-                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
-                <td>
-                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-                </td>`;
-            individualTable.appendChild(row);
+        allBookings.individual.forEach((b, index) => {
+            try {
+                console.log(`[DEBUG] Processing individual booking #${index}`, b);
+                const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
+                const userName = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
+                const assetName = b.asset_name || '(Actif supprimé)';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                    <td>${assetName}</td>
+                    <td>${b.barcode || 'N/A'}</td>
+                    <td>${userName}</td>
+                    <td>${b.mission || 'N/A'}</td>
+                    <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
+                    <td>
+                        ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
+                    </td>`;
+                individualTable.appendChild(row);
+            } catch (e) {
+                console.error(`[DEBUG] Error rendering individual booking #${index}:`, e, b);
+            }
         });
     }
 
+    console.log(`[DEBUG] Rendering mission bookings. Found ${allBookings.mission.length} items.`);
     // Render Mission Bookings
     if (!allBookings.mission || allBookings.mission.length === 0) {
         missionTable.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation de mission.</td></tr>';
     } else {
-        allBookings.mission.forEach(b => {
-            const canCancel = (b.status === 'booked' && IS_ADMIN);
-            const assetName = b.asset_name || '(Actif supprimé)';
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                <td>${b.mission || 'N/A'}</td>
-                <td>${assetName}</td>
-                <td>${b.barcode || 'N/A'}</td>
-                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
-                <td>
-                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-                </td>`;
-            missionTable.appendChild(row);
+        allBookings.mission.forEach((b, index) => {
+            try {
+                console.log(`[DEBUG] Processing mission booking #${index}`, b);
+                const canCancel = (b.status === 'booked' && IS_ADMIN);
+                const assetName = b.asset_name || '(Actif supprimé)';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                    <td>${b.mission || 'N/A'}</td>
+                    <td>${assetName}</td>
+                    <td>${b.barcode || 'N/A'}</td>
+                    <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
+                    <td>
+                        ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
+                    </td>`;
+                missionTable.appendChild(row);
+            } catch (e) {
+                console.error(`[DEBUG] Error rendering mission booking #${index}:`, e, b);
+            }
         });
     }
+    console.log("[DEBUG] Finished renderAllBookingsTables function.");
 }
 
 
