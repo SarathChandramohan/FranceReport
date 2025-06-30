@@ -58,9 +58,9 @@ function respondWithError($message, $code = 400) {
 }
 
 /**
- * [BUG FIX] Changed JOIN to LEFT JOIN for both Inventory and Users.
- * This ensures bookings are shown even if the associated asset or user has been deleted.
- * Also selected b.user_id instead of u.user_id to ensure the ID is always present.
+ * [BUG FIX #2] The date filter `b.booking_date >= CAST(GETDATE() AS DATE)` has been removed from both queries.
+ * This is to handle cases where the server's date is ahead of the booking dates in the database.
+ * The lists will now show all past and future bookings that have a status of 'booked' or 'active'.
  */
 function getAllBookings($conn) {
     // Fetch individual bookings
@@ -69,8 +69,7 @@ function getAllBookings($conn) {
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE b.booking_date >= CAST(GETDATE() AS DATE) 
-        AND b.status IN ('booked', 'active') 
+        WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NOT NULL
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
@@ -82,8 +81,7 @@ function getAllBookings($conn) {
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        WHERE b.booking_date >= CAST(GETDATE() AS DATE) 
-        AND b.status IN ('booked', 'active') 
+        WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NULL
         ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
     $stmt_mission = $conn->prepare($sql_mission);
