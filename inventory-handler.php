@@ -64,22 +64,36 @@ function respondWithError($message, $code = 400) {
  */
 function getAllBookings($conn) {
     // Fetch individual bookings
-    // Example query - replace table/column names with your actual DB structure
-    $individuals = [];
-    $missions = [];
+    $sql_individual = "
+        SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
+        FROM Bookings b 
+        LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
+        LEFT JOIN Users u ON b.user_id = u.user_id 
+        WHERE b.status IN ('booked', 'active') 
+        AND b.user_id IS NOT NULL
+        ORDER BY b.booking_date ASC, a.asset_name ASC";
+    $stmt_individual = $conn->prepare($sql_individual);
+    $stmt_individual->execute();
+    $individual_bookings = $stmt_individual->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $conn->prepare("SELECT date, asset_name AS asset, barcode, reserved_by, mission_name AS mission, status FROM bookings WHERE type = 'individual'");
-    $stmt->execute();
-    $individuals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch mission bookings
+    $sql_mission = "
+        SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
+        FROM Bookings b 
+        LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
+        WHERE b.status IN ('booked', 'active') 
+        AND b.user_id IS NULL
+        ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
+    $stmt_mission = $conn->prepare($sql_mission);
+    $stmt_mission->execute();
+    $mission_bookings = $stmt_mission->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $conn->prepare("SELECT date, mission_name AS mission, asset_name AS asset, barcode, status FROM bookings WHERE type = 'mission'");
-    $stmt->execute();
-    $missions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $bookings = [
+        'individual' => $individual_bookings,
+        'mission' => $mission_bookings
+    ];
 
-    echo json_encode([
-        'individuals' => $individuals,
-        'missions' => $missions
-    ]);
+    respondWithSuccess(['bookings' => $bookings]);
 }
 
 function cancelBooking($conn, $user) {
