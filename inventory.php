@@ -309,8 +309,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /**
- * [FIXED] This function is now more robust.
- * It safely parses the booking data and logs errors to the console for easier debugging.
+ * [DEBUGGING] Added extensive logging to `apiCall` and `fetchInitialData`
+ * to diagnose the data flow from the backend.
  */
 async function fetchInitialData() {
     try {
@@ -320,14 +320,20 @@ async function fetchInitialData() {
             apiCall('get_categories', 'GET')
         ]);
         
+        // --- DEBUGGING START ---
+        console.log("[DEBUG] Data received for bookings:", bookingsData);
+        // --- DEBUGGING END ---
+        
         inventory = inventoryData.inventory || [];
 
-        // Safely parse the nested booking data.
-        if (bookingsData && bookingsData.bookings) {
+        if (bookingsData && bookingsData.bookings && typeof bookingsData.bookings === 'object') {
+            console.log("[DEBUG] 'bookingsData.bookings' is a valid object. Processing...", bookingsData.bookings);
             allBookings.individual = bookingsData.bookings.individual || [];
             allBookings.mission = bookingsData.bookings.mission || [];
+            console.log("[DEBUG] Processed 'individual' bookings array. Count:", allBookings.individual.length, allBookings.individual);
+            console.log("[DEBUG] Processed 'mission' bookings array. Count:", allBookings.mission.length, allBookings.mission);
         } else {
-            console.error("La structure des données de réservation est incorrecte.", bookingsData);
+            console.error("[DEBUG] The booking data structure from the server is incorrect or missing.", bookingsData);
             allBookings.individual = [];
             allBookings.mission = [];
         }
@@ -360,6 +366,7 @@ function showNotification(message, type = 'success') {
         setTimeout(() => document.body.contains(notification) && document.body.removeChild(notification), 500);
     }, 4000);
 }
+
 async function apiCall(action, method = 'POST', body = null) {
     const options = { method, headers: { 'Content-Type': 'application/json' } };
     if (body) options.body = JSON.stringify(body);
@@ -371,52 +378,63 @@ async function apiCall(action, method = 'POST', body = null) {
     }
     try {
         const response = await fetch(url, options);
+
+        // --- DEBUGGING START ---
+        // We clone the response so we can read it twice (once as text, once as json)
+        const clonedResponse = response.clone();
+        const rawText = await clonedResponse.text();
+        console.log(`[DEBUG] Raw text response for action '${action}':`, rawText);
+        // --- DEBUGGING END ---
+
         if (!response.ok) {
             throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
         }
-        const data = await response.json();
+        
+        const data = await response.json(); // Use the original response here
+        
+        // --- DEBUGGING START ---
+        console.log(`[DEBUG] Parsed JSON for action '${action}':`, data);
+        // --- DEBUGGING END ---
+        
         if (data.status !== 'success') {
             throw new Error(data.message || 'Une erreur inconnue est survenue.');
         }
         return data;
     } catch (error) {
-        console.error('API Error:', error);
+        console.error(`API Error during action '${action}':`, error);
         showNotification(error.message, 'error');
         throw error;
     }
 }
 
+
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
     
-    // [FIXED] Centralized filter logic for instant response
     document.getElementById('searchInput').addEventListener('input', updateFiltersAndRender);
     document.getElementById('filterType').addEventListener('change', () => {
-        selectedCategoryId = 'all'; // Reset category when type changes
+        selectedCategoryId = 'all'; 
         updateFiltersAndRender();
-        renderCategoryFilters(); // Also redraw category buttons
+        renderCategoryFilters(); 
     });
     document.getElementById('filterStatus').addEventListener('change', updateFiltersAndRender);
     document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
         if (e.target.matches('.btn[data-category-id]')) {
             selectedCategoryId = e.target.dataset.categoryId;
             updateFiltersAndRender();
-            renderCategoryFilters(); // Redraw buttons to show active state
+            renderCategoryFilters(); 
         }
     });
     
-    // Add/Edit Forms
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
     document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
     document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
     
-    // Scanner
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     
-    // Modals
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
     document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
@@ -524,16 +542,10 @@ function renderCategoryFilters() {
     container.innerHTML = buttonsHTML;
 }
 
-/**
- * [NEW] Centralized function to handle all filtering updates.
- */
 function updateFiltersAndRender() {
     renderInventory();
 }
 
-/**
- * [FIXED] Comparison for category is now type-safe.
- */
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('filterType').value;
@@ -543,7 +555,6 @@ function renderInventory() {
         const s = ((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase();
         const matchesSearch = s.includes(searchTerm);
         const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
-        // Using String() for a type-safe comparison.
         const matchesCategory = selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId;
 
         let displayStatus = asset.status;
@@ -708,10 +719,6 @@ async function openHistoryModal(assetId, assetName) {
     }
 }
 
-/**
- * [BUG FIX] This function now handles null values for asset_name, prenom, and nom.
- * This prevents errors if a booking is associated with a deleted asset or user.
- */
 function renderAllBookingsTables() {
     const individualTable = document.getElementById('individual-bookings-table');
     const missionTable = document.getElementById('mission-bookings-table');
@@ -720,7 +727,7 @@ function renderAllBookingsTables() {
 
     // Render Individual Bookings
     if (!allBookings.individual || allBookings.individual.length === 0) {
-        individualTable.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation individuelle future.</td></tr>';
+        individualTable.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation individuelle.</td></tr>';
     } else {
         allBookings.individual.forEach(b => {
             const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
@@ -743,10 +750,10 @@ function renderAllBookingsTables() {
 
     // Render Mission Bookings
     if (!allBookings.mission || allBookings.mission.length === 0) {
-        missionTable.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation de mission future.</td></tr>';
+        missionTable.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation de mission.</td></tr>';
     } else {
         allBookings.mission.forEach(b => {
-            const canCancel = (b.status === 'booked' && IS_ADMIN); // Only admin can cancel mission bookings
+            const canCancel = (b.status === 'booked' && IS_ADMIN);
             const assetName = b.asset_name || '(Actif supprimé)';
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -984,7 +991,6 @@ async function handleUpdateAsset(e) {
         asset_name: document.getElementById('edit_asset_name').value,
         brand: document.getElementById('edit_brand').value,
         category_id: document.getElementById('edit_category_id').value || null,
-        // [BUG FIX] Corrected the ID for the vehicle plate number from 'add_...' to 'edit_...'
         serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('edit_serial_or_plate_vehicle').value,
         position_or_info: type === 'tool' ? document.getElementById('edit_position_or_info_tool').value : null,
         fuel_level: type === 'vehicle' ? document.getElementById('edit_fuel_level').value : null,
