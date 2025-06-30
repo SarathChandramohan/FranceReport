@@ -994,6 +994,31 @@ async function handleUpdateAsset(e) {
         loadingOverlay.style.display = 'none';
     }
 }
+document.addEventListener('DOMContentLoaded', function () {
+  fetch('inventory-handler.php?action=get_all_bookings')
+    .then(res => res.json())
+    .then(data => {
+      const tbody = document.getElementById('individual-bookings-table');
+      tbody.innerHTML = ''; // Clear previous content
+
+      data.individuals.forEach(booking => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${booking.date}</td>
+          <td>${booking.asset}</td>
+          <td>${booking.barcode}</td>
+          <td>${booking.reserved_by}</td>
+          <td>${booking.mission}</td>
+          <td>${booking.status}</td>
+          <td><button class="btn btn-sm btn-primary">Action</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+    })
+    .catch(err => {
+      console.error('Failed to load bookings:', err);
+    });
+});
 </script>
 </body>
 </html>
