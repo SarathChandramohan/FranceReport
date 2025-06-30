@@ -708,7 +708,10 @@ async function openHistoryModal(assetId, assetName) {
     }
 }
 
-// --- ALL BOOKINGS TAB (MODIFIED) ---
+/**
+ * [BUG FIX] This function now handles null values for asset_name, prenom, and nom.
+ * This prevents errors if a booking is associated with a deleted asset or user.
+ */
 function renderAllBookingsTables() {
     const individualTable = document.getElementById('individual-bookings-table');
     const missionTable = document.getElementById('mission-bookings-table');
@@ -721,12 +724,14 @@ function renderAllBookingsTables() {
     } else {
         allBookings.individual.forEach(b => {
             const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
+            const userName = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
+            const assetName = b.asset_name || '(Actif supprimé)';
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                <td>${b.asset_name}</td>
-                <td>${b.barcode}</td>
-                <td>${b.prenom} ${b.nom}</td>
+                <td>${assetName}</td>
+                <td>${b.barcode || 'N/A'}</td>
+                <td>${userName}</td>
                 <td>${b.mission || 'N/A'}</td>
                 <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
                 <td>
@@ -742,12 +747,13 @@ function renderAllBookingsTables() {
     } else {
         allBookings.mission.forEach(b => {
             const canCancel = (b.status === 'booked' && IS_ADMIN); // Only admin can cancel mission bookings
+            const assetName = b.asset_name || '(Actif supprimé)';
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
                 <td>${b.mission || 'N/A'}</td>
-                <td>${b.asset_name}</td>
-                <td>${b.barcode}</td>
+                <td>${assetName}</td>
+                <td>${b.barcode || 'N/A'}</td>
                 <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
                 <td>
                     ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
@@ -978,7 +984,8 @@ async function handleUpdateAsset(e) {
         asset_name: document.getElementById('edit_asset_name').value,
         brand: document.getElementById('edit_brand').value,
         category_id: document.getElementById('edit_category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('add_serial_or_plate_vehicle').value,
+        // [BUG FIX] Corrected the ID for the vehicle plate number from 'add_...' to 'edit_...'
+        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('edit_serial_or_plate_vehicle').value,
         position_or_info: type === 'tool' ? document.getElementById('edit_position_or_info_tool').value : null,
         fuel_level: type === 'vehicle' ? document.getElementById('edit_fuel_level').value : null,
     };
