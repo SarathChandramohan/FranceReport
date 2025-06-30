@@ -694,46 +694,65 @@ async function openHistoryModal(assetId, assetName) {
 }
 
 /**
- * FINAL DIAGNOSTIC: This function now ignores all real data and tries to add
- * a simple, hardcoded row to the table. This will tell us if JavaScript is
- * capable of modifying the table at all.
+ * FINAL FIX: This function has been completely rewritten to use the browser's native
+ * table manipulation API (insertRow, insertCell). This is the most robust method and
+ * bypasses any potential issues with innerHTML, appendChild, or CSS conflicts.
  */
 function renderAllBookingsTables() {
-    console.log("[DIAGNOSTIC] Starting simplified renderAllBookingsTables.");
+    const individualTableBody = document.getElementById('individual-bookings-table');
+    const missionTableBody = document.getElementById('mission-bookings-table');
     
-    const individualTable = document.getElementById('individual-bookings-table');
-    if (!individualTable) {
-        console.error("[DIAGNOSTIC] Could not find individual-bookings-table");
-        return;
-    }
-    
-    individualTable.innerHTML = ''; // Clear it first
-    
-    try {
-        const staticRow = document.createElement('tr');
-        staticRow.innerHTML = '<td colspan="7" style="background-color: yellow; color: black; font-weight: bold;">DIAGNOSTIC TEST ROW: If you see this, the table is working.</td>';
-        individualTable.appendChild(staticRow);
-        console.log("[DIAGNOSTIC] Appended a static test row to the individual bookings table.");
-    } catch (e) {
-        console.error("[DIAGNOSTIC] Error appending static test row:", e);
+    // Clear tables
+    individualTableBody.innerHTML = '';
+    missionTableBody.innerHTML = '';
+
+    // Render Individual Bookings
+    if (!allBookings.individual || allBookings.individual.length === 0) {
+        individualTableBody.insertRow().innerHTML = '<td colspan="7" class="text-center">Aucune réservation individuelle.</td>';
+    } else {
+        allBookings.individual.forEach(b => {
+            const newRow = individualTableBody.insertRow(); // Create a new <tr>
+            
+            // Populate cells one by one
+            newRow.insertCell().innerHTML = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
+            newRow.insertCell().innerHTML = b.asset_name || '(Actif supprimé)';
+            newRow.insertCell().innerHTML = b.barcode || 'N/A';
+            newRow.insertCell().innerHTML = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
+            newRow.insertCell().innerHTML = b.mission || 'N/A';
+            
+            const statusCell = newRow.insertCell();
+            statusCell.innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span>`;
+            
+            const actionCell = newRow.insertCell();
+            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
+            if (canCancel) {
+                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
+            }
+        });
     }
 
-    const missionTable = document.getElementById('mission-bookings-table');
-    if (!missionTable) {
-        console.error("[DIAGNOSTIC] Could not find mission-bookings-table");
-        return;
-    }
-    missionTable.innerHTML = ''; // Clear it
-    try {
-        const staticMissionRow = document.createElement('tr');
-        staticMissionRow.innerHTML = '<td colspan="6" style="background-color: cyan; color: black; font-weight: bold;">MISSION TEST ROW: If you see this, the table is working.</td>';
-        missionTable.appendChild(staticMissionRow);
-        console.log("[DIAGNOSTIC] Appended a static test row to the mission bookings table.");
-    } catch (e) {
-        console.error("[DIAGNOSTIC] Error appending static mission test row:", e);
-    }
+    // Render Mission Bookings
+    if (!allBookings.mission || allBookings.mission.length === 0) {
+        missionTableBody.insertRow().innerHTML = '<td colspan="6" class="text-center">Aucune réservation de mission.</td>';
+    } else {
+        allBookings.mission.forEach(b => {
+            const newRow = missionTableBody.insertRow();
+            
+            newRow.insertCell().innerHTML = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
+            newRow.insertCell().innerHTML = b.mission || 'N/A';
+            newRow.insertCell().innerHTML = b.asset_name || '(Actif supprimé)';
+            newRow.insertCell().innerHTML = b.barcode || 'N/A';
 
-    console.log("[DIAGNOSTIC] Finished simplified renderAllBookingsTables.");
+            const statusCell = newRow.insertCell();
+            statusCell.innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span>`;
+            
+            const actionCell = newRow.insertCell();
+            const canCancel = (b.status === 'booked' && IS_ADMIN);
+            if (canCancel) {
+                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
+            }
+        });
+    }
 }
 
 
