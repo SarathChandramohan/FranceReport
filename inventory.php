@@ -322,7 +322,7 @@ async function fetchInitialData() {
             allBookings.individual = bookingsData.bookings.individual || [];
             allBookings.mission = bookingsData.bookings.mission || [];
         } else {
-            console.error("[DEBUG] The booking data structure from the server is incorrect or missing.", bookingsData);
+            console.error("The booking data structure from the server is incorrect or missing.", bookingsData);
             allBookings.individual = [];
             allBookings.mission = [];
         }
@@ -695,80 +695,68 @@ async function openHistoryModal(assetId, assetName) {
 }
 
 /**
- * [BUG FIX] Added ultra-detailed logging inside this function.
- * This will help pinpoint any error happening during the rendering of a single row.
+ * FINAL BUG FIX: Added an inline style to forcefully display the table rows.
+ * The logs confirm the JS logic is correct, so the only remaining possibility is a CSS conflict.
+ * This change overrides any other style that might be hiding the rows.
  */
 function renderAllBookingsTables() {
-    console.log("[DEBUG] Starting renderAllBookingsTables function.");
-    
     const individualTable = document.getElementById('individual-bookings-table');
     const missionTable = document.getElementById('mission-bookings-table');
     
-    if (!individualTable || !missionTable) {
-        console.error("[DEBUG] CRITICAL: Could not find table body elements ('individual-bookings-table' or 'mission-bookings-table').");
-        return;
-    }
-    
     individualTable.innerHTML = '';
     missionTable.innerHTML = '';
-
-    console.log(`[DEBUG] Rendering individual bookings. Found ${allBookings.individual.length} items.`);
 
     // Render Individual Bookings
     if (!allBookings.individual || allBookings.individual.length === 0) {
         individualTable.innerHTML = '<tr><td colspan="7" class="text-center">Aucune réservation individuelle.</td></tr>';
     } else {
-        allBookings.individual.forEach((b, index) => {
-            try {
-                console.log(`[DEBUG] Processing individual booking #${index}`, b);
-                const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-                const userName = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
-                const assetName = b.asset_name || '(Actif supprimé)';
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                    <td>${assetName}</td>
-                    <td>${b.barcode || 'N/A'}</td>
-                    <td>${userName}</td>
-                    <td>${b.mission || 'N/A'}</td>
-                    <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
-                    <td>
-                        ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-                    </td>`;
-                individualTable.appendChild(row);
-            } catch (e) {
-                console.error(`[DEBUG] Error rendering individual booking #${index}:`, e, b);
-            }
+        allBookings.individual.forEach(b => {
+            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
+            const userName = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
+            const assetName = b.asset_name || '(Actif supprimé)';
+            const row = document.createElement('tr');
+            
+            // --- FIX APPLIED HERE ---
+            row.style.setProperty('display', 'table-row', 'important');
+
+            row.innerHTML = `
+                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                <td>${assetName}</td>
+                <td>${b.barcode || 'N/A'}</td>
+                <td>${userName}</td>
+                <td>${b.mission || 'N/A'}</td>
+                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
+                <td>
+                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
+                </td>`;
+            individualTable.appendChild(row);
         });
     }
 
-    console.log(`[DEBUG] Rendering mission bookings. Found ${allBookings.mission.length} items.`);
     // Render Mission Bookings
     if (!allBookings.mission || allBookings.mission.length === 0) {
         missionTable.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation de mission.</td></tr>';
     } else {
-        allBookings.mission.forEach((b, index) => {
-            try {
-                console.log(`[DEBUG] Processing mission booking #${index}`, b);
-                const canCancel = (b.status === 'booked' && IS_ADMIN);
-                const assetName = b.asset_name || '(Actif supprimé)';
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                    <td>${b.mission || 'N/A'}</td>
-                    <td>${assetName}</td>
-                    <td>${b.barcode || 'N/A'}</td>
-                    <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
-                    <td>
-                        ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
-                    </td>`;
-                missionTable.appendChild(row);
-            } catch (e) {
-                console.error(`[DEBUG] Error rendering mission booking #${index}:`, e, b);
-            }
+        allBookings.mission.forEach(b => {
+            const canCancel = (b.status === 'booked' && IS_ADMIN);
+            const assetName = b.asset_name || '(Actif supprimé)';
+            const row = document.createElement('tr');
+
+            // --- FIX APPLIED HERE ---
+            row.style.setProperty('display', 'table-row', 'important');
+
+            row.innerHTML = `
+                <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                <td>${b.mission || 'N/A'}</td>
+                <td>${assetName}</td>
+                <td>${b.barcode || 'N/A'}</td>
+                <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
+                <td>
+                    ${canCancel ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}
+                </td>`;
+            missionTable.appendChild(row);
         });
     }
-    console.log("[DEBUG] Finished renderAllBookingsTables function.");
 }
 
 
