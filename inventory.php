@@ -303,8 +303,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     loadingOverlay.style.display = 'flex';
     await fetchInitialData();
-    renderAll();
+    // Initial renders for non-tabbed content
+    renderInventory();
+    renderCategoriesList();
+    populateCategoryDropdowns('add');
     initializeDatePicker();
+    // Manually trigger the render for the initially active tab
+    renderAllBookingsTables();
     loadingOverlay.style.display = 'none';
 });
 
@@ -332,14 +337,6 @@ async function fetchInitialData() {
         console.error("Erreur lors du chargement des données initiales:", error);
         showNotification("Impossible de charger les données.", "error");
     }
-}
-
-function renderAll() {
-    renderCategoryFilters();
-    renderInventory();
-    renderAllBookingsTables();
-    renderCategoriesList();
-    populateCategoryDropdowns('add');
 }
 
 // --- API & HELPERS ---
@@ -384,31 +381,43 @@ async function apiCall(action, method = 'POST', body = null) {
 
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
-    document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
+    // Main tabs
+    document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => {
+        const tabName = e.currentTarget.dataset.tab;
+        showTab(tabName);
+    }));
+
+    // Bootstrap Tab Events for rendering booking tables
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        const targetTab = $(e.target).attr("href"); // e.g., "#individual-bookings"
+        if (targetTab === '#individual-bookings' || targetTab === '#mission-bookings') {
+            renderAllBookingsTables();
+        }
+    });
     
-    document.getElementById('searchInput').addEventListener('input', updateFiltersAndRender);
+    // Filters
+    document.getElementById('searchInput').addEventListener('input', renderInventory);
     document.getElementById('filterType').addEventListener('change', () => {
         selectedCategoryId = 'all'; 
-        updateFiltersAndRender();
+        renderInventory();
         renderCategoryFilters(); 
     });
-    document.getElementById('filterStatus').addEventListener('change', updateFiltersAndRender);
+    document.getElementById('filterStatus').addEventListener('change', renderInventory);
     document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
         if (e.target.matches('.btn[data-category-id]')) {
             selectedCategoryId = e.target.dataset.categoryId;
-            updateFiltersAndRender();
+            renderInventory();
             renderCategoryFilters(); 
         }
     });
     
+    // Forms & Modals
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
     document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
     document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
-    
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
-    
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
     document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
@@ -420,14 +429,71 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
     if (tabName !== 'scanner' && codeReader) stopScanning();
-    if (['all_bookings', 'inventory', 'manage_categories'].includes(tabName)) {
-        loadingOverlay.style.display = 'flex';
-        fetchInitialData().then(() => {
-            renderAll();
-            loadingOverlay.style.display = 'none';
+
+    // Re-render content when a main tab is shown
+    switch(tabName) {
+        case 'inventory':
+            renderInventory();
+            break;
+        case 'all_bookings':
+            renderAllBookingsTables();
+            break;
+        case 'manage_categories':
+            renderCategoriesList();
+            break;
+    }
+}
+
+function renderAllBookingsTables() {
+    const individualTableBody = document.getElementById('individual-bookings-table');
+    const missionTableBody = document.getElementById('mission-bookings-table');
+    
+    // Clear tables
+    while (individualTableBody.firstChild) {
+        individualTableBody.removeChild(individualTableBody.firstChild);
+    }
+    while (missionTableBody.firstChild) {
+        missionTableBody.removeChild(missionTableBody.firstChild);
+    }
+
+    // Render Individual Bookings
+    if (!allBookings.individual || allBookings.individual.length === 0) {
+        individualTableBody.insertRow().innerHTML = '<td colspan="7" class="text-center">Aucune réservation individuelle.</td>';
+    } else {
+        allBookings.individual.forEach(b => {
+            const newRow = individualTableBody.insertRow();
+            newRow.insertCell().textContent = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
+            newRow.insertCell().textContent = b.asset_name || '(Actif supprimé)';
+            newRow.insertCell().textContent = b.barcode || 'N/A';
+            newRow.insertCell().textContent = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
+            newRow.insertCell().textContent = b.mission || 'N/A';
+            newRow.insertCell().innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span>`;
+            const actionCell = newRow.insertCell();
+            if (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) {
+                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
+            }
+        });
+    }
+
+    // Render Mission Bookings
+    if (!allBookings.mission || allBookings.mission.length === 0) {
+        missionTableBody.insertRow().innerHTML = '<td colspan="6" class="text-center">Aucune réservation de mission.</td>';
+    } else {
+        allBookings.mission.forEach(b => {
+            const newRow = missionTableBody.insertRow();
+            newRow.insertCell().textContent = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
+            newRow.insertCell().textContent = b.mission || 'N/A';
+            newRow.insertCell().textContent = b.asset_name || '(Actif supprimé)';
+            newRow.insertCell().textContent = b.barcode || 'N/A';
+            newRow.insertCell().innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span>`;
+            const actionCell = newRow.insertCell();
+            if (b.status === 'booked' && IS_ADMIN) {
+                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
+            }
         });
     }
 }
+
 
 function renderCategoriesList() {
     const toolList = document.getElementById('toolCategoriesList');
@@ -443,104 +509,23 @@ function renderCategoriesList() {
     if (vehicleList.innerHTML === '') vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
 }
 
-async function handleCreateCategory(e) {
-    e.preventDefault();
-    const form = e.target;
-    const categoryData = {
-        category_name: document.getElementById('new_category_name').value,
-        category_type: document.getElementById('new_category_type').value
-    };
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('add_category', 'POST', categoryData);
-        showNotification('Catégorie créée !', 'success');
-        form.reset();
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
-function openModifyCategoryModal(categoryId, currentName) {
-    document.getElementById('modifyCategoryId').value = categoryId;
-    document.getElementById('modifyCategoryName').value = currentName;
-    $('#modifyCategoryModal').modal('show');
-}
-
-async function handleUpdateCategory() {
-    const categoryData = {
-        category_id: document.getElementById('modifyCategoryId').value,
-        category_name: document.getElementById('modifyCategoryName').value
-    };
-    if (!categoryData.category_name.trim()) {
-        showNotification("Le nom ne peut pas être vide.", "error");
-        return;
-    }
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('update_category', 'POST', categoryData);
-        showNotification('Catégorie mise à jour !', 'success');
-        $('#modifyCategoryModal').modal('hide');
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
-async function handleDeleteCategory(categoryId, categoryName) {
-    if (!confirm(`Voulez-vous vraiment supprimer la catégorie "${categoryName}" ? Tous les actifs de cette catégorie seront non-catégorisés.`)) return;
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('delete_category', 'POST', { category_id: categoryId });
-        showNotification('Catégorie supprimée.', 'success');
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
-// --- INVENTORY TAB (FILTER LOGIC IMPROVED) ---
-function renderCategoryFilters() {
-    const container = document.getElementById('categoryFilterContainer');
-    const typeFilter = document.getElementById('filterType').value;
-    const relevantCategories = assetCategories.filter(cat => typeFilter === 'all' || cat.category_type === typeFilter);
-    if (relevantCategories.length < 1) { container.innerHTML = ''; container.style.display = 'none'; return; }
-    container.style.display = 'flex';
-    let buttonsHTML = `<button class="btn ${selectedCategoryId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="all">Toutes les catégories</button>`;
-    relevantCategories.forEach(cat => {
-        buttonsHTML += `<button class="btn ${String(selectedCategoryId) === String(cat.category_id) ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="${cat.category_id}">${cat.category_name}</button>`;
-    });
-    container.innerHTML = buttonsHTML;
-}
-
-function updateFiltersAndRender() {
-    renderInventory();
-}
-
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('filterType').value;
     const statusFilter = document.getElementById('filterStatus').value;
-
     const filtered = inventory.filter(asset => {
         const s = ((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase();
         const matchesSearch = s.includes(searchTerm);
         const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
         const matchesCategory = selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId;
-
         let displayStatus = asset.status;
         const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
         if (asset.status === 'available' && isBookedForToday) {
              displayStatus = 'in-use';
         }
         const matchesStatus = statusFilter === 'all' || displayStatus === statusFilter;
-
         return matchesSearch && matchesType && matchesStatus && matchesCategory;
     });
-
     inventoryGrid.innerHTML = '';
     if (filtered.length === 0) {
         inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif ne correspond à vos critères.</h4></div>`;
@@ -610,11 +595,13 @@ function escapeSingleQuotes(str) {
 }
 
 function initializeDatePicker() {
-    datePicker = flatpickr("#booking_date", {
-        locale: "fr",
-        dateFormat: "Y-m-d",
-        minDate: "today",
-    });
+    if(!datePicker) {
+        datePicker = flatpickr("#booking_date", {
+            locale: "fr",
+            dateFormat: "Y-m-d",
+            minDate: "today",
+        });
+    }
 }
 async function openBookingModal(assetId) {
     const asset = inventory.find(a => a.asset_id == assetId);
@@ -660,7 +647,7 @@ async function handleSaveBooking() {
         $('#bookingModal').modal('hide');
         document.getElementById('bookingForm').reset();
         await fetchInitialData();
-        renderAll();
+        renderAllBookingsTables();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -690,308 +677,6 @@ async function openHistoryModal(assetId, assetName) {
         modalBody.html(tableHtml);
     } catch (error) {
         modalBody.html('<p class="text-danger text-center">Erreur lors du chargement de l\'historique.</p>');
-    }
-}
-
-/**
- * FINAL FIX: This function has been completely rewritten to use the browser's native
- * table manipulation API (insertRow, insertCell). This is the most robust method and
- * bypasses any potential issues with innerHTML, appendChild, or CSS conflicts.
- */
-function renderAllBookingsTables() {
-    const individualTableBody = document.getElementById('individual-bookings-table');
-    const missionTableBody = document.getElementById('mission-bookings-table');
-    
-    // Clear tables
-    individualTableBody.innerHTML = '';
-    missionTableBody.innerHTML = '';
-
-    // Render Individual Bookings
-    if (!allBookings.individual || allBookings.individual.length === 0) {
-        individualTableBody.insertRow().innerHTML = '<td colspan="7" class="text-center">Aucune réservation individuelle.</td>';
-    } else {
-        allBookings.individual.forEach(b => {
-            const newRow = individualTableBody.insertRow(); // Create a new <tr>
-            
-            // Populate cells one by one
-            newRow.insertCell().innerHTML = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
-            newRow.insertCell().innerHTML = b.asset_name || '(Actif supprimé)';
-            newRow.insertCell().innerHTML = b.barcode || 'N/A';
-            newRow.insertCell().innerHTML = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
-            newRow.insertCell().innerHTML = b.mission || 'N/A';
-            
-            const statusCell = newRow.insertCell();
-            statusCell.innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span>`;
-            
-            const actionCell = newRow.insertCell();
-            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-            if (canCancel) {
-                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
-            }
-        });
-    }
-
-    // Render Mission Bookings
-    if (!allBookings.mission || allBookings.mission.length === 0) {
-        missionTableBody.insertRow().innerHTML = '<td colspan="6" class="text-center">Aucune réservation de mission.</td>';
-    } else {
-        allBookings.mission.forEach(b => {
-            const newRow = missionTableBody.insertRow();
-            
-            newRow.insertCell().innerHTML = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
-            newRow.insertCell().innerHTML = b.mission || 'N/A';
-            newRow.insertCell().innerHTML = b.asset_name || '(Actif supprimé)';
-            newRow.insertCell().innerHTML = b.barcode || 'N/A';
-
-            const statusCell = newRow.insertCell();
-            statusCell.innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span>`;
-            
-            const actionCell = newRow.insertCell();
-            const canCancel = (b.status === 'booked' && IS_ADMIN);
-            if (canCancel) {
-                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
-            }
-        });
-    }
-}
-
-
-async function handleCancelBooking(bookingId) {
-    if (!confirm("Voulez-vous vraiment annuler cette réservation ?")) return;
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('cancel_booking', 'POST', { booking_id: bookingId });
-        showNotification('Réservation annulée.', 'success');
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
-function startScanning() {
-    if (codeReader) {
-      codeReader.reset();
-    }
-    codeReader = new ZXing.BrowserMultiFormatReader();
-    document.getElementById('startScanBtn').style.display = 'none';
-    document.getElementById('stopScanBtn').style.display = 'inline-block';
-    
-    codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
-        if (result) {
-            stopScanning();
-            processScanResult(result.text);
-        }
-        if (err && !(err instanceof ZXing.NotFoundException)) {
-          console.error(err);
-          stopScanning();
-        }
-    }).catch(err => {
-        console.error("Camera Error:", err);
-        showNotification("Erreur de caméra. Vérifiez les permissions.", "error");
-        stopScanning();
-    });
-}
-
-function stopScanning() {
-    if (codeReader) {
-        codeReader.reset();
-        codeReader = null;
-    }
-    document.getElementById('startScanBtn').style.display = 'inline-block';
-    document.getElementById('stopScanBtn').style.display = 'none';
-}
-
-async function processScanResult(barcode) {
-    loadingOverlay.style.display = 'flex';
-    try {
-        const data = await apiCall('process_scan', 'POST', { barcode });
-        showNotification(data.message, 'info');
-
-        switch(data.scan_code) {
-            case 'return_success':
-            case 'checkout_success':
-                await fetchInitialData();
-                renderAll();
-                showTab('inventory');
-                break;
-
-            case 'prompt_booking':
-                const asset = data.asset;
-                if(confirm(`"${asset.asset_name}" n'est pas réservé pour aujourd'hui. Voulez-vous le réserver et le sortir maintenant ?`)) {
-                    $('#bookingModalAssetId').val(asset.asset_id);
-                    $('#bookingModalAssetName').text(asset.asset_name);
-                    datePicker.set('disable', []);
-                    datePicker.setDate(new Date(), true);
-                    $('#booking_mission').val('Sortie via scan');
-                    $('#bookingModal').modal('show');
-                    
-                    $('#saveBookingBtn').off('click').one('click', async function() {
-                        const bookingData = { asset_id: $('#bookingModalAssetId').val(), booking_date: $('#booking_date').val(), mission: $('#booking_mission').val() };
-                        if (!bookingData.booking_date) { showNotification("Date invalide.", "error"); return; }
-                        
-                        loadingOverlay.style.display = 'flex';
-                        try {
-                            await apiCall('book_asset', 'POST', bookingData);
-                            $('#bookingModal').modal('hide');
-                            document.getElementById('bookingForm').reset();
-                            await processScanResult(barcode);
-                        } finally {
-                            loadingOverlay.style.display = 'none';
-                             $('#saveBookingBtn').off('click').on('click', handleSaveBooking);
-                        }
-                    });
-                }
-                break;
-            
-            case 'asset_not_found':
-                if (confirm(data.message)) {
-                    showTab('add_asset');
-                    $('#add_barcode').val(data.barcode);
-                }
-                break;
-        }
-    } catch(e) {
-        /* error handled by apiCall */
-    } finally {
-        loadingOverlay.style.display = 'none';
-        $('#bookingModal').on('hidden.bs.modal', function () {
-            $('#saveBookingBtn').off('click').on('click', handleSaveBooking);
-        });
-    }
-}
-
-function openMaintenanceModal(assetId, assetName) {
-    $('#maintenanceModalAssetName').text(assetName);
-    $('#setMaintenanceBtn').off('click').on('click', () => setMaintenanceStatus(assetId, 'maintenance'));
-    $('#maintenanceModal').modal('show');
-}
-
-async function setMaintenanceStatus(assetId, status) {
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('update_maintenance_status', 'POST', { asset_id: assetId, status: status });
-        showNotification('Statut mis à jour.', 'success');
-        $('#maintenanceModal').modal('hide');
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
-async function setAssetAvailable(assetId) {
-    await setMaintenanceStatus(assetId, 'available');
-}
-
-function toggleAssetFields(formPrefix) {
-    const type = document.getElementById(`${formPrefix}_asset_type`).value;
-    document.getElementById(`${formPrefix}_tool_fields`).style.display = (type === 'tool') ? 'block' : 'none';
-    document.getElementById(`${formPrefix}_vehicle_fields`).style.display = (type === 'vehicle') ? 'block' : 'none';
-    populateCategoryDropdowns(formPrefix);
-}
-
-function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
-    const assetTypeElement = document.getElementById(`${formPrefix}_asset_type`);
-    if (!assetTypeElement) return;
-    const assetType = assetTypeElement.value;
-    const dropdown = document.getElementById(`${formPrefix}_category_id`);
-    dropdown.innerHTML = '<option value="">-- Sans catégorie --</option>';
-    if (assetCategories && assetCategories.length > 0) {
-        assetCategories
-            .filter(cat => cat.category_type === assetType)
-            .forEach(cat => dropdown.add(new Option(cat.category_name, cat.category_id)));
-    }
-    if (selectedCategoryId) {
-        dropdown.value = selectedCategoryId;
-    }
-}
-
-async function handleAddAsset(e) {
-    e.preventDefault();
-    const type = document.getElementById('add_asset_type').value;
-    const assetData = {
-        barcode: document.getElementById('add_barcode').value,
-        asset_type: type,
-        asset_name: document.getElementById('add_asset_name').value,
-        brand: document.getElementById('add_brand').value,
-        category_id: document.getElementById('add_category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('add_serial_or_plate_tool').value : document.getElementById('add_serial_or_plate_vehicle').value,
-        position_or_info: type === 'tool' ? document.getElementById('add_position_or_info_tool').value : null,
-        fuel_level: type === 'vehicle' ? document.getElementById('add_fuel_level').value : null,
-    };
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('add_asset', 'POST', assetData);
-        showNotification('Actif ajouté avec succès!', 'success');
-        document.getElementById('addAssetForm').reset();
-        toggleAssetFields('add');
-        await fetchInitialData();
-        renderAll();
-        showTab('inventory');
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-async function handleDeleteAsset(assetId, assetName) {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'actif "${assetName}" ? Cette action est irréversible et supprimera aussi toutes les réservations associées.`)) return;
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('delete_asset', 'POST', { asset_id: assetId });
-        showNotification('Actif supprimé avec succès!', 'success');
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
-function openEditModal(assetId) {
-    const asset = inventory.find(a => a.asset_id == assetId);
-    if (!asset) { showNotification("Actif non trouvé.", "error"); return; }
-    $('#edit_asset_id').val(asset.asset_id);
-    $('#edit_asset_type').val(asset.asset_type);
-    $('#edit_asset_name').val(asset.asset_name);
-    $('#edit_barcode').val(asset.barcode);
-    $('#edit_brand').val(asset.brand);
-    toggleAssetFields('edit');
-    populateCategoryDropdowns('edit', asset.category_id);
-    if (asset.asset_type === 'tool') {
-        $('#edit_serial_or_plate_tool').val(asset.serial_or_plate);
-        $('#edit_position_or_info_tool').val(asset.position_or_info);
-    } else { 
-        $('#edit_serial_or_plate_vehicle').val(asset.serial_or_plate);
-        $('#edit_fuel_level').val(asset.fuel_level);
-    }
-    $('#editAssetModal').modal('show');
-}
-
-async function handleUpdateAsset(e) {
-    e.preventDefault();
-    const type = document.getElementById('edit_asset_type').value;
-    const assetData = {
-        asset_id: document.getElementById('edit_asset_id').value,
-        barcode: document.getElementById('edit_barcode').value,
-        asset_type: type,
-        asset_name: document.getElementById('edit_asset_name').value,
-        brand: document.getElementById('edit_brand').value,
-        category_id: document.getElementById('edit_category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('edit_serial_or_plate_vehicle').value,
-        position_or_info: type === 'tool' ? document.getElementById('edit_position_or_info_tool').value : null,
-        fuel_level: type === 'vehicle' ? document.getElementById('edit_fuel_level').value : null,
-    };
-    loadingOverlay.style.display = 'flex';
-    try {
-        const result = await apiCall('update_asset', 'POST', assetData);
-        showNotification('Actif mis à jour avec succès!', 'success');
-        const index = inventory.findIndex(a => a.asset_id == result.asset.asset_id);
-        if (index !== -1) {
-            inventory[index] = result.asset;
-        }
-        renderInventory();
-        $('#editAssetModal').modal('hide');
-    } finally {
-        loadingOverlay.style.display = 'none';
     }
 }
 </script>
