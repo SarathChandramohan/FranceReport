@@ -48,13 +48,12 @@ $currentUserId = $currentUser['user_id'];
         .notification.show { transform: translateX(0); }
         .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; }
         .booking-info { font-size: 0.85em; color: #e83e8c; font-weight: bold; }
-        #all-bookings-table th { white-space: nowrap; }
         .category-list { list-style-type: none; padding-left: 0; }
         .category-list li { background: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
         .category-actions button { margin-left: 5px; }
         #categoryFilterContainer { display: flex; flex-wrap: wrap; gap: 10px; }
         #categoryFilterContainer .btn { border-radius: 20px; padding: 5px 15px; font-size: 0.9em; }
-        .nav-tabs .nav-link { font-size: 0.9rem; }
+        .booking-filters { display: flex; gap: 15px; margin-top: 15px; margin-bottom: 20px; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -69,7 +68,7 @@ $currentUserId = $currentUser['user_id'];
     <div class="card">
         <div class="tabs">
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
-            <div class="tab" data-tab="all_bookings"><i class="fas fa-calendar-alt"></i> Planning Réservations</div>
+            <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
             <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
             <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
@@ -98,46 +97,58 @@ $currentUserId = $currentUser['user_id'];
         </div>
     </div>
 
-    <div id="all_bookings" class="tab-content">
+    <div id="booking" class="tab-content">
+        <div class="card mb-4">
+            <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
+            <div class="booking-filters">
+                <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
+                <input type="text" id="individualFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="thead-dark">
+                        <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="individual-active-bookings-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
+             <div class="booking-filters">
+                <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="thead-dark">
+                        <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Statut</th><th>Action</th></tr>
+                    </thead>
+                    <tbody id="mission-active-bookings-table"></tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="card">
-            <h3><i class="fas fa-calendar-alt"></i> Planning des Réservations</h3>
-            <ul class="nav nav-tabs mt-3" id="booking-type-tabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link active" id="individual-bookings-tab" data-toggle="tab" href="#individual-bookings" role="tab" aria-controls="individual-bookings" aria-selected="true"><i class="fas fa-user mr-1"></i> Individuelles</a>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link" id="mission-bookings-tab" data-toggle="tab" href="#mission-bookings" role="tab" aria-controls="mission-bookings" aria-selected="false"><i class="fas fa-users mr-1"></i> Par Mission</a>
-                </li>
-            </ul>
-            <div class="tab-content" id="booking-type-tabs-content">
-                <div class="tab-pane fade show active" id="individual-bookings" role="tabpanel" aria-labelledby="individual-bookings-tab">
-                    <div class="table-responsive mt-3">
-                        <table class="table table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Date</th><th>Actif</th><th>Code-barres</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="individual-bookings-table"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="tab-pane fade" id="mission-bookings" role="tabpanel" aria-labelledby="mission-bookings-tab">
-                     <div class="table-responsive mt-3">
-                        <table class="table table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Date</th><th>Mission</th><th>Actif</th><th>Code-barres</th><th>Statut</th><th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mission-bookings-table"></tbody>
-                        </table>
-                    </div>
-                </div>
+            <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
+            <div class="booking-filters">
+                <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                 <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
+                <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="thead-dark">
+                        <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
+                    </thead>
+                    <tbody id="usage-history-table"></tbody>
+                </table>
             </div>
         </div>
     </div>
-
+    
     <div id="scanner" class="tab-content">
         <div class="card">
              <h3 class="text-center mb-4">Scanner un Code-barres</h3>
@@ -153,7 +164,7 @@ $currentUserId = $currentUser['user_id'];
          <div class="card">
             <h3>Ajouter un Nouvel Actif</h3>
             <form id="addAssetForm">
-                </form>
+            </form>
         </div>
     </div>
 
@@ -285,6 +296,8 @@ const CURRENT_USER_ID = <?php echo $currentUserId; ?>;
 let inventory = [];
 let assetCategories = [];
 let allBookings = { individual: [], mission: [] };
+let usageHistory = [];
+let allUsers = [];
 let selectedCategoryId = 'all'; 
 let codeReader = null;
 let datePicker = null;
@@ -301,45 +314,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('addAssetForm').innerHTML = addAssetFormContent;
     document.getElementById('editAssetForm').innerHTML = editAssetFormContent;
     setupEventListeners();
+    initializeBookingTabFilters();
     loadingOverlay.style.display = 'flex';
-    await fetchInitialData();
-    renderAll();
+    await fetchAllData();
+    renderInventoryTab();
     initializeDatePicker();
     loadingOverlay.style.display = 'none';
 });
 
-async function fetchInitialData() {
+async function fetchAllData() {
     try {
-        const [inventoryData, bookingsData, categoriesData] = await Promise.all([
+        const [inventoryData, bookingsData, categoriesData, historyData, usersData] = await Promise.all([
             apiCall('get_inventory', 'GET'),
             apiCall('get_all_bookings', 'GET'),
-            apiCall('get_categories', 'GET')
+            apiCall('get_categories', 'GET'),
+            apiCall('get_booking_history', 'GET'),
+            apiCall('get_users', 'GET')
         ]);
         
         inventory = inventoryData.inventory || [];
-
-        if (bookingsData && bookingsData.bookings && typeof bookingsData.bookings === 'object') {
-            allBookings.individual = bookingsData.bookings.individual || [];
-            allBookings.mission = bookingsData.bookings.mission || [];
-        } else {
-            allBookings.individual = [];
-            allBookings.mission = [];
-        }
-
+        allBookings.individual = bookingsData.bookings?.individual || [];
+        allBookings.mission = bookingsData.bookings?.mission || [];
+        usageHistory = historyData.history || [];
         assetCategories = categoriesData.categories || [];
+        allUsers = usersData.users || [];
+        
         assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
     } catch (error) {
-        console.error("Erreur lors du chargement des données initiales:", error);
-        showNotification("Impossible de charger les données.", "error");
+        console.error("Erreur lors du chargement des données:", error);
+        showNotification("Impossible de charger toutes les données.", "error");
     }
 }
 
-function renderAll() {
+function renderInventoryTab() {
     renderCategoryFilters();
     renderInventory();
-    renderAllBookingsTables();
-    renderCategoriesList();
     populateCategoryDropdowns('add');
+}
+
+function renderBookingTab() {
+    populateUserFilters();
+    renderIndividualBookingsTable();
+    renderMissionBookingsTable();
+    renderUsageHistoryTable();
 }
 
 // --- API & HELPERS ---
@@ -386,6 +403,7 @@ async function apiCall(action, method = 'POST', body = null) {
 function setupEventListeners() {
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
     
+    // Inventory Tab Listeners
     document.getElementById('searchInput').addEventListener('input', updateFiltersAndRender);
     document.getElementById('filterType').addEventListener('change', () => {
         selectedCategoryId = 'all'; 
@@ -401,17 +419,51 @@ function setupEventListeners() {
         }
     });
     
+    // Forms, Modals, and Scanner Listeners
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
     document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
     document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
-    
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
-    
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
     document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
+
+    // Booking Tab Filter Listeners
+    document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
+    document.getElementById('individualFilterUser').addEventListener('change', renderIndividualBookingsTable);
+    document.getElementById('individualFilterMission').addEventListener('input', renderIndividualBookingsTable);
+    document.getElementById('missionFilterDate').addEventListener('change', renderMissionBookingsTable);
+    document.getElementById('missionFilterMission').addEventListener('input', renderMissionBookingsTable);
+    document.getElementById('historyFilterDate').addEventListener('change', renderUsageHistoryTable);
+    document.getElementById('historyFilterUser').addEventListener('change', renderUsageHistoryTable);
+    document.getElementById('historyFilterMission').addEventListener('input', renderUsageHistoryTable);
+}
+
+function initializeBookingTabFilters() {
+    const commonConfig = { 
+        locale: "fr", 
+        dateFormat: "Y-m-d", 
+        allowInput: true,
+        // The 'clear' functionality is handled by flatpickr's native 'X' button
+    };
+    flatpickr("#individualFilterDate", commonConfig);
+    flatpickr("#missionFilterDate", commonConfig);
+    flatpickr("#historyFilterDate", commonConfig);
+}
+
+
+function populateUserFilters() {
+    const userFilters = ['individualFilterUser', 'historyFilterUser'];
+    userFilters.forEach(filterId => {
+        const select = document.getElementById(filterId);
+        if (select.options.length > 1) return; // Populate only once
+        select.innerHTML = '<option value="">Tous les utilisateurs</option>';
+        allUsers.forEach(user => {
+            select.add(new Option(`${user.prenom} ${user.nom}`, user.user_id));
+        });
+    });
 }
 
 function showTab(tabName) {
@@ -419,11 +471,19 @@ function showTab(tabName) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
+
     if (tabName !== 'scanner' && codeReader) stopScanning();
-    if (['all_bookings', 'inventory', 'manage_categories'].includes(tabName)) {
+    
+    // Use a single data fetch function and then render the specific tab
+    const needsDataRefresh = ['inventory', 'booking', 'manage_categories'].includes(tabName);
+    if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
-        fetchInitialData().then(() => {
-            renderAll();
+        fetchAllData().then(() => {
+            if (tabName === 'inventory') renderInventoryTab();
+            else if (tabName === 'booking') renderBookingTab();
+            else if (tabName === 'manage_categories') {
+                renderCategoriesList();
+            }
             loadingOverlay.style.display = 'none';
         });
     }
@@ -455,8 +515,9 @@ async function handleCreateCategory(e) {
         await apiCall('add_category', 'POST', categoryData);
         showNotification('Catégorie créée !', 'success');
         form.reset();
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderCategoriesList();
+        renderInventoryTab();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -482,8 +543,9 @@ async function handleUpdateCategory() {
         await apiCall('update_category', 'POST', categoryData);
         showNotification('Catégorie mise à jour !', 'success');
         $('#modifyCategoryModal').modal('hide');
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderCategoriesList();
+        renderInventoryTab();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -495,8 +557,9 @@ async function handleDeleteCategory(categoryId, categoryName) {
     try {
         await apiCall('delete_category', 'POST', { category_id: categoryId });
         showNotification('Catégorie supprimée.', 'success');
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderCategoriesList();
+        renderInventoryTab();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -530,13 +593,7 @@ function renderInventory() {
         const matchesSearch = s.includes(searchTerm);
         const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
         const matchesCategory = selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId;
-
-        let displayStatus = asset.status;
-        const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
-        if (asset.status === 'available' && isBookedForToday) {
-             displayStatus = 'in-use';
-        }
-        const matchesStatus = statusFilter === 'all' || displayStatus === statusFilter;
+        const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
 
         return matchesSearch && matchesType && matchesStatus && matchesCategory;
     });
@@ -550,49 +607,56 @@ function renderInventory() {
 
 function createAssetCard(asset) {
     const card = document.createElement('div');
-    const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
-    let displayStatus = asset.status;
+    
     let assignedToText = '';
     let statusText = '';
+    let cardStatusClass = asset.status;
+
     if (asset.status === 'in-use') {
-        displayStatus = 'in-use';
-        assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
         statusText = 'En cours d\'utilisation';
-    } else if (asset.status === 'available' && isBookedForToday) {
-        displayStatus = 'in-use';
-        assignedToText = `<strong>Réservé aujourd'hui par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
-        statusText = 'Réservé aujourd\'hui';
+        assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
+    } else if (asset.status === 'available') {
+        const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
+        if(isBookedForToday) {
+            statusText = 'Réservé aujourd\'hui';
+            cardStatusClass = 'in-use'; // Visually treat as in-use
+            assignedToText = `<strong>Réservé par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
+        } else {
+            statusText = 'Disponible';
+        }
     } else if (asset.status === 'maintenance') {
-        displayStatus = 'maintenance';
         statusText = 'En maintenance';
-    } else {
-        displayStatus = 'available';
-        statusText = 'Disponible';
     }
-    card.className = `asset-card ${asset.asset_type} ${displayStatus}`;
+
+    card.className = `asset-card ${asset.asset_type} ${cardStatusClass}`;
     card.dataset.id = asset.asset_id;
-    const bookingInfo = asset.status === 'available' && !isBookedForToday && asset.next_future_booking_date 
+
+    const bookingInfo = asset.status === 'available' && asset.next_future_booking_date 
         ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` 
         : '';
+
     const details = asset.asset_type === 'tool' 
         ? `<strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>` 
         : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
+
     let buttons = '';
-    if (asset.status === 'available' && !isBookedForToday) {
+    if (asset.status === 'available') {
         buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
         buttons += `<button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
     } else if (asset.status === 'maintenance') {
         buttons += `<button class="btn btn-info btn-small" onclick="setAssetAvailable(${asset.asset_id})"><i class="fas fa-check-circle"></i> Rendre Dispo.</button>`;
     }
+
     if (IS_ADMIN) {
         buttons += `<button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button>`;
         buttons += `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
     }
+
     card.innerHTML = `
         <div>
             <div class="asset-header">
                 <span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span>
-                <span class="asset-status status-${displayStatus}">${statusText}</span>
+                <span class="asset-status status-${cardStatusClass}">${statusText}</span>
             </div>
             <div class="asset-details">
                 <strong>Code-barres:</strong> ${asset.barcode}<br>
@@ -609,6 +673,116 @@ function escapeSingleQuotes(str) {
     return str.replace(/'/g, "\\'");
 }
 
+// --- BOOKING TAB & HISTORY MODAL RENDERING ---
+function renderIndividualBookingsTable() {
+    const tableBody = document.getElementById('individual-active-bookings-table');
+    const dateFilter = document.getElementById('individualFilterDate')._flatpickr.input.value;
+    const userFilter = document.getElementById('individualFilterUser').value;
+    const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
+
+    const filtered = allBookings.individual.filter(b => 
+        (!dateFilter || b.booking_date === dateFilter) &&
+        (!userFilter || b.user_id == userFilter) &&
+        (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter)))
+    );
+
+    tableBody.innerHTML = '';
+    if (filtered.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>';
+        return;
+    }
+
+    filtered.forEach(b => {
+        const row = tableBody.insertRow();
+        row.innerHTML = `
+            <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+            <td>${b.asset_name || '(Actif supprimé)'}</td>
+            <td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)'}</td>
+            <td>${b.mission || 'N/A'}</td>
+            <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
+            <td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>
+        `;
+    });
+}
+
+function renderMissionBookingsTable() {
+    const tableBody = document.getElementById('mission-active-bookings-table');
+    const dateFilter = document.getElementById('missionFilterDate')._flatpickr.input.value;
+    const missionFilter = document.getElementById('missionFilterMission').value.toLowerCase();
+
+    const filtered = allBookings.mission.filter(b => 
+        (!dateFilter || b.booking_date === dateFilter) &&
+        (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter)))
+    );
+    
+    tableBody.innerHTML = '';
+    if (filtered.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>';
+        return;
+    }
+
+    filtered.forEach(b => {
+        const row = tableBody.insertRow();
+        row.innerHTML = `
+            <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+            <td>${b.mission || 'N/A'}</td>
+            <td>${b.asset_name || '(Actif supprimé)'}</td>
+            <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
+            <td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>
+        `;
+    });
+}
+
+function renderUsageHistoryTable() {
+    const tableBody = document.getElementById('usage-history-table');
+    const dateFilter = document.getElementById('historyFilterDate')._flatpickr.input.value;
+    const userFilter = document.getElementById('historyFilterUser').value;
+    const missionFilter = document.getElementById('historyFilterMission').value.toLowerCase();
+
+    const filtered = usageHistory.filter(h => 
+        (!dateFilter || h.booking_date === dateFilter) &&
+        (!userFilter || h.user_id == userFilter) &&
+        (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter)))
+    );
+
+    tableBody.innerHTML = '';
+    if (filtered.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>';
+        return;
+    }
+
+    const statusBadges = {
+        completed: 'badge-secondary',
+        cancelled: 'badge-danger'
+    };
+
+    filtered.forEach(h => {
+        const row = tableBody.insertRow();
+        row.innerHTML = `
+            <td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+            <td>${h.asset_name || '(Actif supprimé)'}</td>
+            <td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td>
+            <td>${h.mission || 'N/A'}</td>
+            <td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>
+        `;
+    });
+}
+
+async function handleCancelBooking(bookingId) {
+    if (!confirm("Voulez-vous vraiment annuler cette réservation ?")) return;
+    loadingOverlay.style.display = 'flex';
+    try {
+        await apiCall('cancel_booking', 'POST', { booking_id: bookingId });
+        showNotification('Réservation annulée.', 'success');
+        await fetchAllData();
+        renderBookingTab();
+        renderInventoryTab();
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+// --- MODALS & FORMS LOGIC ---
 function initializeDatePicker() {
     datePicker = flatpickr("#booking_date", {
         locale: "fr",
@@ -616,6 +790,7 @@ function initializeDatePicker() {
         minDate: "today",
     });
 }
+
 async function openBookingModal(assetId) {
     const asset = inventory.find(a => a.asset_id == assetId);
     if (!asset) return;
@@ -643,6 +818,7 @@ async function openBookingModal(assetId) {
         loadingOverlay.style.display = 'none';
     }
 }
+
 async function handleSaveBooking() {
     const bookingData = {
         asset_id: $('#bookingModalAssetId').val(),
@@ -659,12 +835,14 @@ async function handleSaveBooking() {
         showNotification('Réservation enregistrée !', 'success');
         $('#bookingModal').modal('hide');
         document.getElementById('bookingForm').reset();
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderInventoryTab();
+        renderBookingTab();
     } finally {
         loadingOverlay.style.display = 'none';
     }
 }
+
 async function openHistoryModal(assetId, assetName) {
     $('#historyModalAssetName').text(assetName);
     const modalBody = $('#historyModalBody');
@@ -693,82 +871,7 @@ async function openHistoryModal(assetId, assetName) {
     }
 }
 
-/**
- * FINAL FIX: This function has been completely rewritten to use the browser's native
- * table manipulation API (insertRow, insertCell). This is the most robust method and
- * bypasses any potential issues with innerHTML, appendChild, or CSS conflicts.
- */
-function renderAllBookingsTables() {
-    const individualTableBody = document.getElementById('individual-bookings-table');
-    const missionTableBody = document.getElementById('mission-bookings-table');
-    
-    // Clear tables
-    individualTableBody.innerHTML = '';
-    missionTableBody.innerHTML = '';
-
-    // Render Individual Bookings
-    if (!allBookings.individual || allBookings.individual.length === 0) {
-        individualTableBody.insertRow().innerHTML = '<td colspan="7" class="text-center">Aucune réservation individuelle.</td>';
-    } else {
-        allBookings.individual.forEach(b => {
-            const newRow = individualTableBody.insertRow(); // Create a new <tr>
-            
-            // Populate cells one by one
-            newRow.insertCell().innerHTML = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
-            newRow.insertCell().innerHTML = b.asset_name || '(Actif supprimé)';
-            newRow.insertCell().innerHTML = b.barcode || 'N/A';
-            newRow.insertCell().innerHTML = (b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)';
-            newRow.insertCell().innerHTML = b.mission || 'N/A';
-            
-            const statusCell = newRow.insertCell();
-            statusCell.innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span>`;
-            
-            const actionCell = newRow.insertCell();
-            const canCancel = (b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID));
-            if (canCancel) {
-                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
-            }
-        });
-    }
-
-    // Render Mission Bookings
-    if (!allBookings.mission || allBookings.mission.length === 0) {
-        missionTableBody.insertRow().innerHTML = '<td colspan="6" class="text-center">Aucune réservation de mission.</td>';
-    } else {
-        allBookings.mission.forEach(b => {
-            const newRow = missionTableBody.insertRow();
-            
-            newRow.insertCell().innerHTML = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
-            newRow.insertCell().innerHTML = b.mission || 'N/A';
-            newRow.insertCell().innerHTML = b.asset_name || '(Actif supprimé)';
-            newRow.insertCell().innerHTML = b.barcode || 'N/A';
-
-            const statusCell = newRow.insertCell();
-            statusCell.innerHTML = `<span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span>`;
-            
-            const actionCell = newRow.insertCell();
-            const canCancel = (b.status === 'booked' && IS_ADMIN);
-            if (canCancel) {
-                actionCell.innerHTML = `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>`;
-            }
-        });
-    }
-}
-
-
-async function handleCancelBooking(bookingId) {
-    if (!confirm("Voulez-vous vraiment annuler cette réservation ?")) return;
-    loadingOverlay.style.display = 'flex';
-    try {
-        await apiCall('cancel_booking', 'POST', { booking_id: bookingId });
-        showNotification('Réservation annulée.', 'success');
-        await fetchInitialData();
-        renderAll();
-    } finally {
-        loadingOverlay.style.display = 'none';
-    }
-}
-
+// --- SCANNER LOGIC ---
 function startScanning() {
     if (codeReader) {
       codeReader.reset();
@@ -798,6 +901,10 @@ function stopScanning() {
         codeReader.reset();
         codeReader = null;
     }
+    const videoElem = document.getElementById('video');
+    if (videoElem && videoElem.srcObject) {
+        videoElem.srcObject.getTracks().forEach(track => track.stop());
+    }
     document.getElementById('startScanBtn').style.display = 'inline-block';
     document.getElementById('stopScanBtn').style.display = 'none';
 }
@@ -811,8 +918,9 @@ async function processScanResult(barcode) {
         switch(data.scan_code) {
             case 'return_success':
             case 'checkout_success':
-                await fetchInitialData();
-                renderAll();
+                await fetchAllData();
+                renderInventoryTab();
+                renderBookingTab();
                 showTab('inventory');
                 break;
 
@@ -861,6 +969,7 @@ async function processScanResult(barcode) {
     }
 }
 
+// --- MAINTENANCE & ASSET MANAGEMENT ---
 function openMaintenanceModal(assetId, assetName) {
     $('#maintenanceModalAssetName').text(assetName);
     $('#setMaintenanceBtn').off('click').on('click', () => setMaintenanceStatus(assetId, 'maintenance'));
@@ -873,8 +982,8 @@ async function setMaintenanceStatus(assetId, status) {
         await apiCall('update_maintenance_status', 'POST', { asset_id: assetId, status: status });
         showNotification('Statut mis à jour.', 'success');
         $('#maintenanceModal').modal('hide');
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderInventoryTab();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -926,8 +1035,8 @@ async function handleAddAsset(e) {
         showNotification('Actif ajouté avec succès!', 'success');
         document.getElementById('addAssetForm').reset();
         toggleAssetFields('add');
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderInventoryTab();
         showTab('inventory');
     } finally {
         loadingOverlay.style.display = 'none';
@@ -939,8 +1048,9 @@ async function handleDeleteAsset(assetId, assetName) {
     try {
         await apiCall('delete_asset', 'POST', { asset_id: assetId });
         showNotification('Actif supprimé avec succès!', 'success');
-        await fetchInitialData();
-        renderAll();
+        await fetchAllData();
+        renderInventoryTab();
+        renderBookingTab();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -982,13 +1092,10 @@ async function handleUpdateAsset(e) {
     };
     loadingOverlay.style.display = 'flex';
     try {
-        const result = await apiCall('update_asset', 'POST', assetData);
+        await apiCall('update_asset', 'POST', assetData);
         showNotification('Actif mis à jour avec succès!', 'success');
-        const index = inventory.findIndex(a => a.asset_id == result.asset.asset_id);
-        if (index !== -1) {
-            inventory[index] = result.asset;
-        }
-        renderInventory();
+        await fetchAllData();
+        renderInventoryTab();
         $('#editAssetModal').modal('hide');
     } finally {
         loadingOverlay.style.display = 'none';
