@@ -54,6 +54,10 @@ $currentUserId = $currentUser['user_id'];
         #categoryFilterContainer { display: flex; flex-wrap: wrap; gap: 10px; }
         #categoryFilterContainer .btn { border-radius: 20px; padding: 5px 15px; font-size: 0.9em; }
         .booking-filters { display: flex; gap: 15px; margin-top: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .booking-sub-nav { display: flex; gap: 10px; flex-wrap: wrap; }
+        .booking-sub-nav .btn { font-weight: 600; }
+        .booking-content-pane { display: none; }
+        .booking-content-pane.active { display: block; }
     </style>
 </head>
 <body>
@@ -99,52 +103,66 @@ $currentUserId = $currentUser['user_id'];
 
     <div id="booking" class="tab-content">
         <div class="card mb-4">
-            <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
-            <div class="booking-filters">
-                <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
-                <input type="text" id="individualFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+            <div class="booking-sub-nav">
+                <button class="btn btn-primary booking-sub-nav-btn active" data-target="individual-bookings-content"><i class="fas fa-user mr-2"></i>Individuelles</button>
+                <button class="btn btn-outline-primary booking-sub-nav-btn" data-target="mission-bookings-content"><i class="fas fa-users mr-2"></i>Par Mission</button>
+                <button class="btn btn-outline-primary booking-sub-nav-btn" data-target="history-content"><i class="fas fa-history mr-2"></i>Historique</button>
             </div>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="thead-dark">
-                        <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th></tr>
-                    </thead>
-                    <tbody id="individual-active-bookings-table"></tbody>
-                </table>
+        </div>
+        
+        <div id="individual-bookings-content" class="booking-content-pane active">
+            <div class="card">
+                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
+                <div class="booking-filters">
+                    <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                    <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
+                    <input type="text" id="individualFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="individual-active-bookings-table"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="card mb-4">
-            <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
-             <div class="booking-filters">
-                <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
-            </div>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="thead-dark">
-                        <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Statut</th><th>Action</th></tr>
-                    </thead>
-                    <tbody id="mission-active-bookings-table"></tbody>
-                </table>
+        <div id="mission-bookings-content" class="booking-content-pane">
+            <div class="card">
+                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
+                 <div class="booking-filters">
+                    <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                    <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Statut</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="mission-active-bookings-table"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="card">
-            <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
-            <div class="booking-filters">
-                <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                 <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
-                <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
-            </div>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="thead-dark">
-                        <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
-                    </thead>
-                    <tbody id="usage-history-table"></tbody>
-                </table>
+        <div id="history-content" class="booking-content-pane">
+            <div class="card">
+                <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
+                <div class="booking-filters">
+                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
+                    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
+                        </thead>
+                        <tbody id="usage-history-table"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -289,7 +307,6 @@ $currentUserId = $currentUser['user_id'];
 <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
 <script>
-// --- CONFIG & GLOBAL STATE ---
 const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
 const CURRENT_USER_ID = <?php echo $currentUserId; ?>;
@@ -302,14 +319,11 @@ let selectedCategoryId = 'all';
 let codeReader = null;
 let datePicker = null;
 
-// --- DOM ELEMENTS & TEMPLATES ---
 const inventoryGrid = document.getElementById('inventoryGrid');
 const loadingOverlay = document.querySelector('.loading-overlay');
 const addAssetFormContent = `<div class="form-row"><div class="form-group col-md-6"><label for="add_asset_type">Type d'actif *</label><select id="add_asset_type" class="form-control" required><option value="tool" selected>🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="add_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="add_barcode" placeholder="Ex: TOOL001, 123456789" required></div></div><div class="form-group"><label for="add_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="add_asset_name" placeholder="Ex: Perceuse sans fil, Renault Master" required></div><div class="form-row"><div class="form-group col-md-6"><label for="add_brand">Marque</label><input type="text" class="form-control" id="add_brand" placeholder="Ex: DeWalt, Renault"></div><div class="form-group col-md-6"><label for="add_category_id">Catégorie</label><select id="add_category_id" class="form-control"></select></div></div><div id="add_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="add_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="add_serial_or_plate_tool" placeholder="Ex: SN12345678"></div><div class="form-group col-md-6"><label for="add_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="add_position_or_info_tool" placeholder="Ex: Entrepôt A, Étagère B-3"></div></div></div><div id="add_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="add_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="add_serial_or_plate_vehicle" placeholder="Ex: AA-123-BB"></div><div class="form-group col-md-6"><label for="add_fuel_level">Niveau de carburant</label><select id="add_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Ajouter l'Actif</button>`;
 const editAssetFormContent = `<input type="hidden" id="edit_asset_id"><div class="form-row"><div class="form-group col-md-6"><label for="edit_asset_type">Type d'actif *</label><select id="edit_asset_type" class="form-control" required><option value="tool">🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="edit_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="edit_barcode" required></div></div><div class="form-group"><label for="edit_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="edit_asset_name" required></div><div class="form-row"><div class="form-group col-md-6"><label for="edit_brand">Marque</label><input type="text" class="form-control" id="edit_brand"></div><div class="form-group col-md-6"><label for="edit_category_id">Catégorie</label><select id="edit_category_id" class="form-control"></select></div></div><div id="edit_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="edit_serial_or_plate_tool"></div><div class="form-group col-md-6"><label for="edit_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="edit_position_or_info_tool"></div></div></div><div id="edit_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="edit_serial_or_plate_vehicle"></div><div class="form-group col-md-6"><label for="edit_fuel_level">Niveau de carburant</label><select id="edit_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary" id="saveAssetUpdateBtn"><i class="fas fa-save"></i> Sauvegarder</button></div>`;
 
-
-// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('addAssetForm').innerHTML = addAssetFormContent;
     document.getElementById('editAssetForm').innerHTML = editAssetFormContent;
@@ -338,7 +352,6 @@ async function fetchAllData() {
         usageHistory = historyData.history || [];
         assetCategories = categoriesData.categories || [];
         allUsers = usersData.users || [];
-        
         assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
     } catch (error) {
         console.error("Erreur lors du chargement des données:", error);
@@ -359,7 +372,6 @@ function renderBookingTab() {
     renderUsageHistoryTable();
 }
 
-// --- API & HELPERS ---
 function showNotification(message, type = 'success') { 
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -383,13 +395,9 @@ async function apiCall(action, method = 'POST', body = null) {
     }
     try {
         const response = await fetch(url, options);
-        if (!response.ok) {
-            throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Erreur réseau: ${response.status} ${response.statusText}`);
         const data = await response.json();
-        if (data.status !== 'success') {
-            throw new Error(data.message || 'Une erreur inconnue est survenue.');
-        }
+        if (data.status !== 'success') throw new Error(data.message || 'Une erreur inconnue est survenue.');
         return data;
     } catch (error) {
         console.error(`API Error during action '${action}':`, error);
@@ -398,12 +406,8 @@ async function apiCall(action, method = 'POST', body = null) {
     }
 }
 
-
-// --- EVENT LISTENERS ---
 function setupEventListeners() {
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', e => showTab(e.currentTarget.dataset.tab)));
-    
-    // Inventory Tab Listeners
     document.getElementById('searchInput').addEventListener('input', updateFiltersAndRender);
     document.getElementById('filterType').addEventListener('change', () => {
         selectedCategoryId = 'all'; 
@@ -415,11 +419,24 @@ function setupEventListeners() {
         if (e.target.matches('.btn[data-category-id]')) {
             selectedCategoryId = e.target.dataset.categoryId;
             updateFiltersAndRender();
-            renderCategoryFilters(); 
         }
     });
     
-    // Forms, Modals, and Scanner Listeners
+    document.querySelector('.booking-sub-nav').addEventListener('click', (e) => {
+        const button = e.target.closest('.booking-sub-nav-btn');
+        if (button) {
+            const targetId = button.dataset.target;
+            document.querySelectorAll('.booking-sub-nav-btn').forEach(btn => {
+                btn.classList.remove('btn-primary', 'active');
+                btn.classList.add('btn-outline-primary');
+            });
+            button.classList.add('btn-primary', 'active');
+            button.classList.remove('btn-outline-primary');
+            document.querySelectorAll('.booking-content-pane').forEach(pane => pane.classList.remove('active'));
+            document.getElementById(targetId).classList.add('active');
+        }
+    });
+
     document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
     document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
     document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
@@ -430,7 +447,6 @@ function setupEventListeners() {
     document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
     document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
 
-    // Booking Tab Filter Listeners
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterUser').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterMission').addEventListener('input', renderIndividualBookingsTable);
@@ -442,48 +458,34 @@ function setupEventListeners() {
 }
 
 function initializeBookingTabFilters() {
-    const commonConfig = { 
-        locale: "fr", 
-        dateFormat: "Y-m-d", 
-        allowInput: true,
-        // The 'clear' functionality is handled by flatpickr's native 'X' button
-    };
+    const commonConfig = { locale: "fr", dateFormat: "Y-m-d", allowInput: true };
     flatpickr("#individualFilterDate", commonConfig);
     flatpickr("#missionFilterDate", commonConfig);
     flatpickr("#historyFilterDate", commonConfig);
 }
 
-
 function populateUserFilters() {
     const userFilters = ['individualFilterUser', 'historyFilterUser'];
     userFilters.forEach(filterId => {
         const select = document.getElementById(filterId);
-        if (select.options.length > 1) return; // Populate only once
+        if (select.options.length > 1) return;
         select.innerHTML = '<option value="">Tous les utilisateurs</option>';
-        allUsers.forEach(user => {
-            select.add(new Option(`${user.prenom} ${user.nom}`, user.user_id));
-        });
+        allUsers.forEach(user => select.add(new Option(`${user.prenom} ${user.nom}`, user.user_id)));
     });
 }
 
 function showTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content, .tab').forEach(el => el.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
-
     if (tabName !== 'scanner' && codeReader) stopScanning();
-    
-    // Use a single data fetch function and then render the specific tab
     const needsDataRefresh = ['inventory', 'booking', 'manage_categories'].includes(tabName);
     if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
         fetchAllData().then(() => {
             if (tabName === 'inventory') renderInventoryTab();
             else if (tabName === 'booking') renderBookingTab();
-            else if (tabName === 'manage_categories') {
-                renderCategoriesList();
-            }
+            else if (tabName === 'manage_categories') renderCategoriesList();
             loadingOverlay.style.display = 'none';
         });
     }
@@ -501,15 +503,13 @@ function renderCategoriesList() {
     });
     if (toolList.innerHTML === '') toolList.innerHTML = '<li>Aucune catégorie d\'outil.</li>';
     if (vehicleList.innerHTML === '') vehicleList.innerHTML = '<li>Aucune catégorie de véhicule.</li>';
+    populateCategoryDropdowns('add');
 }
 
 async function handleCreateCategory(e) {
     e.preventDefault();
     const form = e.target;
-    const categoryData = {
-        category_name: document.getElementById('new_category_name').value,
-        category_type: document.getElementById('new_category_type').value
-    };
+    const categoryData = { category_name: document.getElementById('new_category_name').value, category_type: document.getElementById('new_category_type').value };
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('add_category', 'POST', categoryData);
@@ -530,14 +530,8 @@ function openModifyCategoryModal(categoryId, currentName) {
 }
 
 async function handleUpdateCategory() {
-    const categoryData = {
-        category_id: document.getElementById('modifyCategoryId').value,
-        category_name: document.getElementById('modifyCategoryName').value
-    };
-    if (!categoryData.category_name.trim()) {
-        showNotification("Le nom ne peut pas être vide.", "error");
-        return;
-    }
+    const categoryData = { category_id: document.getElementById('modifyCategoryId').value, category_name: document.getElementById('modifyCategoryName').value };
+    if (!categoryData.category_name.trim()) { showNotification("Le nom ne peut pas être vide.", "error"); return; }
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('update_category', 'POST', categoryData);
@@ -552,7 +546,7 @@ async function handleUpdateCategory() {
 }
 
 async function handleDeleteCategory(categoryId, categoryName) {
-    if (!confirm(`Voulez-vous vraiment supprimer la catégorie "${categoryName}" ? Tous les actifs de cette catégorie seront non-catégorisés.`)) return;
+    if (!confirm(`Voulez-vous vraiment supprimer la catégorie "${categoryName}" ?`)) return;
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('delete_category', 'POST', { category_id: categoryId });
@@ -565,14 +559,12 @@ async function handleDeleteCategory(categoryId, categoryName) {
     }
 }
 
-// --- INVENTORY TAB (FILTER LOGIC IMPROVED) ---
 function renderCategoryFilters() {
     const container = document.getElementById('categoryFilterContainer');
     const typeFilter = document.getElementById('filterType').value;
     const relevantCategories = assetCategories.filter(cat => typeFilter === 'all' || cat.category_type === typeFilter);
-    if (relevantCategories.length < 1) { container.innerHTML = ''; container.style.display = 'none'; return; }
-    container.style.display = 'flex';
-    let buttonsHTML = `<button class="btn ${selectedCategoryId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="all">Toutes les catégories</button>`;
+    container.style.display = relevantCategories.length < 1 ? 'none' : 'flex';
+    let buttonsHTML = `<button class="btn ${selectedCategoryId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="all">Toutes</button>`;
     relevantCategories.forEach(cat => {
         buttonsHTML += `<button class="btn ${String(selectedCategoryId) === String(cat.category_id) ? 'btn-primary' : 'btn-outline-secondary'}" data-category-id="${cat.category_id}">${cat.category_name}</button>`;
     });
@@ -581,45 +573,35 @@ function renderCategoryFilters() {
 
 function updateFiltersAndRender() {
     renderInventory();
+    renderCategoryFilters();
 }
 
 function renderInventory() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('filterType').value;
     const statusFilter = document.getElementById('filterStatus').value;
-
-    const filtered = inventory.filter(asset => {
-        const s = ((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase();
-        const matchesSearch = s.includes(searchTerm);
-        const matchesType = typeFilter === 'all' || asset.asset_type === typeFilter;
-        const matchesCategory = selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId;
-        const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
-
-        return matchesSearch && matchesType && matchesStatus && matchesCategory;
-    });
-
+    const filtered = inventory.filter(asset => 
+        (((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase().includes(searchTerm)) &&
+        (typeFilter === 'all' || asset.asset_type === typeFilter) &&
+        (statusFilter === 'all' || asset.status === statusFilter) &&
+        (selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId)
+    );
     inventoryGrid.innerHTML = '';
-    if (filtered.length === 0) {
-        inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif ne correspond à vos critères.</h4></div>`;
-    }
-    filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
+    if (filtered.length === 0) inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif trouvé.</h4></div>`;
+    else filtered.forEach(asset => inventoryGrid.appendChild(createAssetCard(asset)));
 }
 
 function createAssetCard(asset) {
     const card = document.createElement('div');
-    
-    let assignedToText = '';
-    let statusText = '';
-    let cardStatusClass = asset.status;
-
+    let assignedToText = '', statusText = '', cardStatusClass = asset.status;
     if (asset.status === 'in-use') {
-        statusText = 'En cours d\'utilisation';
+        statusText = 'En utilisation';
         assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
     } else if (asset.status === 'available') {
-        const isBookedForToday = asset.todays_booking_user_id !== null && asset.todays_booking_user_id !== undefined;
-        if(isBookedForToday) {
-            statusText = 'Réservé aujourd\'hui';
-            cardStatusClass = 'in-use'; // Visually treat as in-use
+        const isBookedForToday = asset.todays_booking_user_id != null;
+        if (isBookedForToday) {
+            statusText = 'Réservé';
+            cardStatusClass = 'in-use';
             assignedToText = `<strong>Réservé par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
         } else {
             statusText = 'Disponible';
@@ -627,81 +609,35 @@ function createAssetCard(asset) {
     } else if (asset.status === 'maintenance') {
         statusText = 'En maintenance';
     }
-
     card.className = `asset-card ${asset.asset_type} ${cardStatusClass}`;
-    card.dataset.id = asset.asset_id;
-
-    const bookingInfo = asset.status === 'available' && asset.next_future_booking_date 
-        ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` 
-        : '';
-
-    const details = asset.asset_type === 'tool' 
-        ? `<strong>N° de série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Emplacement:</strong> ${asset.position_or_info || 'N/A'}<br>` 
-        : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
-
+    const bookingInfo = asset.status === 'available' && asset.next_future_booking_date ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` : '';
+    const details = asset.asset_type === 'tool' ? `<strong>N° série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Lieu:</strong> ${asset.position_or_info || 'N/A'}<br>` : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
     let buttons = '';
     if (asset.status === 'available') {
-        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
-        buttons += `<button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
+        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button> <button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
     } else if (asset.status === 'maintenance') {
         buttons += `<button class="btn btn-info btn-small" onclick="setAssetAvailable(${asset.asset_id})"><i class="fas fa-check-circle"></i> Rendre Dispo.</button>`;
     }
-
     if (IS_ADMIN) {
-        buttons += `<button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button>`;
-        buttons += `<button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
+        buttons += ` <button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button> <button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
     }
-
-    card.innerHTML = `
-        <div>
-            <div class="asset-header">
-                <span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span>
-                <span class="asset-status status-${cardStatusClass}">${statusText}</span>
-            </div>
-            <div class="asset-details">
-                <strong>Code-barres:</strong> ${asset.barcode}<br>
-                ${details} ${assignedToText}
-            </div>
-            ${bookingInfo}
-        </div>
-        <div class="asset-actions mt-3">${buttons}</div>`;
+    card.innerHTML = `<div><div class="asset-header"><span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span><span class="asset-status status-${cardStatusClass}">${statusText}</span></div><div class="asset-details"><strong>Code-barres:</strong> ${asset.barcode}<br>${details}${assignedToText}</div>${bookingInfo}</div><div class="asset-actions mt-3">${buttons}</div>`;
     return card;
 }
 
-function escapeSingleQuotes(str) {
-    if (typeof str !== 'string') return '';
-    return str.replace(/'/g, "\\'");
-}
+function escapeSingleQuotes(str) { return typeof str === 'string' ? str.replace(/'/g, "\\'") : ''; }
 
-// --- BOOKING TAB & HISTORY MODAL RENDERING ---
 function renderIndividualBookingsTable() {
     const tableBody = document.getElementById('individual-active-bookings-table');
     const dateFilter = document.getElementById('individualFilterDate')._flatpickr.input.value;
     const userFilter = document.getElementById('individualFilterUser').value;
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
-
-    const filtered = allBookings.individual.filter(b => 
-        (!dateFilter || b.booking_date === dateFilter) &&
-        (!userFilter || b.user_id == userFilter) &&
-        (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter)))
-    );
-
+    const filtered = allBookings.individual.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!userFilter || b.user_id == userFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>';
-        return;
-    }
-
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `
-            <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-            <td>${b.asset_name || '(Actif supprimé)'}</td>
-            <td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Utilisateur supprimé)'}</td>
-            <td>${b.mission || 'N/A'}</td>
-            <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td>
-            <td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>
-        `;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
@@ -709,27 +645,12 @@ function renderMissionBookingsTable() {
     const tableBody = document.getElementById('mission-active-bookings-table');
     const dateFilter = document.getElementById('missionFilterDate')._flatpickr.input.value;
     const missionFilter = document.getElementById('missionFilterMission').value.toLowerCase();
-
-    const filtered = allBookings.mission.filter(b => 
-        (!dateFilter || b.booking_date === dateFilter) &&
-        (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter)))
-    );
-    
+    const filtered = allBookings.mission.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>';
-        return;
-    }
-
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `
-            <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-            <td>${b.mission || 'N/A'}</td>
-            <td>${b.asset_name || '(Actif supprimé)'}</td>
-            <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
-            <td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>
-        `;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
@@ -738,33 +659,13 @@ function renderUsageHistoryTable() {
     const dateFilter = document.getElementById('historyFilterDate')._flatpickr.input.value;
     const userFilter = document.getElementById('historyFilterUser').value;
     const missionFilter = document.getElementById('historyFilterMission').value.toLowerCase();
-
-    const filtered = usageHistory.filter(h => 
-        (!dateFilter || h.booking_date === dateFilter) &&
-        (!userFilter || h.user_id == userFilter) &&
-        (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter)))
-    );
-
+    const filtered = usageHistory.filter(h => (!dateFilter || h.booking_date === dateFilter) && (!userFilter || h.user_id == userFilter) && (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>';
-        return;
-    }
-
-    const statusBadges = {
-        completed: 'badge-secondary',
-        cancelled: 'badge-danger'
-    };
-
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
+    const statusBadges = { completed: 'badge-secondary', cancelled: 'badge-danger' };
     filtered.forEach(h => {
         const row = tableBody.insertRow();
-        row.innerHTML = `
-            <td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-            <td>${h.asset_name || '(Actif supprimé)'}</td>
-            <td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td>
-            <td>${h.mission || 'N/A'}</td>
-            <td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>
-        `;
+        row.innerHTML = `<td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td><td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>`;
     });
 }
 
@@ -782,13 +683,8 @@ async function handleCancelBooking(bookingId) {
     }
 }
 
-// --- MODALS & FORMS LOGIC ---
 function initializeDatePicker() {
-    datePicker = flatpickr("#booking_date", {
-        locale: "fr",
-        dateFormat: "Y-m-d",
-        minDate: "today",
-    });
+    datePicker = flatpickr("#booking_date", { locale: "fr", dateFormat: "Y-m-d", minDate: "today" });
 }
 
 async function openBookingModal(assetId) {
@@ -796,21 +692,16 @@ async function openBookingModal(assetId) {
     if (!asset) return;
     $('#bookingModalAssetId').val(asset.asset_id);
     $('#bookingModalAssetName').text(asset.asset_name);
-    const futureBookingsDiv = document.getElementById('futureBookingsInfo');
-    futureBookingsDiv.style.display = 'none';
-    futureBookingsDiv.innerHTML = '';
+    $('#futureBookingsInfo').hide().html('');
     loadingOverlay.style.display = 'flex';
     try {
         const data = await apiCall('get_asset_availability', 'GET', { asset_id: assetId });
         datePicker.set('disable', data.booked_dates);
         if (data.booked_dates && data.booked_dates.length > 0) {
             const todayStr = new Date().toISOString().split('T')[0];
-            const futureDates = data.booked_dates
-                .filter(d => d > todayStr)
-                .map(d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR'));
+            const futureDates = data.booked_dates.filter(d => d > todayStr).map(d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR'));
             if (futureDates.length > 0) {
-                futureBookingsDiv.innerHTML = `<strong>Déjà réservé le:</strong> ${futureDates.join(', ')}`;
-                futureBookingsDiv.style.display = 'block';
+                $('#futureBookingsInfo').html(`<strong>Déjà réservé le:</strong> ${futureDates.join(', ')}`).show();
             }
         }
         $('#bookingModal').modal('show');
@@ -820,15 +711,8 @@ async function openBookingModal(assetId) {
 }
 
 async function handleSaveBooking() {
-    const bookingData = {
-        asset_id: $('#bookingModalAssetId').val(),
-        booking_date: $('#booking_date').val(),
-        mission: $('#booking_mission').val(),
-    };
-    if (!bookingData.booking_date) {
-        showNotification("Veuillez choisir une date.", "error");
-        return;
-    }
+    const bookingData = { asset_id: $('#bookingModalAssetId').val(), booking_date: $('#booking_date').val(), mission: $('#booking_mission').val() };
+    if (!bookingData.booking_date) { showNotification("Veuillez choisir une date.", "error"); return; }
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('book_asset', 'POST', bookingData);
@@ -850,36 +734,23 @@ async function openHistoryModal(assetId, assetName) {
     $('#historyModal').modal('show');
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
-        if (data.history.length === 0) {
-            modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation pour cet actif.</p>');
-            return;
-        }
+        if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
         let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
         data.history.forEach(rec => {
-            tableHtml += `
-                <tr>
-                    <td>${new Date(rec.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
-                    <td>${rec.prenom} ${rec.nom}</td>
-                    <td>${rec.mission || 'N/A'}</td>
-                    <td><span class="badge badge-info">${rec.status}</span></td>
-                </tr>`;
+            tableHtml += `<tr><td>${new Date(rec.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${rec.prenom} ${rec.nom}</td><td>${rec.mission || 'N/A'}</td><td><span class="badge badge-info">${rec.status}</span></td></tr>`;
         });
         tableHtml += '</tbody></table></div>';
         modalBody.html(tableHtml);
     } catch (error) {
-        modalBody.html('<p class="text-danger text-center">Erreur lors du chargement de l\'historique.</p>');
+        modalBody.html('<p class="text-danger text-center">Erreur de chargement.</p>');
     }
 }
 
-// --- SCANNER LOGIC ---
 function startScanning() {
-    if (codeReader) {
-      codeReader.reset();
-    }
+    if (codeReader) codeReader.reset();
     codeReader = new ZXing.BrowserMultiFormatReader();
-    document.getElementById('startScanBtn').style.display = 'none';
-    document.getElementById('stopScanBtn').style.display = 'inline-block';
-    
+    $('#startScanBtn').hide();
+    $('#stopScanBtn').show();
     codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
         if (result) {
             stopScanning();
@@ -902,11 +773,9 @@ function stopScanning() {
         codeReader = null;
     }
     const videoElem = document.getElementById('video');
-    if (videoElem && videoElem.srcObject) {
-        videoElem.srcObject.getTracks().forEach(track => track.stop());
-    }
-    document.getElementById('startScanBtn').style.display = 'inline-block';
-    document.getElementById('stopScanBtn').style.display = 'none';
+    if (videoElem && videoElem.srcObject) videoElem.srcObject.getTracks().forEach(track => track.stop());
+    $('#startScanBtn').show();
+    $('#stopScanBtn').hide();
 }
 
 async function processScanResult(barcode) {
@@ -914,7 +783,6 @@ async function processScanResult(barcode) {
     try {
         const data = await apiCall('process_scan', 'POST', { barcode });
         showNotification(data.message, 'info');
-
         switch(data.scan_code) {
             case 'return_success':
             case 'checkout_success':
@@ -923,21 +791,18 @@ async function processScanResult(barcode) {
                 renderBookingTab();
                 showTab('inventory');
                 break;
-
             case 'prompt_booking':
                 const asset = data.asset;
-                if(confirm(`"${asset.asset_name}" n'est pas réservé pour aujourd'hui. Voulez-vous le réserver et le sortir maintenant ?`)) {
+                if(confirm(`"${asset.asset_name}" n'est pas réservé. Réserver et sortir maintenant ?`)) {
                     $('#bookingModalAssetId').val(asset.asset_id);
                     $('#bookingModalAssetName').text(asset.asset_name);
                     datePicker.set('disable', []);
                     datePicker.setDate(new Date(), true);
                     $('#booking_mission').val('Sortie via scan');
                     $('#bookingModal').modal('show');
-                    
                     $('#saveBookingBtn').off('click').one('click', async function() {
                         const bookingData = { asset_id: $('#bookingModalAssetId').val(), booking_date: $('#booking_date').val(), mission: $('#booking_mission').val() };
                         if (!bookingData.booking_date) { showNotification("Date invalide.", "error"); return; }
-                        
                         loadingOverlay.style.display = 'flex';
                         try {
                             await apiCall('book_asset', 'POST', bookingData);
@@ -951,7 +816,6 @@ async function processScanResult(barcode) {
                     });
                 }
                 break;
-            
             case 'asset_not_found':
                 if (confirm(data.message)) {
                     showTab('add_asset');
@@ -959,17 +823,12 @@ async function processScanResult(barcode) {
                 }
                 break;
         }
-    } catch(e) {
-        /* error handled by apiCall */
     } finally {
         loadingOverlay.style.display = 'none';
-        $('#bookingModal').on('hidden.bs.modal', function () {
-            $('#saveBookingBtn').off('click').on('click', handleSaveBooking);
-        });
+        $('#bookingModal').on('hidden.bs.modal', () => $('#saveBookingBtn').off('click').on('click', handleSaveBooking));
     }
 }
 
-// --- MAINTENANCE & ASSET MANAGEMENT ---
 function openMaintenanceModal(assetId, assetName) {
     $('#maintenanceModalAssetName').text(assetName);
     $('#setMaintenanceBtn').off('click').on('click', () => setMaintenanceStatus(assetId, 'maintenance'));
@@ -1001,38 +860,28 @@ function toggleAssetFields(formPrefix) {
 }
 
 function populateCategoryDropdowns(formPrefix, selectedCategoryId = null) {
-    const assetTypeElement = document.getElementById(`${formPrefix}_asset_type`);
-    if (!assetTypeElement) return;
-    const assetType = assetTypeElement.value;
+    const assetType = document.getElementById(`${formPrefix}_asset_type`)?.value;
     const dropdown = document.getElementById(`${formPrefix}_category_id`);
+    if (!assetType || !dropdown) return;
     dropdown.innerHTML = '<option value="">-- Sans catégorie --</option>';
-    if (assetCategories && assetCategories.length > 0) {
-        assetCategories
-            .filter(cat => cat.category_type === assetType)
-            .forEach(cat => dropdown.add(new Option(cat.category_name, cat.category_id)));
-    }
-    if (selectedCategoryId) {
-        dropdown.value = selectedCategoryId;
-    }
+    assetCategories.filter(cat => cat.category_type === assetType).forEach(cat => dropdown.add(new Option(cat.category_name, cat.category_id)));
+    if (selectedCategoryId) dropdown.value = selectedCategoryId;
 }
 
 async function handleAddAsset(e) {
     e.preventDefault();
-    const type = document.getElementById('add_asset_type').value;
+    const type = $('#add_asset_type').val();
     const assetData = {
-        barcode: document.getElementById('add_barcode').value,
-        asset_type: type,
-        asset_name: document.getElementById('add_asset_name').value,
-        brand: document.getElementById('add_brand').value,
-        category_id: document.getElementById('add_category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('add_serial_or_plate_tool').value : document.getElementById('add_serial_or_plate_vehicle').value,
-        position_or_info: type === 'tool' ? document.getElementById('add_position_or_info_tool').value : null,
-        fuel_level: type === 'vehicle' ? document.getElementById('add_fuel_level').value : null,
+        barcode: $('#add_barcode').val(), asset_type: type, asset_name: $('#add_asset_name').val(), brand: $('#add_brand').val(),
+        category_id: $('#add_category_id').val() || null,
+        serial_or_plate: type === 'tool' ? $('#add_serial_or_plate_tool').val() : $('#add_serial_or_plate_vehicle').val(),
+        position_or_info: type === 'tool' ? $('#add_position_or_info_tool').val() : null,
+        fuel_level: type === 'vehicle' ? $('#add_fuel_level').val() : null,
     };
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('add_asset', 'POST', assetData);
-        showNotification('Actif ajouté avec succès!', 'success');
+        showNotification('Actif ajouté !', 'success');
         document.getElementById('addAssetForm').reset();
         toggleAssetFields('add');
         await fetchAllData();
@@ -1043,11 +892,11 @@ async function handleAddAsset(e) {
     }
 }
 async function handleDeleteAsset(assetId, assetName) {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'actif "${assetName}" ? Cette action est irréversible et supprimera aussi toutes les réservations associées.`)) return;
+    if (!confirm(`Supprimer l'actif "${assetName}" ? Cette action est irréversible.`)) return;
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('delete_asset', 'POST', { asset_id: assetId });
-        showNotification('Actif supprimé avec succès!', 'success');
+        showNotification('Actif supprimé !', 'success');
         await fetchAllData();
         renderInventoryTab();
         renderBookingTab();
@@ -1078,22 +927,18 @@ function openEditModal(assetId) {
 
 async function handleUpdateAsset(e) {
     e.preventDefault();
-    const type = document.getElementById('edit_asset_type').value;
+    const type = $('#edit_asset_type').val();
     const assetData = {
-        asset_id: document.getElementById('edit_asset_id').value,
-        barcode: document.getElementById('edit_barcode').value,
-        asset_type: type,
-        asset_name: document.getElementById('edit_asset_name').value,
-        brand: document.getElementById('edit_brand').value,
-        category_id: document.getElementById('edit_category_id').value || null,
-        serial_or_plate: type === 'tool' ? document.getElementById('edit_serial_or_plate_tool').value : document.getElementById('edit_serial_or_plate_vehicle').value,
-        position_or_info: type === 'tool' ? document.getElementById('edit_position_or_info_tool').value : null,
-        fuel_level: type === 'vehicle' ? document.getElementById('edit_fuel_level').value : null,
+        asset_id: $('#edit_asset_id').val(), barcode: $('#edit_barcode').val(), asset_type: type, asset_name: $('#edit_asset_name').val(),
+        brand: $('#edit_brand').val(), category_id: $('#edit_category_id').val() || null,
+        serial_or_plate: type === 'tool' ? $('#edit_serial_or_plate_tool').val() : $('#edit_serial_or_plate_vehicle').val(),
+        position_or_info: type === 'tool' ? $('#edit_position_or_info_tool').val() : null,
+        fuel_level: type === 'vehicle' ? $('#edit_fuel_level').val() : null,
     };
     loadingOverlay.style.display = 'flex';
     try {
         await apiCall('update_asset', 'POST', assetData);
-        showNotification('Actif mis à jour avec succès!', 'success');
+        showNotification('Actif mis à jour !', 'success');
         await fetchAllData();
         renderInventoryTab();
         $('#editAssetModal').modal('hide');
