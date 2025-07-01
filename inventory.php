@@ -66,10 +66,6 @@ $currentUserId = $currentUser['user_id'];
 
 <div class="container-fluid">
     <div class="card">
-        <h2 class="text-center mb-0">📦 Gestion de l'Inventaire</h2>
-    </div>
-
-    <div class="card">
         <div class="tabs">
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
