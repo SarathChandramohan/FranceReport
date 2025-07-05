@@ -1,5 +1,5 @@
 <?php
-// technician-handler.php (New and Final Version)
+// technician-handler.php (Updated Version)
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
@@ -57,34 +57,72 @@ function getTechnicianEquipment($conn, $userId) {
 }
 
 function checkoutItem($conn, $userId, $bookingId, $assetId) {
-    if (empty($bookingId) || empty($assetId)) throw new Exception("Données de prise manquantes.");
+    if (empty($bookingId) || empty($assetId)) {
+        throw new Exception("Données de prise manquantes.");
+    }
 
     $conn->beginTransaction();
-    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ? AND status = 'available'");
-    $updateInvStmt->execute([$userId, $assetId]);
-    if ($updateInvStmt->rowCount() == 0) {
+
+    // Check current status first for better error messages
+    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+    $checkStmt->execute([$assetId]);
+    $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$asset) {
         $conn->rollBack();
-        throw new Exception("Action impossible. Cet article n'est plus disponible ou est déjà pris.");
+        throw new Exception("Article non trouvé.");
     }
+
+    if ($asset['status'] !== 'available') {
+        $conn->rollBack();
+        if ($asset['status'] === 'in-use' && $asset['assigned_to_user_id'] == $userId) {
+             throw new Exception("Vous avez déjà pris cet article.");
+        } else {
+             throw new Exception("Cet article n'est pas disponible. Statut actuel: " . $asset['status']);
+        }
+    }
+
+    // Proceed with checkout
+    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
+    $updateInvStmt->execute([$userId, $assetId]);
+
     $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
     $updateBookingStmt->execute([$bookingId]);
+    
     $conn->commit();
     json_response('success', 'Article pris avec succès.');
 }
 
 function returnItem($conn, $userId, $assetId) {
-    if (empty($assetId)) throw new Exception("Données de retour manquantes.");
+    if (empty($assetId)) {
+        throw new Exception("Données de retour manquantes.");
+    }
     
     $conn->beginTransaction();
-    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL WHERE asset_id = ? AND assigned_to_user_id = ?");
-    $updateInvStmt->execute([$assetId, $userId]);
-    if ($updateInvStmt->rowCount() == 0) {
+
+    // Check current status first for better error messages
+    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+    $checkStmt->execute([$assetId]);
+    $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$asset) {
+        $conn->rollBack();
+        throw new Exception("Article non trouvé.");
+    }
+    
+    if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
         $conn->rollBack();
         throw new Exception("Retour impossible. Cet article n'est pas actuellement sorti à votre nom.");
     }
+
+    // Proceed with return
+    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE asset_id = ?");
+    $updateInvStmt->execute([$assetId]);
+    
     $today = date('Y-m-d');
     $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active' AND booking_date <= ?");
     $updateBookingStmt->execute([$assetId, $today]);
+    
     $conn->commit();
     json_response('success', 'Article retourné avec succès.');
 }
@@ -99,15 +137,22 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
     $itemStmt->execute([$barcode]);
     $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$item) throw new Exception("Aucun article trouvé avec ce code-barres.");
-    if ($item['status'] !== 'available') throw new Exception("Cet article n'est pas disponible actuellement.");
+    if (!$item) {
+        $conn->rollBack();
+        throw new Exception("Aucun article trouvé avec ce code-barres.");
+    }
+    if ($item['status'] !== 'available') {
+        $conn->rollBack();
+        throw new Exception("Cet article n'est pas disponible actuellement. Statut: " . $item['status']);
+    }
     
     $assetId = $item['asset_id'];
     
     $bookingCheckStmt = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date = ? AND status IN ('booked', 'active')");
     $bookingCheckStmt->execute([$assetId, $today]);
     if ($bookingCheckStmt->fetchColumn() > 0) {
-        throw new Exception("Cet article est déjà réservé pour une mission aujourd'hui.");
+        $conn->rollBack();
+        throw new Exception("Action impossible. Cet article est déjà réservé pour une mission aujourd'hui. S'il vous est assigné, veuillez utiliser le bouton 'Prendre' depuis votre liste de matériel.");
     }
 
     $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, 'Prise directe', 'active')");
