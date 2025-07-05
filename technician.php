@@ -11,40 +11,30 @@ $user = getCurrentUser();
     <title>Gestion du Matériel Technicien</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style>
         body { background-color: #f5f5f7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 25px; margin-bottom: 25px; border: 1px solid #e5e5e5; }
         h2 { font-weight: 600; }
         .item-list { list-style-type: none; padding: 0; }
-        .item-list li {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
-            transition: background-color 0.2s ease;
-        }
+        .item-list li { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #e9ecef; }
         .item-list li:last-child { border-bottom: none; }
-        .item-list li:hover { background-color: #f8f9fa; }
         .item-icon { font-size: 1.8em; margin-right: 20px; color: #007bff; width: 40px; text-align: center; }
         .item-details { flex-grow: 1; }
         .item-name { font-weight: 600; color: #343a40; }
         .item-meta { font-size: 0.85em; color: #6c757d; }
         .item-status { font-size: 0.8em; font-weight: bold; padding: 3px 8px; border-radius: 12px; }
         .status-in-use { background-color: #d4edda; color: #155724; }
-        .status-booked { background-color: #d1ecf1; color: #0c5460; }
         .custom-checkbox .custom-control-input:checked~.custom-control-label::before { background-color: #28a745; border-color: #28a745; }
-        .action-buttons {
-            display: flex;
-            gap: 15px; /* Spacing between buttons */
-            justify-content: center;
-            flex-wrap: wrap; /* Allow buttons to wrap on small screens */
-            padding: 20px 0;
-        }
-
-        /* Responsive adjustments */
+        .action-buttons { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; padding: 20px 0; }
+        .scan-section { text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 8px; }
+        
+        /* Modal for scanner */
+        #scanner-modal .modal-content { padding: 20px; text-align: center; }
+        #scanner-preview { width: 100%; max-width: 400px; height: auto; border: 2px solid #007bff; border-radius: 8px; margin: 15px auto; }
+        
         @media (max-width: 576px) {
             .item-list li { flex-direction: column; align-items: flex-start; gap: 10px; }
-            .item-icon { margin-right: 0; margin-bottom: 10px; }
             .action-buttons { flex-direction: column; align-items: stretch; }
         }
     </style>
@@ -55,12 +45,11 @@ $user = getCurrentUser();
 
 <div class="container-fluid mt-4">
     <div class="row">
-        <div class="col-lg-7">
+        <div class="col-lg-8">
             <div class="card">
                 <h2 class="mb-4">Mon Matériel du Jour</h2>
                 <div id="assigned-items-section">
-                    <ul id="assigned-items-list" class="item-list">
-                        </ul>
+                    <ul id="assigned-items-list" class="item-list"></ul>
                     <div id="assigned-items-placeholder" class="text-center p-5" style="display: none;">
                         <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
                         <p class="text-muted">Aucun matériel assigné pour aujourd'hui.</p>
@@ -73,53 +62,84 @@ $user = getCurrentUser();
             </div>
         </div>
 
-        <div class="col-lg-5">
+        <div class="col-lg-4">
             <div class="card">
-                <h2 class="mb-4">Prendre du Matériel Disponible</h2>
-                <div id="available-items-section">
-                    <ul id="available-items-list" class="item-list">
-                        </ul>
-                    <div id="available-items-placeholder" class="text-center p-5" style="display: none;">
-                        <i class="fas fa-store-slash fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">Aucun matériel disponible pour le moment.</p>
-                    </div>
+                <h2 class="mb-4">Prendre du Matériel</h2>
+                <div class="scan-section">
+                     <p class="text-muted">Scannez un article disponible pour le prendre immédiatement.</p>
+                    <button id="scan-to-pick-btn" class="btn btn-primary btn-block btn-lg"><i class="fas fa-barcode mr-2"></i>Scanner pour Prendre</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="scanner-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scanner un Code-barres</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <video id="scanner-preview"></video>
+                <div id="scan-feedback" class="mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        let currentScanAction = null;
+
         loadTechnicianData();
 
         $('#checkout-btn').on('click', handleCheckout);
         $('#return-btn').on('click', handleReturn);
+        $('#scan-to-pick-btn').on('click', function() {
+            currentScanAction = 'pick_item';
+            startScanner();
+        });
+
+        $('#scanner-modal').on('hidden.bs.modal', function () {
+            codeReader.reset();
+            currentScanAction = null;
+            $('#scan-feedback').empty();
+        });
+        
+        function startScanner() {
+            $('#scanner-modal').modal('show');
+            codeReader.decodeFromVideoDevice(undefined, 'scanner-preview', (result, err) => {
+                if (result) {
+                    codeReader.reset();
+                    $('#scanner-modal').modal('hide');
+                    if (currentScanAction === 'pick_item') {
+                        handlePickItem(result.text);
+                    }
+                }
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error(err);
+                    $('#scan-feedback').html('<div class="alert alert-danger">Erreur de caméra.</div>');
+                }
+            });
+        }
     });
-
-    function showLoading(listElement, message) {
-        listElement.html(`<li class="text-center text-muted p-4"><div class="spinner-border spinner-border-sm mr-2"></div>${message}</li>`);
-    }
-
-    function showPlaceholder(placeholderElement) {
-        placeholderElement.show();
-    }
 
     function loadTechnicianData() {
         showLoading($('#assigned-items-list'), 'Chargement du matériel assigné...');
-        showLoading($('#available-items-list'), 'Chargement du matériel disponible...');
-
         $.ajax({
-            url: 'technician-handler.php',
-            type: 'GET',
-            data: { action: 'get_technician_data' },
-            dataType: 'json',
+            url: 'technician-handler.php', type: 'GET', data: { action: 'get_technician_data' }, dataType: 'json',
             success: function(response) {
                 if (response.status === 'success') {
                     renderAssignedItems(response.data.assigned_items);
-                    renderAvailableItems(response.data.available_items);
                 } else {
                     alert('Erreur: ' + response.message);
                 }
@@ -129,12 +149,12 @@ $user = getCurrentUser();
             }
         });
     }
-
+    
     function renderAssignedItems(items) {
         const list = $('#assigned-items-list');
         list.empty();
         if (!items || items.length === 0) {
-            showPlaceholder($('#assigned-items-placeholder'));
+            $('#assigned-items-placeholder').show();
             return;
         }
         $('#assigned-items-placeholder').hide();
@@ -154,8 +174,8 @@ $user = getCurrentUser();
                     ${ isCheckedOut
                         ? `<span class="item-status status-in-use">PRIS</span>`
                         : `<div class="custom-control custom-checkbox ml-3">
-                               <input type="checkbox" class="custom-control-input" id="item-${item.asset_id}" value="${item.asset_id}" data-booking-id="${item.booking_id}">
-                               <label class="custom-control-label" for="item-${item.asset_id}">Prendre</label>
+                               <input type="checkbox" class="custom-control-input checkout-checkbox" id="item-${item.booking_id}" value="${item.asset_id}" data-booking-id="${item.booking_id}">
+                               <label class="custom-control-label" for="item-${item.booking_id}">Prendre</label>
                            </div>`
                     }
                 </li>
@@ -164,123 +184,53 @@ $user = getCurrentUser();
         });
     }
 
-    function renderAvailableItems(items) {
-        const list = $('#available-items-list');
-        list.empty();
-        if (!items || items.length === 0) {
-            showPlaceholder($('#available-items-placeholder'));
-            return;
-        }
-        $('#available-items-placeholder').hide();
-        items.forEach(item => {
-            const iconClass = item.asset_type === 'vehicle' ? 'fa-car' : 'fa-wrench';
-            const itemHtml = `
-                <li>
-                    <i class="fas ${iconClass} item-icon"></i>
-                    <div class="item-details">
-                        <div class="item-name">${item.asset_name}</div>
-                        <div class="item-meta">${item.serial_or_plate || 'N/A'}</div>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary pick-item-btn" data-asset-id="${item.asset_id}">
-                        <i class="fas fa-hand-paper mr-1"></i>Prendre
-                    </button>
-                </li>
-            `;
-            list.append(itemHtml);
-        });
-
-        $('.pick-item-btn').on('click', handlePickItem);
-    }
-
     function handleCheckout() {
-        const selectedItems = [];
-        $('#assigned-items-list input[type="checkbox"]:checked').each(function() {
-            selectedItems.push({
-                asset_id: $(this).val(),
-                booking_id: $(this).data('booking-id')
-            });
-        });
+        const selectedItems = $('.checkout-checkbox:checked').map(function() {
+            return { asset_id: $(this).val(), booking_id: $(this).data('booking-id') };
+        }).get();
 
         if (selectedItems.length === 0) {
             alert("Veuillez sélectionner au moins un article à prendre.");
             return;
         }
 
-        if (!confirm(`Confirmez-vous prendre les ${selectedItems.length} article(s) sélectionné(s) ?`)) {
-            return;
-        }
+        if (!confirm(`Confirmez-vous prendre les ${selectedItems.length} article(s) sélectionné(s) ?`)) return;
 
-        $.ajax({
-            url: 'technician-handler.php',
-            type: 'POST',
-            data: {
-                action: 'checkout_items',
-                items: JSON.stringify(selectedItems)
-            },
-            dataType: 'json',
-            success: function(response) {
-                if (response.status === 'success') {
-                    alert(response.message);
-                    loadTechnicianData();
-                } else {
-                    alert('Erreur: ' + response.message);
-                }
-            },
-            error: function() {
-                alert('Erreur de communication lors de la prise du matériel.');
-            }
-        });
+        performAjaxCall('checkout_items', { items: JSON.stringify(selectedItems) }, "Prise du matériel en cours...");
     }
 
     function handleReturn() {
-        if (!confirm("Êtes-vous sûr de vouloir retourner tout le matériel que vous avez pris ?")) {
-            return;
-        }
+        if (!confirm("Êtes-vous sûr de vouloir retourner tout le matériel que vous avez pris ?")) return;
+        performAjaxCall('return_my_items', {}, "Retour du matériel en cours...");
+    }
 
+    function handlePickItem(barcode) {
+        if (!confirm(`Voulez-vous prendre l'article avec le code-barres "${barcode}" ?`)) return;
+        performAjaxCall('pick_item_by_barcode', { barcode: barcode }, "Traitement du scan en cours...");
+    }
+    
+    function performAjaxCall(action, data, loadingMessage) {
+        showLoading($('#assigned-items-list'), loadingMessage);
         $.ajax({
-            url: 'technician-handler.php',
-            type: 'POST',
-            data: { action: 'return_my_items' },
-            dataType: 'json',
+            url: 'technician-handler.php', type: 'POST', data: { action, ...data }, dataType: 'json',
             success: function(response) {
                 if (response.status === 'success') {
                     alert(response.message);
                     loadTechnicianData();
                 } else {
                     alert('Erreur: ' + response.message);
+                    loadTechnicianData(); // Refresh list even on error
                 }
             },
             error: function() {
-                alert('Erreur de communication lors du retour du matériel.');
+                alert('Erreur de communication lors de l\'opération.');
+                loadTechnicianData();
             }
         });
     }
 
-    function handlePickItem(event) {
-        const assetId = $(event.currentTarget).data('asset-id');
-        const assetName = $(event.currentTarget).closest('li').find('.item-name').text();
-
-        if (!confirm(`Voulez-vous prendre "${assetName}" maintenant ? L'article sera réservé et sorti à votre nom pour aujourd'hui.`)) {
-            return;
-        }
-
-        $.ajax({
-            url: 'technician-handler.php',
-            type: 'POST',
-            data: { action: 'pick_item', asset_id: assetId },
-            dataType: 'json',
-            success: function(response) {
-                if (response.status === 'success') {
-                    alert(response.message);
-                    loadTechnicianData();
-                } else {
-                    alert('Erreur: ' + response.message);
-                }
-            },
-            error: function() {
-                alert('Erreur de communication lors de la prise de l\'article.');
-            }
-        });
+    function showLoading(element, message) {
+        element.html(`<li class="text-center text-muted p-4"><div class="spinner-border spinner-border-sm mr-2"></div>${message}</li>`);
     }
 
 </script>
