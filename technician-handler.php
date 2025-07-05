@@ -6,102 +6,109 @@ require_once 'session-management.php';
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
-    echo json_encode(['status' => 'error', 'message' => 'Session expirée. Veuillez vous reconnecter.']);
-    exit;
+    json_response('error', 'Session expirée. Veuillez vous reconnecter.');
 }
 
 $currentUser = getCurrentUser();
-$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
+$action = $_REQUEST['action'] ?? '';
 
 try {
     switch ($action) {
-        case 'get_technician_data':
-            getTechnicianData($conn, $currentUser['user_id']);
+        case 'get_technician_equipment':
+            getTechnicianEquipment($conn, $currentUser['user_id']);
             break;
-        case 'checkout_items':
-            checkoutItems($conn, $currentUser['user_id'], $_POST['items']);
+        case 'checkout_item':
+            checkoutItem($conn, $currentUser['user_id'], $_POST['booking_id'], $_POST['asset_id']);
             break;
-        case 'return_my_items':
-            returnMyItems($conn, $currentUser['user_id']);
+        case 'return_item':
+            returnItem($conn, $currentUser['user_id'], $_POST['asset_id']);
             break;
         case 'pick_item_by_barcode':
             pickItemByBarcode($conn, $currentUser['user_id'], $_POST['barcode']);
             break;
         default:
-            echo json_encode(['status' => 'error', 'message' => 'Action non valide.']);
+            json_response('error', 'Action non valide.');
     }
 } catch (Exception $e) {
-    error_log("Technician handler error: " . $e->getMessage());
-    echo json_encode(['status' => 'error', 'message' => 'Une erreur interne est survenue: ' . $e->getMessage()]);
+    error_log("Technician handler error: " . $e->getMessage() . " on line " . $e->getLine());
+    json_response('error', 'Une erreur interne est survenue: ' . $e->getMessage());
 }
 
-function getTechnicianData($conn, $userId) {
+function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
-    $data = ['assigned_items' => []];
-
-    // More robust query to get items booked for the technician today.
-    // This includes items booked for a mission they are on, or items they booked directly.
-    $sqlAssigned = "
-        SELECT
-            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.status, i.assigned_to_user_id,
+    
+    // This query now correctly fetches items assigned to the user for today,
+    // either directly or through a mission they are part of.
+    $sql = "
+        SELECT DISTINCT
+            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate,
+            i.status, i.assigned_to_user_id,
             b.booking_id, b.mission
         FROM Inventory i
         JOIN Bookings b ON i.asset_id = b.asset_id
-        WHERE b.booking_date = :today AND b.status IN ('booked', 'active')
-          AND (
-            b.user_id = :userId
-            OR
-            b.mission_group_id IN (
-                SELECT DISTINCT pa.mission_group_id
-                FROM Planning_Assignments pa
-                WHERE pa.assigned_user_id = :userId2 AND pa.assignment_date = :today2
+        WHERE
+            b.booking_date = :today AND b.status IN ('booked', 'active')
+            AND (
+                -- Item is booked directly for the user
+                b.user_id = :userId
+                OR
+                -- Item is booked for a mission the user is assigned to
+                b.mission_group_id IN (
+                    SELECT pa.mission_group_id
+                    FROM Planning_Assignments pa
+                    WHERE pa.assigned_user_id = :userId2 AND pa.assignment_date = :today2
+                )
             )
-          )
         ORDER BY i.asset_name
     ";
-    $stmtAssigned = $conn->prepare($sqlAssigned);
-    $stmtAssigned->execute([':today' => $today, ':userId' => $userId, ':userId2' => $userId, ':today2' => $today]);
-    $data['assigned_items'] = $stmtAssigned->fetchAll(PDO::FETCH_ASSOC);
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        ':today' => $today,
+        ':userId' => $userId,
+        ':userId2' => $userId,
+        ':today2' => $today
+    ]);
+    $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    echo json_encode(['status' => 'success', 'data' => $data]);
+    json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
 
-
-function checkoutItems($conn, $userId, $itemsJson) {
-    $items = json_decode($itemsJson, true);
-    if (empty($items)) throw new Exception("Aucun article sélectionné.");
+function checkoutItem($conn, $userId, $bookingId, $assetId) {
+    if (empty($bookingId) || empty($assetId)) throw new Exception("Données manquantes.");
 
     $conn->beginTransaction();
     try {
         $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ? AND status = 'available'");
-        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
+        $updateInvStmt->execute([$userId, $assetId]);
+        if ($updateInvStmt->rowCount() == 0) throw new Exception("Cet article n'est plus disponible.");
 
-        foreach ($items as $item) {
-            $updateInvStmt->execute([$userId, $item['asset_id']]);
-            if ($updateInvStmt->rowCount() == 0) throw new Exception("L'article ID {$item['asset_id']} n'est plus disponible.");
-            $updateBookingStmt->execute([$item['booking_id']]);
-        }
+        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
+        $updateBookingStmt->execute([$bookingId]);
+        
         $conn->commit();
-        echo json_encode(['status' => 'success', 'message' => count($items) . ' article(s) marqué(s) comme pris.']);
+        json_response('success', 'Article marqué comme pris.');
     } catch (Exception $e) {
         $conn->rollBack();
         throw $e;
     }
 }
 
-function returnMyItems($conn, $userId) {
+function returnItem($conn, $userId, $assetId) {
+    if (empty($assetId)) throw new Exception("ID d'article manquant.");
+    
     $conn->beginTransaction();
     try {
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE assigned_to_user_id = ? AND status = 'in-use'");
-        $updateInvStmt->execute([$userId]);
-        $rowCount = $updateInvStmt->rowCount();
+        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE asset_id = ? AND assigned_to_user_id = ?");
+        $updateInvStmt->execute([$assetId, $userId]);
+        if ($updateInvStmt->rowCount() == 0) throw new Exception("L'article n'a pas pu être retourné. Il n'est peut-être pas sorti à votre nom.");
+        
+        $today = date('Y-m-d');
+        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status = 'active' AND booking_date = ?");
+        $updateBookingStmt->execute([$assetId, $userId, $today]);
 
-        if ($rowCount > 0) {
-            $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE user_id = ? AND status = 'active'");
-            $updateBookingStmt->execute([$userId]);
-        }
         $conn->commit();
-        echo json_encode(['status' => 'success', 'message' => $rowCount . ' article(s) retourné(s) avec succès.']);
+        json_response('success', 'Article retourné avec succès.');
     } catch (Exception $e) {
         $conn->rollBack();
         throw $e;
@@ -133,10 +140,15 @@ function pickItemByBarcode($conn, $userId, $barcode) {
         $updateInvStmt->execute([$userId, $assetId]);
 
         $conn->commit();
-        echo json_encode(['status' => 'success', 'message' => 'Article pris avec succès.']);
+        json_response('success', 'Article pris avec succès et ajouté à votre liste.');
     } catch (Exception $e) {
         $conn->rollBack();
         throw $e;
     }
+}
+
+function json_response($status, $message, $data = []) {
+    echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
+    exit;
 }
 ?>
