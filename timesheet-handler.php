@@ -1,155 +1,242 @@
+
 <?php
-// technician-handler.php (Corrected)
+// timesheet-handler.php - Handles all AJAX requests for timesheet operations
+
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
-header('Content-Type: application/json');
+requireLogin();
 
-if (!isLoggedIn()) {
-    json_response('error', 'Session expirée. Veuillez vous reconnecter.');
+$user = getCurrentUser();
+$user_id = $user['user_id'];
+
+define('APP_TIMEZONE', 'Europe/Paris');
+define('MAX_DISTANCE_METERS', 100);
+
+$action = isset($_POST['action']) ? $_POST['action'] : '';
+
+switch($action) {
+    case 'record_entry':
+        recordTimeEntry($user_id, 'logon');
+        break;
+    case 'record_exit':
+        recordTimeEntry($user_id, 'logoff');
+        break;
+    case 'add_break':
+        addBreak($user_id);
+        break;
+    case 'get_history':
+        getTimesheetHistory($user_id);
+        break;
+    case 'get_latest_entry_status':
+        getLatestEntryStatus($user_id);
+        break;
+    case 'check_location_status':
+        checkLocationStatus();
+        break;
+    default:
+        respondWithError('Invalid action specified');
 }
 
-$currentUser = getCurrentUser();
-$action = $_REQUEST['action'] ?? '';
+function calculateDistance($lat1, $lon1, $lat2, $lon2) {
+    $earth_radius = 6371000;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLon = deg2rad($lon2 - $lon1);
+    $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+    return $earth_radius * $c;
+}
 
-try {
-    switch ($action) {
-        case 'get_technician_equipment':
-            getTechnicianEquipment($conn, $currentUser['user_id']);
-            break;
-        case 'checkout_item':
-            checkoutItem($conn, $currentUser['user_id'], $_POST['booking_id'], $_POST['asset_id']);
-            break;
-        case 'return_item':
-            returnItem($conn, $currentUser['user_id'], $_POST['asset_id']);
-            break;
-        case 'pick_item_by_barcode':
-            pickItemByBarcode($conn, $currentUser['user_id'], $_POST['barcode']);
-            break;
-        default:
-            json_response('error', 'Action non valide.');
+function findNearestWorkLocation($user_lat, $user_lon) {
+    global $conn;
+    $stmt = $conn->prepare("SELECT latitude, longitude, location_name FROM WorkLocations WHERE is_active = 1");
+    $stmt->execute();
+    $work_locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (empty($work_locations)) return null;
+
+    $min_distance = PHP_INT_MAX;
+    $nearest_location_name = '';
+    foreach ($work_locations as $location) {
+        $distance = calculateDistance($user_lat, $user_lon, $location['latitude'], $location['longitude']);
+        if ($distance < $min_distance) {
+            $min_distance = $distance;
+            $nearest_location_name = $location['location_name'];
+        }
     }
-} catch (Exception $e) {
-    error_log("Technician handler error: " . $e->getMessage() . " on line " . $e->getLine());
-    json_response('error', 'Une erreur interne est survenue: ' . $e->getMessage());
+    return ['distance' => round($min_distance), 'name' => $nearest_location_name];
 }
 
-function getTechnicianEquipment($conn, $userId) {
-    $today = date('Y-m-d');
+function checkLocationStatus() {
+    $user_lat = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
+    $user_lon = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
+    if ($user_lat === null || $user_lon === null) {
+        respondWithError('Coordonnées utilisateur non fournies.');
+        return;
+    }
+
+    $nearest = findNearestWorkLocation($user_lat, $user_lon);
+    if ($nearest === null) {
+        respondWithSuccess('Aucun site de travail trouvé.', ['in_range' => false, 'message' => 'Aucun site de travail n\'est configuré.']);
+        return;
+    }
+
+    $is_in_range = $nearest['distance'] <= MAX_DISTANCE_METERS;
+    $message = $is_in_range
+        ? "Vous êtes à portée ({$nearest['distance']}m de: {$nearest['name']})."
+        : "Vous êtes trop loin ({$nearest['distance']}m). Le pointage est désactivé.";
+
+    respondWithSuccess('Statut de localisation vérifié.', ['in_range' => $is_in_range, 'message' => $message]);
+}
+
+function recordTimeEntry($user_id, $type) {
+    global $conn;
+
+    $paris_tz = new DateTimeZone(APP_TIMEZONE);
+    $current_time_for_sql = (new DateTime('now', $paris_tz))->format('Y-m-d H:i:s');
+    $current_date_for_sql = (new DateTime('now', $paris_tz))->format('Y-m-d');
+
+    $latitude = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
+    $longitude = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
+
+    if ($latitude === null || $longitude === null) {
+        respondWithError("Les coordonnées GPS sont requises pour pointer.");
+        return;
+    }
+
+    $nearest = findNearestWorkLocation($latitude, $longitude);
+    if ($nearest === null) {
+        respondWithError("Aucun site de travail configuré. Impossible de pointer.");
+        return;
+    }
+    if ($nearest['distance'] > MAX_DISTANCE_METERS) {
+        respondWithError("Pointage refusé. Vous n'êtes pas sur un site de travail autorisé (à {$nearest['distance']}m).");
+        return;
+    }
     
-    // **THIS IS THE CORRECTED QUERY**
-    // It now correctly fetches items assigned to the user for today,
-    // either directly or through a mission they are part of in Planning.
-    $sql = "
-        SELECT DISTINCT
-            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate,
-            i.status, i.assigned_to_user_id,
-            b.booking_id, b.mission
-        FROM Inventory i
-        JOIN Bookings b ON i.asset_id = b.asset_id
-        WHERE
-            b.booking_date = :today AND b.status IN ('booked', 'active')
-            AND (
-                -- Item is booked directly for the user
-                b.user_id = :userId
-                OR
-                -- Item is booked for a mission the user is assigned to in Planning
-                b.mission_group_id IN (
-                    SELECT pa.mission_group_id
-                    FROM Planning_Assignments pa
-                    WHERE pa.assigned_user_id = :userId2 AND pa.assignment_date = :today2
-                )
-            )
-        ORDER BY i.asset_name
-    ";
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([
-        ':today' => $today,
-        ':userId' => $userId,
-        ':userId2' => $userId,
-        ':today2' => $today
-    ]);
-    $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $distance_meters = $nearest['distance'];
+    $location_name = $nearest['name'];
 
-    json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
-}
-
-function checkoutItem($conn, $userId, $bookingId, $assetId) {
-    if (empty($bookingId) || empty($assetId)) throw new Exception("Données manquantes.");
-
-    $conn->beginTransaction();
     try {
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ? AND status = 'available'");
-        $updateInvStmt->execute([$userId, $assetId]);
-        if ($updateInvStmt->rowCount() == 0) throw new Exception("Cet article n'est plus disponible.");
+        $conn->beginTransaction();
+        $stmt = $conn->prepare("SELECT timesheet_id, logon_time, logoff_time FROM Timesheet WHERE user_id = ? AND entry_date = ?");
+        $stmt->execute([$user_id, $current_date_for_sql]);
+        $existing_entry = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
-        $updateBookingStmt->execute([$bookingId]);
-        
+        if ($type === 'logon') {
+            if ($existing_entry && $existing_entry['logon_time'] !== null) {
+                $conn->rollBack();
+                respondWithError("Une entrée a déjà été enregistrée pour aujourd'hui.");
+                return;
+            }
+            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters, logon_location_name) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters, $location_name]);
+            $message = "Entrée enregistrée avec succès.";
+        } else if ($type === 'logoff') {
+            if (!$existing_entry || $existing_entry['logon_time'] === null) {
+                $conn->rollBack();
+                respondWithError("Impossible d'enregistrer la sortie sans une entrée préalable.");
+                return;
+            }
+            if ($existing_entry['logoff_time'] !== null) {
+                $conn->rollBack();
+                respondWithError("Une sortie a déjà été enregistrée pour aujourd'hui.");
+                return;
+            }
+            $stmt = $conn->prepare("UPDATE Timesheet SET logoff_time = ?, logoff_distance_meters = ?, logoff_location_name = ? WHERE timesheet_id = ?");
+            $stmt->execute([$current_time_for_sql, $distance_meters, $location_name, $existing_entry['timesheet_id']]);
+            $message = "Sortie enregistrée avec succès.";
+        }
         $conn->commit();
-        json_response('success', 'Article marqué comme pris.');
-    } catch (Exception $e) {
-        $conn->rollBack();
-        throw $e;
+        respondWithSuccess($message);
+    } catch (PDOException $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        respondWithError('Database error: ' . $e->getMessage());
     }
 }
 
-function returnItem($conn, $userId, $assetId) {
-    if (empty($assetId)) throw new Exception("ID d'article manquant.");
-    
-    $conn->beginTransaction();
+function getTimesheetHistory($user_id) {
+    global $conn;
     try {
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE asset_id = ? AND assigned_to_user_id = ?");
-        $updateInvStmt->execute([$assetId, $userId]);
-        if ($updateInvStmt->rowCount() == 0) throw new Exception("L'article n'a pas pu être retourné. Il n'est peut-être pas sorti à votre nom.");
-        
-        $today = date('Y-m-d');
-        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status = 'active' AND booking_date = ?");
-        $updateBookingStmt->execute([$assetId, $userId, $today]);
+        $stmt = $conn->prepare("SELECT
+                                    timesheet_id, entry_date, logon_time, logon_location_name,
+                                    logoff_time, logoff_location_name, break_minutes
+                                FROM Timesheet WHERE user_id = ? ORDER BY entry_date DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
+        $stmt->execute([$user_id]);
+        $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $conn->commit();
-        json_response('success', 'Article retourné avec succès.');
+        $formatted_history = [];
+        foreach ($history as $entry) {
+            $duration = '';
+            if ($entry['logon_time'] && $entry['logoff_time']) {
+                $logon_dt = new DateTime($entry['logon_time']);
+                $logoff_dt = new DateTime($entry['logoff_time']);
+                $interval = $logon_dt->diff($logoff_dt);
+                $total_minutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
+                $effective_minutes = $total_minutes - ($entry['break_minutes'] ?? 0);
+                if ($effective_minutes < 0) $effective_minutes = 0;
+                $hours = floor($effective_minutes / 60);
+                $minutes = $effective_minutes % 60;
+                $duration = sprintf('%dh%02d', $hours, $minutes);
+            }
+
+            $formatted_history[] = [
+                'date' => (new DateTime($entry['entry_date']))->format('d/m/Y'),
+                'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time']))->format('H:i') : '--:--',
+                'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
+                'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time']))->format('H:i') : '--:--',
+                'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
+                'break_minutes' => $entry['break_minutes'] ?? 0,
+                'duration' => $duration
+            ];
+        }
+        respondWithSuccess('History retrieved successfully', $formatted_history);
     } catch (Exception $e) {
-        $conn->rollBack();
-        throw $e;
+        respondWithError('Processing error: ' . $e->getMessage());
     }
 }
 
-function pickItemByBarcode($conn, $userId, $barcode) {
-    if (empty($barcode)) throw new Exception("Le code-barres est manquant.");
-    $today = date('Y-m-d');
-    $conn->beginTransaction();
+function addBreak($user_id) {
+    global $conn;
+    $current_date_for_sql = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('Y-m-d');
+    $break_minutes = isset($_POST['break_minutes']) ? intval($_POST['break_minutes']) : 0;
+    if (!in_array($break_minutes, [30, 60])) { respondWithError('Invalid break duration specified.'); return; }
     try {
-        $checkStmt = $conn->prepare("SELECT asset_id, status FROM Inventory WHERE barcode = ? FOR UPDATE");
-        $checkStmt->execute([$barcode]);
-        $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$asset) throw new Exception("Aucun article trouvé avec ce code-barres.");
-        if ($asset['status'] !== 'available') throw new Exception("Cet article n'est pas disponible pour le moment.");
-
-        $assetId = $asset['asset_id'];
-
-        $bookingCheckStmt = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date = ? AND status IN ('booked', 'active')");
-        $bookingCheckStmt->execute([$assetId, $today]);
-        if ($bookingCheckStmt->fetchColumn() > 0) throw new Exception("Cet article est déjà réservé par quelqu'un d'autre pour aujourd'hui.");
-
-        $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, 'Prise directe via scan', 'active')");
-        $bookStmt->execute([$assetId, $userId, $today]);
-
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
-        $updateInvStmt->execute([$userId, $assetId]);
-
+        $conn->beginTransaction();
+        $stmt = $conn->prepare("SELECT timesheet_id FROM Timesheet WHERE user_id = ? AND entry_date = ? AND logon_time IS NOT NULL AND logoff_time IS NULL");
+        $stmt->execute([$user_id, $current_date_for_sql]);
+        $existing_entry = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$existing_entry) { $conn->rollBack(); respondWithError("Impossible d'ajouter une pause. Aucun pointage d'entrée actif trouvé."); return; }
+        $stmt = $conn->prepare("UPDATE Timesheet SET break_minutes = ? WHERE timesheet_id = ?");
+        $stmt->execute([$break_minutes, $existing_entry['timesheet_id']]);
         $conn->commit();
-        json_response('success', 'Article pris avec succès et ajouté à votre liste.');
-    } catch (Exception $e) {
-        $conn->rollBack();
-        throw $e;
+        respondWithSuccess("Pause de {$break_minutes} minutes ajoutée avec succès.");
+    } catch(PDOException $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        respondWithError('Database error: ' . $e->getMessage());
     }
 }
 
-function json_response($status, $message, $data = []) {
-    echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
-    exit;
+function getLatestEntryStatus($user_id) {
+    global $conn;
+    $current_date_for_sql = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('Y-m-d');
+    try {
+        $stmt = $conn->prepare("SELECT logon_time, logoff_time FROM Timesheet WHERE user_id = ? AND entry_date = ?");
+        $stmt->execute([$user_id, $current_date_for_sql]);
+        $latest_entry = $stmt->fetch(PDO::FETCH_ASSOC);
+        $status = [
+            'has_entry' => $latest_entry && $latest_entry['logon_time'] !== null,
+            'has_exit' => $latest_entry && $latest_entry['logoff_time'] !== null
+        ];
+        respondWithSuccess('Latest entry status retrieved successfully', $status);
+    } catch(PDOException $e) {
+        respondWithError('Database error: ' . $e->getMessage());
+    }
+}
+
+function respondWithSuccess($message, $data = []) {
+    header('Content-Type: application/json'); echo json_encode(['status' => 'success', 'message' => $message, 'data' => $data]); exit;
+}
+function respondWithError($message) {
+    header('Content-Type: application/json'); echo json_encode(['status' => 'error', 'message' => $message]); exit;
 }
 ?>
