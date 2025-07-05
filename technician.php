@@ -14,7 +14,7 @@ $user = getCurrentUser();
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style>
         body { background-color: #f5f5f7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 25px; margin-bottom: 25px; border: 1px solid #e5e5e5; }
+        .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e5e5; }
         h2 { font-weight: 600; }
         .item-list { list-style-type: none; padding: 0; }
         .item-list li { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #e9ecef; }
@@ -23,11 +23,8 @@ $user = getCurrentUser();
         .item-details { flex-grow: 1; }
         .item-name { font-weight: 600; color: #343a40; }
         .item-meta { font-size: 0.85em; color: #6c757d; }
-        .scan-section { text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 8px; }
-
-        /* Modal for scanner */
-        #scanner-modal .modal-content { padding: 20px; text-align: center; }
-        #scanner-preview { width: 100%; max-width: 400px; height: auto; border: 2px solid #007bff; border-radius: 8px; margin: 15px auto; }
+        #scanner-modal .modal-content { text-align: center; }
+        #scanner-preview { width: 100%; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -38,16 +35,14 @@ $user = getCurrentUser();
     <div class="row">
         <div class="col-lg-8 mx-auto">
             <div class="card">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="mb-0">Mon Matériel</h2>
-                    <button id="scan-to-pick-btn" class="btn btn-primary"><i class="fas fa-barcode mr-2"></i>Scanner un Article</button>
-                </div>
-                <div id="equipment-list-section">
-                    <ul id="equipment-list" class="item-list"></ul>
-                    <div id="equipment-placeholder" class="text-center p-5" style="display: none;">
-                        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">Aucun matériel assigné pour aujourd'hui.</p>
-                        <p>Utilisez le bouton "Scanner un Article" pour prendre du matériel disponible.</p>
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Mon Matériel de Mission</h2>
+                    <div id="equipment-list-section">
+                        <ul id="equipment-list" class="item-list"></ul>
+                        <div id="equipment-placeholder" class="text-center p-5" style="display: none;">
+                            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Aucun matériel assigné pour aujourd'hui.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -59,7 +54,7 @@ $user = getCurrentUser();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Scanner un Code-barres</h5>
+                <h5 class="modal-title" id="scanner-title">Scanner un Article</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -75,16 +70,28 @@ $user = getCurrentUser();
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const codeReader = new ZXing.BrowserMultiFormatReader();
+        let itemToProcess = null; // Holds data for the item being taken/returned
 
         loadTechnicianEquipment();
 
-        $('#scan-to-pick-btn').on('click', function() {
+        // Use event delegation for dynamically created buttons
+        $('#equipment-list').on('click', '.action-btn', function() {
+            const button = $(this);
+            itemToProcess = {
+                action: button.data('action'),
+                assetId: button.data('asset-id'),
+                bookingId: button.data('booking-id'),
+                barcode: button.data('barcode'),
+                itemName: button.data('item-name')
+            };
+            
+            $('#scanner-title').text(`Scannez "${itemToProcess.itemName}"`);
             startScanner();
         });
 
-        $('#scanner-modal').on('hidden.bs.modal', function () {
+        $('#scanner-modal').on('hidden.bs.modal', () => {
             codeReader.reset();
-            $('#scan-feedback').empty();
+            itemToProcess = null; // Clear the item after modal closes
         });
         
         function startScanner() {
@@ -93,70 +100,84 @@ $user = getCurrentUser();
                 if (result) {
                     codeReader.reset();
                     $('#scanner-modal').modal('hide');
-                    handleScannedBarcode(result.text);
+                    confirmActionWithScan(result.text);
                 }
                 if (err && !(err instanceof ZXing.NotFoundException)) {
-                    console.error(err);
                     $('#scan-feedback').html('<div class="alert alert-danger">Erreur de caméra.</div>');
                 }
             });
         }
-        
-        // Use event delegation for dynamically created buttons
-        $('#equipment-list').on('click', '.take-item-btn', function() {
-            const button = $(this);
-            const bookingId = button.data('booking-id');
-            const assetId = button.data('asset-id');
-            const itemName = button.closest('li').find('.item-name').text();
-            if (confirm(`Confirmez-vous prendre "${itemName}" ?`)) {
-                performAjaxCall('checkout_item', { booking_id: bookingId, asset_id: assetId }, "Prise du matériel...");
-            }
-        });
-
-        $('#equipment-list').on('click', '.return-item-btn', function() {
-            const button = $(this);
-            const assetId = button.data('asset-id');
-            const itemName = button.closest('li').find('.item-name').text();
-            if (confirm(`Confirmez-vous retourner "${itemName}" ?`)) {
-                performAjaxCall('return_item', { asset_id: assetId }, "Retour du matériel...");
-            }
-        });
     });
+
+    function confirmActionWithScan(scannedBarcode) {
+        if (!itemToProcess) return;
+
+        // Check if the scanned barcode matches the item we intend to process
+        if (scannedBarcode !== itemToProcess.barcode) {
+            alert(`Action annulée. Mauvais article scanné. Vous avez scanné un article différent de "${itemToProcess.itemName}".`);
+            itemToProcess = null;
+            return;
+        }
+
+        // Barcode matches, proceed with the action
+        let backendAction = '';
+        let postData = {};
+
+        if (itemToProcess.action === 'take') {
+            backendAction = 'checkout_item';
+            postData = { asset_id: itemToProcess.assetId, booking_id: itemToProcess.bookingId };
+        } else if (itemToProcess.action === 'return') {
+            backendAction = 'return_item';
+            postData = { asset_id: itemToProcess.assetId };
+        }
+        
+        performAjaxCall(backendAction, postData, "Traitement en cours...");
+    }
 
     function loadTechnicianEquipment() {
         showLoading($('#equipment-list'), 'Chargement de votre matériel...');
         $.ajax({
             url: 'technician-handler.php', type: 'GET', data: { action: 'get_technician_equipment' }, dataType: 'json',
-            success: function(response) {
-                if (response.status === 'success') {
-                    renderEquipmentList(response.data.equipment);
-                } else {
-                    alert('Erreur: ' + response.message);
-                }
-            },
-            error: function() {
-                alert('Erreur de communication avec le serveur.');
-            }
+            success: (response) => renderEquipmentList(response),
+            error: () => alert('Erreur de communication avec le serveur.')
         });
     }
-    
-    function renderEquipmentList(items) {
+
+    function renderEquipmentList(response) {
+        if (response.status !== 'success') {
+            alert('Erreur: ' + response.message);
+            return;
+        }
+        const items = response.data.equipment;
         const list = $('#equipment-list');
         list.empty();
+
         if (!items || items.length === 0) {
             $('#equipment-placeholder').show();
             return;
         }
+
         $('#equipment-placeholder').hide();
         items.forEach(item => {
             const iconClass = item.asset_type === 'vehicle' ? 'fa-car' : 'fa-wrench';
-            const isCheckedOut = item.status === 'in-use' && item.assigned_to_user_id == <?php echo $user['user_id']; ?>;
-            
+            const isTakenByMe = item.status === 'in-use' && item.assigned_to_user_id == <?php echo $user['user_id']; ?>;
+
             let actionButton = '';
-            if (isCheckedOut) {
-                actionButton = `<button class="btn btn-info return-item-btn" data-asset-id="${item.asset_id}">Retourner</button>`;
+            if (isTakenByMe) {
+                actionButton = `<button class="btn btn-info action-btn" 
+                                        data-action="return" 
+                                        data-asset-id="${item.asset_id}" 
+                                        data-barcode="${item.barcode}"
+                                        data-item-name="${item.asset_name}">Retourner</button>`;
+            } else if (item.status === 'available') {
+                actionButton = `<button class="btn btn-success action-btn" 
+                                        data-action="take" 
+                                        data-asset-id="${item.asset_id}" 
+                                        data-booking-id="${item.booking_id}"
+                                        data-barcode="${item.barcode}"
+                                        data-item-name="${item.asset_name}">Prendre</button>`;
             } else {
-                actionButton = `<button class="btn btn-success take-item-btn" data-booking-id="${item.booking_id}" data-asset-id="${item.asset_id}">Prendre</button>`;
+                 actionButton = `<button class="btn btn-secondary" disabled>Pris (autre)</button>`;
             }
 
             const itemHtml = `
@@ -165,19 +186,13 @@ $user = getCurrentUser();
                     <div class="item-details">
                         <div class="item-name">${item.asset_name}</div>
                         <div class="item-meta">
-                            ${item.serial_or_plate || 'N/A'} | Mission: ${item.mission || 'Non spécifiée'}
+                           Code: ${item.barcode || 'N/A'} | Mission: ${item.mission || 'Non spécifiée'}
                         </div>
                     </div>
                     <div class="ml-auto">${actionButton}</div>
-                </li>
-            `;
+                </li>`;
             list.append(itemHtml);
         });
-    }
-    
-    function handleScannedBarcode(barcode) {
-        if (!confirm(`Vous avez scanné le code-barres "${barcode}". Voulez-vous prendre cet article ?`)) return;
-        performAjaxCall('pick_item_by_barcode', { barcode: barcode }, "Traitement du scan...");
     }
     
     function performAjaxCall(action, data, loadingMessage) {
@@ -185,12 +200,8 @@ $user = getCurrentUser();
         $.ajax({
             url: 'technician-handler.php', type: 'POST', data: { action, ...data }, dataType: 'json',
             success: function(response) {
-                if (response.status === 'success') {
-                    alert(response.message);
-                } else {
-                    alert('Erreur: ' + response.message);
-                }
-                loadTechnicianEquipment(); // Always refresh the list
+                alert(response.message);
+                loadTechnicianEquipment();
             },
             error: function() {
                 alert('Erreur de communication lors de l\'opération.');
