@@ -14,15 +14,47 @@ $user = getCurrentUser();
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style>
         body { background-color: #f5f5f7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e5e5; }
+        .main-card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e5e5; }
         h2 { font-weight: 600; }
-        .item-list { list-style-type: none; padding: 0; }
-        .item-list li { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #e9ecef; }
-        .item-list li:last-child { border-bottom: none; }
-        .item-icon { font-size: 1.8em; margin-right: 20px; color: #007bff; width: 40px; text-align: center; }
-        .item-details { flex-grow: 1; }
-        .item-name { font-weight: 600; color: #343a40; }
-        .item-meta { font-size: 0.85em; color: #6c757d; }
+        
+        /* New Item Card Style */
+        .item-card {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .item-icon {
+            font-size: 2em;
+            color: #007bff;
+            margin-right: 1.5rem;
+            width: 45px;
+            text-align: center;
+        }
+        .item-details {
+            flex-grow: 1;
+        }
+        .item-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #343a40;
+        }
+        .item-meta {
+            font-size: 0.9em;
+            color: #6c757d;
+            line-height: 1.5;
+        }
+        .item-meta strong {
+            color: #495057;
+        }
+        .item-actions {
+            margin-left: 1rem;
+        }
+
         #scanner-modal .modal-content { text-align: center; }
         #scanner-preview { width: 100%; border-radius: 8px; }
     </style>
@@ -34,15 +66,18 @@ $user = getCurrentUser();
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-lg-8 mx-auto">
-            <div class="card">
+            <div class="main-card">
                 <div class="card-body">
                     <h2 class="card-title mb-4">Mon Matériel de Mission</h2>
                     <div id="equipment-list-section">
-                        <ul id="equipment-list" class="item-list"></ul>
-                        <div id="equipment-placeholder" class="text-center p-5" style="display: none;">
-                            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">Aucun matériel assigné pour aujourd'hui.</p>
                         </div>
+                    <div id="equipment-placeholder" class="text-center p-5" style="display: none;">
+                        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">Aucun matériel assigné pour aujourd'hui.</p>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                         <button id="pickup-item-btn" class="btn btn-outline-primary"><i class="fas fa-barcode mr-2"></i>Prendre un Article non Assigné</button>
                     </div>
                 </div>
             </div>
@@ -59,7 +94,6 @@ $user = getCurrentUser();
             </div>
             <div class="modal-body">
                 <video id="scanner-preview" playsinline></video>
-                <div id="scan-feedback" class="mt-2"></div>
             </div>
         </div>
     </div>
@@ -70,28 +104,34 @@ $user = getCurrentUser();
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const codeReader = new ZXing.BrowserMultiFormatReader();
-        let itemToProcess = null; // Holds data for the item being taken/returned
+        let itemToProcess = null; 
 
         loadTechnicianEquipment();
 
-        // Use event delegation for dynamically created buttons
-        $('#equipment-list').on('click', '.action-btn', function() {
+        // Event handler for all action buttons using delegation
+        $('#equipment-list-section').on('click', '.action-btn', function() {
             const button = $(this);
             itemToProcess = {
-                action: button.data('action'),
+                action: button.data('action'), // 'take' or 'return'
                 assetId: button.data('asset-id'),
                 bookingId: button.data('booking-id'),
                 barcode: button.data('barcode'),
                 itemName: button.data('item-name')
             };
-            
-            $('#scanner-title').text(`Scannez "${itemToProcess.itemName}"`);
+            $('#scanner-title').text(`Pour ${itemToProcess.action === 'take' ? 'Prendre' : 'Retourner'}: Scannez "${itemToProcess.itemName}"`);
+            startScanner();
+        });
+
+        // Event handler for the new global pickup button
+        $('#pickup-item-btn').on('click', function() {
+            itemToProcess = { action: 'pickup' }; // Special action type
+            $('#scanner-title').text("Scannez un article disponible");
             startScanner();
         });
 
         $('#scanner-modal').on('hidden.bs.modal', () => {
             codeReader.reset();
-            itemToProcess = null; // Clear the item after modal closes
+            itemToProcess = null;
         });
         
         function startScanner() {
@@ -100,42 +140,40 @@ $user = getCurrentUser();
                 if (result) {
                     codeReader.reset();
                     $('#scanner-modal').modal('hide');
-                    confirmActionWithScan(result.text);
-                }
-                if (err && !(err instanceof ZXing.NotFoundException)) {
-                    $('#scan-feedback').html('<div class="alert alert-danger">Erreur de caméra.</div>');
+                    processScanResult(result.text);
                 }
             });
         }
     });
 
-    function confirmActionWithScan(scannedBarcode) {
+    function processScanResult(scannedBarcode) {
         if (!itemToProcess) return;
 
-        // Check if the scanned barcode matches the item we intend to process
-        if (scannedBarcode !== itemToProcess.barcode) {
-            alert(`Action annulée. Mauvais article scanné. Vous avez scanné un article différent de "${itemToProcess.itemName}".`);
-            itemToProcess = null;
-            return;
-        }
-
-        // Barcode matches, proceed with the action
         let backendAction = '';
         let postData = {};
 
-        if (itemToProcess.action === 'take') {
-            backendAction = 'checkout_item';
+        // Case 1 & 2: Taking or Returning an ASSIGNED item
+        if (itemToProcess.action === 'take' || itemToProcess.action === 'return') {
+            if (scannedBarcode !== itemToProcess.barcode) {
+                alert(`Action annulée. Mauvais article scanné.`);
+                return;
+            }
+            backendAction = itemToProcess.action === 'take' ? 'checkout_item' : 'return_item';
             postData = { asset_id: itemToProcess.assetId, booking_id: itemToProcess.bookingId };
-        } else if (itemToProcess.action === 'return') {
-            backendAction = 'return_item';
-            postData = { asset_id: itemToProcess.assetId };
+        } 
+        // Case 3: Picking up an UNASSIGNED item
+        else if (itemToProcess.action === 'pickup') {
+            backendAction = 'pickup_unassigned_item';
+            postData = { barcode: scannedBarcode };
         }
-        
-        performAjaxCall(backendAction, postData, "Traitement en cours...");
+
+        if (backendAction) {
+            performAjaxCall(backendAction, postData);
+        }
     }
 
     function loadTechnicianEquipment() {
-        showLoading($('#equipment-list'), 'Chargement de votre matériel...');
+        showLoading($('#equipment-list-section'));
         $.ajax({
             url: 'technician-handler.php', type: 'GET', data: { action: 'get_technician_equipment' }, dataType: 'json',
             success: (response) => renderEquipmentList(response),
@@ -149,8 +187,8 @@ $user = getCurrentUser();
             return;
         }
         const items = response.data.equipment;
-        const list = $('#equipment-list');
-        list.empty();
+        const listContainer = $('#equipment-list-section');
+        listContainer.empty();
 
         if (!items || items.length === 0) {
             $('#equipment-placeholder').show();
@@ -164,44 +202,42 @@ $user = getCurrentUser();
 
             let actionButton = '';
             if (isTakenByMe) {
-                actionButton = `<button class="btn btn-info action-btn" 
-                                        data-action="return" 
-                                        data-asset-id="${item.asset_id}" 
-                                        data-barcode="${item.barcode}"
-                                        data-item-name="${item.asset_name}">Retourner</button>`;
+                actionButton = `<button class="btn btn-info action-btn" data-action="return" data-asset-id="${item.asset_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}">Retourner</button>`;
             } else if (item.status === 'available') {
-                actionButton = `<button class="btn btn-success action-btn" 
-                                        data-action="take" 
-                                        data-asset-id="${item.asset_id}" 
-                                        data-booking-id="${item.booking_id}"
-                                        data-barcode="${item.barcode}"
-                                        data-item-name="${item.asset_name}">Prendre</button>`;
+                actionButton = `<button class="btn btn-success action-btn" data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}">Prendre</button>`;
             } else {
                  actionButton = `<button class="btn btn-secondary" disabled>Pris (autre)</button>`;
             }
 
-            const itemHtml = `
-                <li>
-                    <i class="fas ${iconClass} item-icon"></i>
+            // New Card Layout
+            const itemCardHtml = `
+                <div class="item-card">
+                    <div class="item-icon">
+                        <i class="fas ${iconClass}"></i>
+                    </div>
                     <div class="item-details">
                         <div class="item-name">${item.asset_name}</div>
                         <div class="item-meta">
-                           Code: ${item.barcode || 'N/A'} | Mission: ${item.mission || 'Non spécifiée'}
+                            <div><strong>Mission:</strong> ${item.mission || 'Non spécifiée'}</div>
+                            <div><strong>Code:</strong> ${item.serial_or_plate || 'N/A'}</div>
+                            <div><strong>Code-barres:</strong> ${item.barcode || 'N/A'}</div>
                         </div>
                     </div>
-                    <div class="ml-auto">${actionButton}</div>
-                </li>`;
-            list.append(itemHtml);
+                    <div class="item-actions">
+                        ${actionButton}
+                    </div>
+                </div>`;
+            listContainer.append(itemCardHtml);
         });
     }
     
-    function performAjaxCall(action, data, loadingMessage) {
-        showLoading($('#equipment-list'), loadingMessage);
+    function performAjaxCall(action, data) {
+        showLoading($('#equipment-list-section'));
         $.ajax({
             url: 'technician-handler.php', type: 'POST', data: { action, ...data }, dataType: 'json',
             success: function(response) {
                 alert(response.message);
-                loadTechnicianEquipment();
+                loadTechnicianEquipment(); // Always refresh the list
             },
             error: function() {
                 alert('Erreur de communication lors de l\'opération.');
@@ -210,8 +246,8 @@ $user = getCurrentUser();
         });
     }
 
-    function showLoading(element, message) {
-        element.html(`<li class="text-center text-muted p-4"><div class="spinner-border spinner-border-sm mr-2"></div>${message}</li>`);
+    function showLoading(element) {
+        element.html(`<div class="text-center p-5"><div class="spinner-border text-primary"></div><p class="mt-2">Chargement...</p></div>`);
     }
 </script>
 </body>
