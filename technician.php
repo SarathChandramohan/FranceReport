@@ -16,47 +16,23 @@ $user = getCurrentUser();
         body { background-color: #f5f5f7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         .main-card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e5e5; }
         h2 { font-weight: 600; }
-        
-        /* New Item Card Style */
-        .item-card {
-            display: flex;
-            align-items: center;
-            padding: 1rem;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .item-icon {
-            font-size: 2em;
-            color: #007bff;
-            margin-right: 1.5rem;
-            width: 45px;
-            text-align: center;
-        }
-        .item-details {
-            flex-grow: 1;
-        }
-        .item-name {
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: #343a40;
-        }
-        .item-meta {
-            font-size: 0.9em;
-            color: #6c757d;
-            line-height: 1.5;
-        }
-        .item-meta strong {
-            color: #495057;
-        }
-        .item-actions {
-            margin-left: 1rem;
-        }
-
+        .item-card { display: flex; align-items: center; padding: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .item-icon { font-size: 2em; color: #007bff; margin-right: 1.5rem; width: 45px; text-align: center; }
+        .item-details { flex-grow: 1; }
+        .item-name { font-weight: 600; font-size: 1.1rem; color: #343a40; }
+        .item-meta { font-size: 0.9em; color: #6c757d; line-height: 1.5; }
+        .item-meta strong { color: #495057; }
+        .item-actions { margin-left: 1rem; }
         #scanner-modal .modal-content { text-align: center; }
         #scanner-preview { width: 100%; border-radius: 8px; }
+        /* New Notification Style */
+        .technician-notification {
+            display: none;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -69,6 +45,9 @@ $user = getCurrentUser();
             <div class="main-card">
                 <div class="card-body">
                     <h2 class="card-title mb-4">Mon Matériel de Mission</h2>
+                    
+                    <div id="notification-area" class="technician-notification"></div>
+
                     <div id="equipment-list-section">
                         </div>
                     <div id="equipment-placeholder" class="text-center p-5" style="display: none;">
@@ -108,11 +87,10 @@ $user = getCurrentUser();
 
         loadTechnicianEquipment();
 
-        // Event handler for all action buttons using delegation
         $('#equipment-list-section').on('click', '.action-btn', function() {
             const button = $(this);
             itemToProcess = {
-                action: button.data('action'), // 'take' or 'return'
+                action: button.data('action'),
                 assetId: button.data('asset-id'),
                 bookingId: button.data('booking-id'),
                 barcode: button.data('barcode'),
@@ -122,9 +100,8 @@ $user = getCurrentUser();
             startScanner();
         });
 
-        // Event handler for the new global pickup button
         $('#pickup-item-btn').on('click', function() {
-            itemToProcess = { action: 'pickup' }; // Special action type
+            itemToProcess = { action: 'pickup' };
             $('#scanner-title').text("Scannez un article disponible");
             startScanner();
         });
@@ -152,16 +129,14 @@ $user = getCurrentUser();
         let backendAction = '';
         let postData = {};
 
-        // Case 1 & 2: Taking or Returning an ASSIGNED item
         if (itemToProcess.action === 'take' || itemToProcess.action === 'return') {
             if (scannedBarcode !== itemToProcess.barcode) {
-                alert(`Action annulée. Mauvais article scanné.`);
+                showNotification(`Action annulée. Le code-barres scanné ne correspond pas à "${itemToProcess.itemName}".`, 'danger');
                 return;
             }
             backendAction = itemToProcess.action === 'take' ? 'checkout_item' : 'return_item';
             postData = { asset_id: itemToProcess.assetId, booking_id: itemToProcess.bookingId };
         } 
-        // Case 3: Picking up an UNASSIGNED item
         else if (itemToProcess.action === 'pickup') {
             backendAction = 'pickup_unassigned_item';
             postData = { barcode: scannedBarcode };
@@ -177,18 +152,21 @@ $user = getCurrentUser();
         $.ajax({
             url: 'technician-handler.php', type: 'GET', data: { action: 'get_technician_equipment' }, dataType: 'json',
             success: (response) => renderEquipmentList(response),
-            error: () => alert('Erreur de communication avec le serveur.')
+            error: () => showNotification('Erreur de communication avec le serveur.', 'danger')
         });
     }
 
     function renderEquipmentList(response) {
-        if (response.status !== 'success') {
-            alert('Erreur: ' + response.message);
-            return;
-        }
-        const items = response.data.equipment;
         const listContainer = $('#equipment-list-section');
         listContainer.empty();
+
+        if (response.status !== 'success') {
+            showNotification('Erreur: ' + response.message, 'danger');
+            $('#equipment-placeholder').show();
+            return;
+        }
+        
+        const items = response.data.equipment;
 
         if (!items || items.length === 0) {
             $('#equipment-placeholder').show();
@@ -209,12 +187,9 @@ $user = getCurrentUser();
                  actionButton = `<button class="btn btn-secondary" disabled>Pris (autre)</button>`;
             }
 
-            // New Card Layout
             const itemCardHtml = `
                 <div class="item-card">
-                    <div class="item-icon">
-                        <i class="fas ${iconClass}"></i>
-                    </div>
+                    <div class="item-icon"><i class="fas ${iconClass}"></i></div>
                     <div class="item-details">
                         <div class="item-name">${item.asset_name}</div>
                         <div class="item-meta">
@@ -223,9 +198,7 @@ $user = getCurrentUser();
                             <div><strong>Code-barres:</strong> ${item.barcode || 'N/A'}</div>
                         </div>
                     </div>
-                    <div class="item-actions">
-                        ${actionButton}
-                    </div>
+                    <div class="item-actions">${actionButton}</div>
                 </div>`;
             listContainer.append(itemCardHtml);
         });
@@ -236,11 +209,15 @@ $user = getCurrentUser();
         $.ajax({
             url: 'technician-handler.php', type: 'POST', data: { action, ...data }, dataType: 'json',
             success: function(response) {
-                alert(response.message);
-                loadTechnicianEquipment(); // Always refresh the list
+                showNotification(response.message, response.status);
+                loadTechnicianEquipment();
             },
-            error: function() {
-                alert('Erreur de communication lors de l\'opération.');
+            error: function(xhr) {
+                let errorMsg = 'Erreur de communication lors de l\'opération.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showNotification(errorMsg, 'danger');
                 loadTechnicianEquipment();
             }
         });
@@ -248,6 +225,26 @@ $user = getCurrentUser();
 
     function showLoading(element) {
         element.html(`<div class="text-center p-5"><div class="spinner-border text-primary"></div><p class="mt-2">Chargement...</p></div>`);
+    }
+
+    /**
+     * NEW: Displays a styled notification message on the page.
+     * @param {string} message - The message to display.
+     * @param {string} type - 'success', 'danger', or 'info'.
+     */
+    function showNotification(message, type) {
+        const notificationArea = $('#notification-area');
+        let alertClass = 'alert-info'; // Default
+        if (type === 'success') alertClass = 'alert-success';
+        if (type === 'error' || type === 'danger') alertClass = 'alert-danger';
+
+        notificationArea.removeClass('alert-success alert-danger alert-info').addClass(alertClass);
+        notificationArea.text(message).slideDown(300);
+
+        // Hide after 5 seconds
+        setTimeout(() => {
+            notificationArea.slideUp(300);
+        }, 5000);
     }
 </script>
 </body>
