@@ -1,5 +1,5 @@
 <?php
-// technician-handler.php (Updated Version with better error messages)
+// technician-handler.php (Corrected Version)
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
@@ -34,25 +34,45 @@ try {
     json_response('error', 'Erreur: ' . $e->getMessage());
 }
 
+/**
+ * Fetches the equipment assigned to a technician for the day.
+ * This function has been rewritten with a more reliable SQL query.
+ */
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
+    
+    // This SQL query is now more direct and less prone to errors.
     $sql = "
-        SELECT
+        SELECT DISTINCT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
-            i.status, i.assigned_to_user_id, b.booking_id, b.mission
-        FROM Inventory i JOIN Bookings b ON i.asset_id = b.asset_id
-        WHERE b.booking_id IN (
-            SELECT booking_id FROM Bookings WHERE user_id = :userId AND booking_date = :today1 AND status IN ('booked', 'active')
-            UNION
-            SELECT b_inner.booking_id 
-            FROM Bookings b_inner
-            JOIN Planning_Assignments pa ON b_inner.mission_group_id = pa.mission_group_id
-            WHERE pa.assigned_user_id = :userId2 AND pa.assignment_date = :today2 AND b_inner.booking_date = :today3 AND b_inner.status IN ('booked', 'active')
-        )
-        ORDER BY i.asset_name";
+            i.status, i.assigned_to_user_id,
+            b.booking_id, b.mission
+        FROM
+            Inventory i
+        INNER JOIN
+            Bookings b ON i.asset_id = b.asset_id
+        LEFT JOIN
+            Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
+        WHERE
+            b.booking_date = :today_b
+            AND b.status IN ('booked', 'active')
+            AND (
+                b.user_id = :userId1 -- Case 1: Booking is directly for the user
+                OR
+                pa.assigned_user_id = :userId2 -- Case 2: User is part of a mission that has the booking
+            )
+        ORDER BY
+            i.asset_name;
+    ";
     
     $stmt = $conn->prepare($sql);
-    $stmt->execute([':userId' => $userId, ':today1' => $today, ':userId2' => $userId, ':today2' => $today, ':today3' => $today]);
+    $stmt->execute([
+        ':today_pa' => $today,
+        ':today_b' => $today,
+        ':userId1' => $userId,
+        ':userId2' => $userId
+    ]);
+    
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
     json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
@@ -71,15 +91,15 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
 
     if (!$asset) {
         $conn->rollBack();
-        throw new Exception("Article non trouvé.");
+        throw new Exception("Article non trouvé dans l'inventaire.");
     }
 
     if ($asset['status'] !== 'available') {
         $conn->rollBack();
         if ($asset['status'] === 'in-use' && $asset['assigned_to_user_id'] == $userId) {
-             throw new Exception("Vous avez déjà pris cet article.");
+             throw new Exception("Opération impossible: Vous avez déjà cet article en votre possession.");
         } else {
-             throw new Exception("Cet article n'est pas disponible. Statut actuel: " . $asset['status']);
+             throw new Exception("Opération impossible: Cet article n'est pas disponible. Statut actuel: " . $asset['status']);
         }
     }
 
@@ -90,7 +110,7 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
     $updateBookingStmt->execute([$bookingId]);
     
     $conn->commit();
-    json_response('success', 'Article pris avec succès.');
+    json_response('success', 'Article marqué comme "en cours d\'utilisation".');
 }
 
 function returnItem($conn, $userId, $assetId) {
@@ -164,9 +184,10 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
 }
 
 function json_response($status, $message, $data = []) {
-    // Ensure HTTP status code reflects the response status for better client-side handling
     if ($status === 'error') {
-        http_response_code(400); // Bad Request
+        http_response_code(400); 
+    } else {
+        http_response_code(200);
     }
     echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
     exit;
