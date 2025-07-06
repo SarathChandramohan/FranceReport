@@ -228,7 +228,7 @@ $user = getCurrentUser();
     }
 
     /**
-     * NEW: Displays a styled notification message on the page.
+     * Displays a styled notification message on the page.
      * @param {string} message - The message to display.
      * @param {string} type - 'success', 'danger', or 'info'.
      */
