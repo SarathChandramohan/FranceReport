@@ -1,5 +1,5 @@
 <?php
-// technician-handler.php (Updated Version)
+// technician-handler.php (Updated Version with better error messages)
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
@@ -42,12 +42,13 @@ function getTechnicianEquipment($conn, $userId) {
             i.status, i.assigned_to_user_id, b.booking_id, b.mission
         FROM Inventory i JOIN Bookings b ON i.asset_id = b.asset_id
         WHERE b.booking_id IN (
-            SELECT booking_id FROM Bookings WHERE user_id = :userId AND booking_date = :today1
+            SELECT booking_id FROM Bookings WHERE user_id = :userId AND booking_date = :today1 AND status IN ('booked', 'active')
             UNION
-            SELECT booking_id FROM Bookings WHERE mission_group_id IN (
-                SELECT mission_group_id FROM Planning_Assignments WHERE assigned_user_id = :userId2 AND assignment_date = :today2
-            ) AND booking_date = :today3
-        ) AND b.status IN ('booked', 'active')
+            SELECT b_inner.booking_id 
+            FROM Bookings b_inner
+            JOIN Planning_Assignments pa ON b_inner.mission_group_id = pa.mission_group_id
+            WHERE pa.assigned_user_id = :userId2 AND pa.assignment_date = :today2 AND b_inner.booking_date = :today3 AND b_inner.status IN ('booked', 'active')
+        )
         ORDER BY i.asset_name";
     
     $stmt = $conn->prepare($sql);
@@ -56,6 +57,7 @@ function getTechnicianEquipment($conn, $userId) {
     json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
 
+
 function checkoutItem($conn, $userId, $bookingId, $assetId) {
     if (empty($bookingId) || empty($assetId)) {
         throw new Exception("Données de prise manquantes.");
@@ -63,8 +65,7 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
 
     $conn->beginTransaction();
 
-    // Check current status first for better error messages
-    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ? FOR UPDATE");
     $checkStmt->execute([$assetId]);
     $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -82,7 +83,6 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
         }
     }
 
-    // Proceed with checkout
     $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
     $updateInvStmt->execute([$userId, $assetId]);
 
@@ -100,8 +100,7 @@ function returnItem($conn, $userId, $assetId) {
     
     $conn->beginTransaction();
 
-    // Check current status first for better error messages
-    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ? FOR UPDATE");
     $checkStmt->execute([$assetId]);
     $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -115,7 +114,6 @@ function returnItem($conn, $userId, $assetId) {
         throw new Exception("Retour impossible. Cet article n'est pas actuellement sorti à votre nom.");
     }
 
-    // Proceed with return
     $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE asset_id = ?");
     $updateInvStmt->execute([$assetId]);
     
@@ -152,7 +150,7 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
     $bookingCheckStmt->execute([$assetId, $today]);
     if ($bookingCheckStmt->fetchColumn() > 0) {
         $conn->rollBack();
-        throw new Exception("Action impossible. Cet article est déjà réservé pour une mission aujourd'hui. S'il vous est assigné, veuillez utiliser le bouton 'Prendre' depuis votre liste de matériel.");
+        throw new Exception("Action impossible. Cet article est déjà réservé pour aujourd'hui. S'il vous est assigné, utilisez le bouton 'Prendre' depuis votre liste de matériel.");
     }
 
     $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, 'Prise directe', 'active')");
@@ -166,6 +164,10 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
 }
 
 function json_response($status, $message, $data = []) {
+    // Ensure HTTP status code reflects the response status for better client-side handling
+    if ($status === 'error') {
+        http_response_code(400); // Bad Request
+    }
     echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
     exit;
 }
