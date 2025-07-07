@@ -196,7 +196,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- HELPERS ---
     const showLoading = (show) => $loading.toggle(show);
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    // ** DATE FIX **: This function now formats the date string without timezone conversion
+    const getLocalDateString = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
     const formatTime = (time) => time ? time.substring(0, 5) : '';
     const showModalError = (msg) => $('#modal_error_message').text(msg).show();
     const hideModalError = () => $('#modal_error_message').hide();
@@ -216,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isMulti && start && end) {
             for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
-                dates.push(formatDate(new Date(d)));
+                dates.push(getLocalDateString(new Date(d)));
             }
         } else if (single) {
             dates.push(single);
@@ -246,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const endDate = new Date(state.currentWeekStart);
             endDate.setDate(endDate.getDate() + 6);
-            const data = await apiCall('get_initial_data', 'GET', { start: formatDate(state.currentWeekStart), end: formatDate(endDate) });
+            const data = await apiCall('get_initial_data', 'GET', { start: getLocalDateString(state.currentWeekStart), end: getLocalDateString(endDate) });
             state.staff = data.staff || [];
             state.missions = data.missions || [];
             state.inventory = data.inventory || [];
@@ -282,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = 0; i < 7; i++) {
             const dayDate = new Date(state.currentWeekStart);
             dayDate.setDate(dayDate.getDate() + i);
-            const dateStr = formatDate(dayDate);
+            const dateStr = getLocalDateString(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
             const isSelected = dateStr === state.selectedDate;
             const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-mission-to-day-btn" title="Ajouter une mission"><i class="fas fa-plus-circle"></i></button></div>`);
@@ -489,7 +495,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('input[name="mission_id"]').val('');
         $missionModal.find('input[name="assignment_date"]').val(date);
 
-        // Fix date display by using UTC to prevent timezone shifts
         const [year, month, day] = date.split('-').map(Number);
         const correctDate = new Date(Date.UTC(year, month - 1, day));
         const displayDate = correctDate.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
@@ -515,7 +520,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
 
-        // Fix date display by using UTC to prevent timezone shifts
         const [year, month, day] = mission.assignment_date.split('-').map(Number);
         const correctDate = new Date(Date.UTC(year, month - 1, day));
         const displayDate = correctDate.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
