@@ -1,5 +1,5 @@
 <?php
-// planning.php (Final version with fix for getDatesFromModal error)
+// planning.php (Final version with all fixes)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
@@ -96,7 +96,7 @@ $default_color = $predefined_colors[0];
                         <input type="hidden" id="mission_id_form" name="mission_id">
                         <input type="hidden" id="assignment_date_form" name="assignment_date">
                         <div class="alert alert-info" id="modalDateDisplay"></div>
-                        
+
                         <div class="form-row" id="multi_day_fields" style="display: none;">
                             <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date"></div>
                             <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date"></div>
@@ -114,7 +114,7 @@ $default_color = $predefined_colors[0];
                             <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
                         </div>
                         <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
-                        
+
                         <div id="assign-users-group" style="display:none;">
                              <hr>
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
@@ -123,7 +123,7 @@ $default_color = $predefined_colors[0];
                             <label>Cliquer pour assigner un ouvrier :</label>
                             <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
                         </div>
-                        
+
                         <div id="asset-management-container" style="display: none;">
                             <hr>
                             <div class="form-group">
@@ -147,7 +147,7 @@ $default_color = $predefined_colors[0];
             </div>
         </div>
     </div>
-    
+
     <div class="modal fade" id="assetAssignmentModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -185,15 +185,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const PREDEFINED_COLORS = <?php echo json_encode($predefined_colors); ?>;
     const DEFAULT_COLOR = <?php echo json_encode($default_color); ?>;
     let state = { staff: [], missions: [], inventory: [], bookings: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, shouldRefreshOnModalClose: false, selectedDate: null };
-    let assignedWorkersInModal = []; 
-    let assignedAssetsInModal = []; 
+    let assignedWorkersInModal = [];
+    let assignedAssetsInModal = [];
 
     // --- DOM ELEMENTS ---
     const $loading = $('#loadingOverlay');
     const $planningContainer = $('#dailyPlanningContainer');
     const $workerList = $('#workerList');
     const $missionModal = $('#missionFormModal');
-    
+
     // --- HELPERS ---
     const showLoading = (show) => $loading.toggle(show);
     const formatDate = (date) => date.toISOString().split('T')[0];
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result.status !== 'success') throw new Error(result.message);
         return result.data;
     }
-    
+
     // --- DATA FETCHING ---
     async function fetchInitialData(manageLoadingState = true) {
         if (manageLoadingState) showLoading(true);
@@ -255,9 +255,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 await refreshWorkerListForDate(state.selectedDate, false);
             }
             updateUI();
-        } catch (error) { 
-            alert(`Erreur de chargement: ${error.message}`); 
-        } finally { 
+        } catch (error) {
+            alert(`Erreur de chargement: ${error.message}`);
+        } finally {
             if (manageLoadingState) showLoading(false);
         }
     }
@@ -269,14 +269,14 @@ document.addEventListener('DOMContentLoaded', function() {
         renderWorkerList();
         setupModalStaticContent();
     }
-    
+
     function renderWeekHeader() {
         const endDate = new Date(state.currentWeekStart);
         endDate.setDate(endDate.getDate() + 6);
         const options = { day: 'numeric', month: 'long', year: 'numeric' };
         $('#currentWeekRange').text(`${state.currentWeekStart.toLocaleDateString('fr-FR', options)} - ${endDate.toLocaleDateString('fr-FR', options)}`);
     }
-    
+
     function renderPlanningGrid() {
         $planningContainer.empty();
         for (let i = 0; i < 7; i++) {
@@ -313,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
         const missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''} ${isConflicting ? 'conflicting-assignment' : ''}`;
-        
+
         return $(`<div class="${missionCardClass}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
                 <div class="mission-card-body">
@@ -338,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>`);
         });
     }
-    
+
     async function refreshWorkerListForDate(date, manageLoadingState = true) {
         if (manageLoadingState) showLoading(true);
         try {
@@ -384,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         $hiddenInput.val(assignedAssetsInModal.map(a => a.id).join(','));
     }
-    
+
     function populateAssetAssignmentModal() {
         const $list = $('#asset_assignment_list'); $list.empty();
         const assignedIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
@@ -418,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- EVENT HANDLERS ---
     $('#prevWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7); fetchInitialData(); });
     $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchInitialData(); });
-    
+
     $('#addMultiDayMissionBtn').on('click', function() {
         assignedWorkersInModal = []; assignedAssetsInModal = [];
         $missionModal.find('form')[0].reset(); hideModalError();
@@ -447,12 +447,12 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
         openModalForCreate($(this).closest('.day-header').data('date'));
     });
-    
+
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
     $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
-    
+
     async function handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
         if (!state.draggedWorker) return;
@@ -488,7 +488,12 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#shift_type_buttons label').removeClass('active');
         $missionModal.find('input[name="mission_id"]').val('');
         $missionModal.find('input[name="assignment_date"]').val(date);
-        const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Fix date display by using UTC to prevent timezone shifts
+        const [year, month, day] = date.split('-').map(Number);
+        const correctDate = new Date(Date.UTC(year, month - 1, day));
+        const displayDate = correctDate.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
         $('#multi_day_fields').hide();
         $('#modalDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`).show();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
@@ -499,17 +504,22 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     }
-    
+
     $planningContainer.on('click', '.mission-card-body', function() {
         const mission = state.missions.find(m => m.mission_id == $(this).closest('.mission-card').data('mission-id'));
         if (!mission) return;
         $missionModal.find('form')[0].reset(); hideModalError();
-        assignedWorkersInModal = []; 
+        assignedWorkersInModal = [];
         assignedAssetsInModal = mission.assigned_assets || [];
         $('#shift_type_buttons label').removeClass('active');
         $missionModal.find('input[name="mission_id"]').val(mission.mission_id);
         $missionModal.find('input[name="assignment_date"]').val(mission.assignment_date);
-        const displayDate = new Date(mission.assignment_date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Fix date display by using UTC to prevent timezone shifts
+        const [year, month, day] = mission.assignment_date.split('-').map(Number);
+        const correctDate = new Date(Date.UTC(year, month - 1, day));
+        const displayDate = correctDate.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
         $('#multi_day_fields').hide();
         $('#modalDateDisplay').html(`Modifier la mission du: <strong>${displayDate}</strong>`).show();
         $missionModal.find('input[name="mission_text"]').val(mission.mission_text);
@@ -528,14 +538,14 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
-    
+
     // --- EVENT LISTENERS CONTINUED ---
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const dis = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', dis).val(dis ? '' : $('#mission_start_time').val()); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
     $('#modal_available_workers').on('click', '.list-group-item', function(e) { e.preventDefault(); assignedWorkersInModal.push({ id: $(this).data('worker-id'), name: $(this).data('worker-name') }); renderAssignedWorkersInModal(); $(this).remove(); });
     $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() { const id = $(this).data('worker-id'); assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(id)); renderAssignedWorkersInModal(); renderAvailableWorkersInModal(); });
-    
+
     $('#manageAssetsBtn').on('click', function() { populateAssetAssignmentModal(); $('#assetAssignmentModal').modal('show'); });
     $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
     $('#confirmAssetAssignmentBtn').on('click', function() {
@@ -561,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function() {
             $missionModal.modal('hide');
         } catch (error) { showModalError(error.message); } finally { showLoading(false); }
     });
-    
+
     $missionModal.on('hidden.bs.modal', function () {
         hideModalError();
         assignedAssetsInModal = []; assignedWorkersInModal = [];
