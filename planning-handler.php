@@ -1,6 +1,9 @@
 <?php
 // planning-handler.php
 
+// ** TIMEZONE FIX **: Set the default timezone for all date functions in this script
+date_default_timezone_set('Europe/Paris');
+
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
