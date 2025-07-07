@@ -137,8 +137,10 @@ function getInitialData($conn) {
             $mission['assigned_assets'] = [];
             $mission['assigned_asset_names'] = '';
         }
-        if ($mission['conflicting_assignments']) {
-            $mission['conflicting_assignments'] = array_unique(explode(',', $mission['conflicting_assignments']));
+        if (!empty($mission['conflicting_assignments'])) {
+            $mission['conflicting_assignments'] = array_values(array_unique(explode(',', $mission['conflicting_assignments'])));
+        } else {
+            $mission['conflicting_assignments'] = [];
         }
     }
     unset($mission);
