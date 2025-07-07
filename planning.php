@@ -33,7 +33,7 @@ $default_color = $predefined_colors[0];
         .planning-col { flex: 1; }
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
         .worker-item.unavailable { background-color: #f8d7da; border-color: #f5c6cb; }
-        .assignment-count { font-size: 0.5rem; color: #fff; background-color: #28a745; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
+        .assignment-count { font-size: 0.5rem; color: #fff; background-color: #dc3545; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
         .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; cursor: pointer; }
@@ -301,11 +301,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',').map(id => id.trim()) : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
-        const isConflicting = mission.conflicting_assignments && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
+        const isConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
 
         const workersHtml = assignedNames.map((name, i) => {
             const workerId = assignedIds[i];
-            const isWorkerConflicting = mission.conflicting_assignments && mission.conflicting_assignments.includes(workerId);
+            const isWorkerConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.includes(workerId);
             const style = isWorkerConflicting ? 'style="color: red; font-weight: bold;"' : '';
             return `<li ${style}>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
         }).join('');
@@ -328,21 +328,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderWorkerList() {
-        const workerAssignmentCounts = new Map();
-        state.missions.forEach(mission => {
-            if (mission.assigned_user_ids) {
-                mission.assigned_user_ids.split(',').forEach(id => workerAssignmentCounts.set(id, (workerAssignmentCounts.get(id) || 0) + 1));
-            }
-        });
         $workerList.empty();
         state.staff.forEach(worker => {
-            const count = workerAssignmentCounts.get(String(worker.user_id)) || 0;
             const isUnavailable = worker.status && worker.status !== 'available';
             const statusText = worker.status === 'assigned' ? 'Assigné' : 'En Congé';
             $workerList.append(`<div class="worker-item ${isUnavailable ? 'unavailable' : ''}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                 <div>${worker.prenom} ${worker.nom}</div>
-                ${isUnavailable ? `<div class="assignment-count bg-danger">${statusText}</div>` : ''}
-                ${count > 0 ? `<div class="assignment-count">Assigné à ${count} mission(s)</div>` : ''}
+                ${isUnavailable ? `<div class="assignment-count">${statusText}</div>` : ''}
             </div>`);
         });
     }
