@@ -32,13 +32,16 @@ $default_color = $predefined_colors[0];
         .workers-list-col { flex: 0 0 280px; background: var(--card-bg); border-right: 1px solid var(--border-color); }
         .planning-col { flex: 1; }
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
+        .worker-item.unavailable { background-color: #f8d7da; border-color: #f5c6cb; }
         .assignment-count { font-size: 0.5rem; color: #fff; background-color: #28a745; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
-        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; }
-        .day-content { flex-grow: 1; padding: 10px; }
+        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; cursor: pointer; }
+        .day-header.selected { background-color: var(--primary); color: white; }
         .add-mission-to-day-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; }
+        .day-header.selected .add-mission-to-day-btn { color: white; }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
+        .mission-card.conflicting-assignment { border: 2px solid red !important; }
         .mission-card.validated { opacity: 0.8; background-color: #e6ffed; }
         .mission-card-body { cursor: pointer; }
         .mission-title { font-weight: 600; font-size: 0.6rem; margin-bottom: 5px; }
@@ -65,7 +68,7 @@ $default_color = $predefined_colors[0];
 
     <div class="main-container">
         <div class="workers-list-col">
-            <h5><i class="fas fa-users"></i> Ouvriers</h5>
+            <h5><i class="fas fa-users"></i> Ouvriers Emploi</h5>
             <div id="workerList"></div>
         </div>
         <div class="planning-col">
@@ -100,6 +103,7 @@ $default_color = $predefined_colors[0];
                         </div>
 
                         <div class="form-group"><label>Titre de la mission *</label><input type="text" class="form-control" name="mission_text" required></div>
+                        <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="3"></textarea></div>
                         <div class="form-row">
                             <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control" name="start_time" id="mission_start_time"></div>
                             <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control" name="end_time" id="mission_end_time"></div>
@@ -180,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const HANDLER_URL = 'planning-handler.php';
     const PREDEFINED_COLORS = <?php echo json_encode($predefined_colors); ?>;
     const DEFAULT_COLOR = <?php echo json_encode($default_color); ?>;
-    let state = { staff: [], missions: [], inventory: [], bookings: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, shouldRefreshOnModalClose: false };
+    let state = { staff: [], missions: [], inventory: [], bookings: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, shouldRefreshOnModalClose: false, selectedDate: null };
     let assignedWorkersInModal = []; 
     let assignedAssetsInModal = []; 
 
@@ -203,7 +207,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     }
 
-    // *** FIXED: ADDED MISSING FUNCTION ***
     function getDatesFromModal() {
         const dates = [];
         const isMulti = $('#multi_day_fields').is(':visible');
@@ -212,12 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const single = $('#assignment_date_form').val();
 
         if (isMulti && start && end) {
-            // This case is for multi-day creation, where asset management is disabled by UI logic.
             for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
                 dates.push(formatDate(new Date(d)));
             }
         } else if (single) {
-            // This handles single-day creation and edits.
             dates.push(single);
         }
         return dates;
@@ -250,6 +251,9 @@ document.addEventListener('DOMContentLoaded', function() {
             state.missions = data.missions || [];
             state.inventory = data.inventory || [];
             state.bookings = data.bookings || [];
+            if (state.selectedDate) {
+                await refreshWorkerListForDate(state.selectedDate, false);
+            }
             updateUI();
         } catch (error) { 
             alert(`Erreur de chargement: ${error.message}`); 
@@ -280,7 +284,8 @@ document.addEventListener('DOMContentLoaded', function() {
             dayDate.setDate(dayDate.getDate() + i);
             const dateStr = formatDate(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
-            const $dayHeader = $(`<div class="day-header" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-mission-to-day-btn" title="Ajouter une mission"><i class="fas fa-plus-circle"></i></button></div>`);
+            const isSelected = dateStr === state.selectedDate;
+            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-mission-to-day-btn" title="Ajouter une mission"><i class="fas fa-plus-circle"></i></button></div>`);
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
             const $dayContent = $(`<div class="day-content p-2" data-date="${dateStr}"></div>`).appendTo($dayColumn);
             $planningContainer.append($dayColumn);
@@ -294,12 +299,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createMissionCard(mission) {
-        const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',') : [];
+        const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',').map(id => id.trim()) : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
-        const workersHtml = assignedNames.map((name, i) => `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${assignedIds[i]}"></i></li>`).join('');
+        const isConflicting = mission.conflicting_assignments && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
+
+        const workersHtml = assignedNames.map((name, i) => {
+            const workerId = assignedIds[i];
+            const isWorkerConflicting = mission.conflicting_assignments && mission.conflicting_assignments.includes(workerId);
+            const style = isWorkerConflicting ? 'style="color: red; font-weight: bold;"' : '';
+            return `<li ${style}>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
+        }).join('');
+
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
-        return $(`<div class="mission-card ${mission.is_validated == 1 ? 'validated' : ''}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
+        const missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''} ${isConflicting ? 'conflicting-assignment' : ''}`;
+        
+        return $(`<div class="${missionCardClass}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
                 <div class="mission-card-body">
                     <div class="mission-title">${mission.mission_text}</div>
@@ -322,8 +337,30 @@ document.addEventListener('DOMContentLoaded', function() {
         $workerList.empty();
         state.staff.forEach(worker => {
             const count = workerAssignmentCounts.get(String(worker.user_id)) || 0;
-            $workerList.append(`<div class="worker-item" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}"><div>${worker.prenom} ${worker.nom}</div>${count > 0 ? `<div class="assignment-count">Assigné à ${count} mission(s)</div>` : ''}</div>`);
+            const isUnavailable = worker.status && worker.status !== 'available';
+            const statusText = worker.status === 'assigned' ? 'Assigné' : 'En Congé';
+            $workerList.append(`<div class="worker-item ${isUnavailable ? 'unavailable' : ''}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
+                <div>${worker.prenom} ${worker.nom}</div>
+                ${isUnavailable ? `<div class="assignment-count bg-danger">${statusText}</div>` : ''}
+                ${count > 0 ? `<div class="assignment-count">Assigné à ${count} mission(s)</div>` : ''}
+            </div>`);
         });
+    }
+    
+    async function refreshWorkerListForDate(date, manageLoadingState = true) {
+        if (manageLoadingState) showLoading(true);
+        try {
+            const workerStatuses = await apiCall('get_worker_status_for_date', 'GET', { date: date });
+            state.staff.forEach(worker => {
+                const statusInfo = workerStatuses.find(s => s.user_id === worker.user_id);
+                worker.status = statusInfo ? statusInfo.status : 'available';
+            });
+            renderWorkerList();
+        } catch (error) {
+            alert(`Erreur de rafraîchissement des ouvriers: ${error.message}`);
+        } finally {
+            if (manageLoadingState) showLoading(false);
+        }
     }
 
     // --- MODAL WORKER LOGIC ---
@@ -398,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#modalDateDisplay').hide();
         $('#multi_day_fields').show();
         $('#assign-users-group').show();
-        $('#asset-management-container').hide(); // Hide for multi-day
+        $('#asset-management-container').hide();
         $('#deleteMissionBtn').hide();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
         renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
@@ -406,7 +443,19 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.modal('show');
     });
 
-    $planningContainer.on('click', '.add-mission-to-day-btn', function() { openModalForCreate($(this).closest('.day-header').data('date')); });
+    $planningContainer.on('click', '.day-header', function() {
+        const date = $(this).data('date');
+        state.selectedDate = date;
+        $('.day-header.selected').removeClass('selected');
+        $(this).addClass('selected');
+        refreshWorkerListForDate(date);
+    });
+
+    $planningContainer.on('click', '.add-mission-to-day-btn', function(e) {
+        e.stopPropagation();
+        openModalForCreate($(this).closest('.day-header').data('date'));
+    });
+    
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
@@ -453,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
         $missionModal.find('#deleteMissionBtn').hide();
         $('#assign-users-group').show();
-        $('#asset-management-container').show(); // Show for single-day create
+        $('#asset-management-container').show();
         renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
@@ -472,6 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#multi_day_fields').hide();
         $('#modalDateDisplay').html(`Modifier la mission du: <strong>${displayDate}</strong>`).show();
         $missionModal.find('input[name="mission_text"]').val(mission.mission_text);
+        $missionModal.find('textarea[name="comments"]').val(mission.comments);
         $missionModal.find('input[name="start_time"]').val(mission.start_time);
         $missionModal.find('input[name="end_time"]').val(mission.end_time);
         $missionModal.find('input[name="location"]').val(mission.location);
@@ -482,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
         $missionModal.find('#deleteMissionBtn').show();
         $('#assign-users-group').hide();
-        $('#asset-management-container').show(); // Show for edit
+        $('#asset-management-container').show();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
