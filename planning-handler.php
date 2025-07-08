@@ -205,9 +205,6 @@ function saveMission($conn, $creator_id, $data) {
 
     $dates = [];
     $is_multi_day = !empty($data['start_date']) && !empty($data['end_date']);
-    if ($is_multi_day && !empty($assigned_asset_ids)) {
-        respondWithError("L'assignation de matériel n'est pas supportée pour les missions sur plusieurs jours.");
-    }
     
     if ($is_multi_day) {
         $start = new DateTime($data['start_date']);
