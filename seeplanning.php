@@ -1,4 +1,3 @@
-
 <?php
 // seeplanning.php
 require_once 'session-management.php';
