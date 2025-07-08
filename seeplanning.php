@@ -303,16 +303,27 @@ document.addEventListener('DOMContentLoaded', function() {
             const card = document.createElement('div');
             card.className = 'mission-card';
 
+            // --- START: FIX FOR DUPLICATE NAMES ---
+            let uniqueTeamNames = '';
+            if (mission.assigned_user_names) {
+                // 1. Split names by comma, trim whitespace from each name, and filter out any empty entries.
+                const namesArray = mission.assigned_user_names.split(',').map(name => name.trim()).filter(Boolean);
+                // 2. Use a Set to get only the unique names, then join them back into a string.
+                uniqueTeamNames = [...new Set(namesArray)].join(', ');
+            }
+            // --- END: FIX FOR DUPLICATE NAMES ---
+
             const locationHtml = mission.location ? `
                 <div class="mission-detail-item">
                     <i class="fas fa-map-marker-alt icon"></i>
                     <span><strong>Lieu :</strong> ${escapeHtml(mission.location)}</span>
                 </div>` : '';
 
-            const teamHtml = mission.assigned_user_names ? `
+            // MODIFIED: This now uses the processed 'uniqueTeamNames' variable
+            const teamHtml = uniqueTeamNames ? `
                 <div class="mission-detail-item">
                     <i class="fas fa-users icon"></i>
-                    <span><strong>Équipe :</strong> ${escapeHtml(mission.assigned_user_names)}</span>
+                    <span><strong>Équipe :</strong> ${escapeHtml(uniqueTeamNames)}</span>
                 </div>` : '';
 
             const assetsHtml = mission.assigned_asset_names ? `
