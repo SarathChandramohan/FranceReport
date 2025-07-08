@@ -57,9 +57,6 @@ try {
         case 'get_worker_status_for_date':
             getWorkerStatusForDate($conn, $_GET['date']);
             break;
-        case 'get_user_planning':
-            getUserPlanning($conn, $currentUser['user_id'], $_GET['date']);
-            break;
         default:
             respondWithError('Action non valide.', 400);
     }
@@ -364,49 +361,6 @@ function removeWorkerFromMission($conn, $data) {
     respondWithSuccess('Ouvrier retiré de la mission.');
 }
 
-function getUserPlanning($conn, $userId, $date) {
-    if (empty($date)) {
-        respondWithError('Date non spécifiée.');
-    }
-
-    $sql = "
-        WITH UserMissions AS (
-            SELECT DISTINCT mission_group_id
-            FROM Planning_Assignments
-            WHERE assigned_user_id = ? AND assignment_date = ?
-        )
-        SELECT
-            m.mission_group_id,
-            m.mission_text,
-            m.comments,
-            m.location,
-            m.start_time,
-            m.end_time,
-            m.color,
-            (
-                SELECT STRING_AGG(u.prenom + ' ' + u.nom, ', ')
-                FROM Planning_Assignments pa
-                JOIN Users u ON pa.assigned_user_id = u.user_id
-                WHERE pa.mission_group_id = m.mission_group_id
-            ) as assigned_user_names,
-            (
-                SELECT STRING_AGG(i.asset_name, ', ')
-                FROM Bookings b
-                JOIN Inventory i ON b.asset_id = i.asset_id
-                WHERE b.mission_group_id = m.mission_group_id
-            ) as assigned_asset_names
-        FROM Planning_Assignments m
-        WHERE m.mission_group_id IN (SELECT mission_group_id FROM UserMissions)
-        GROUP BY m.mission_group_id, m.mission_text, m.comments, m.location, m.start_time, m.end_time, m.color
-        ORDER BY m.start_time;
-    ";
-
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$userId, $date]);
-    $missions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    respondWithSuccess('Planning de l\'utilisateur récupéré.', $missions);
-}
 
 /**
  * Toggles the validation status for an entire mission group.
