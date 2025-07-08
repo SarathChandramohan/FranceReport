@@ -73,6 +73,7 @@ function getUserPlanning($conn, $userId, $date) {
 
     // This query first finds the unique mission groups for the user on a given day,
     // then aggregates the details for those missions.
+    // MODIFIED: Added DISTINCT to STRING_AGG to prevent duplicate names.
     $sql = "
         WITH UserMissions AS (
             SELECT DISTINCT mission_group_id
@@ -88,13 +89,13 @@ function getUserPlanning($conn, $userId, $date) {
             m.end_time,
             m.color,
             (
-                SELECT STRING_AGG(u.prenom + ' ' + u.nom, ', ')
+                SELECT STRING_AGG(DISTINCT u.prenom + ' ' + u.nom, ', ')
                 FROM Planning_Assignments pa
                 JOIN Users u ON pa.assigned_user_id = u.user_id
                 WHERE pa.mission_group_id = m.mission_group_id
             ) as assigned_user_names,
             (
-                SELECT STRING_AGG(i.asset_name, ', ')
+                SELECT STRING_AGG(DISTINCT i.asset_name, ', ')
                 FROM Bookings b
                 JOIN Inventory i ON b.asset_id = i.asset_id
                 WHERE b.mission_group_id = m.mission_group_id
