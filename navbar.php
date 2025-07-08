@@ -179,6 +179,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
             <li class="nav-item"><a href="planning.php" class="nav-link <?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a></li>
             <li class="nav-item"><a href="inventory.php" class="nav-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventory</a></li>
+            <?php else: ?>
+            <li class="nav-item"><a href="seeplanning.php" class="nav-link <?php echo ($current_page == 'seeplanning.php') ? 'active' : ''; ?>">See Planning</a></li>
             <?php endif; ?>
             <li class="nav-item"><a href="technician.php" class="nav-link <?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">Technician</a></li>
             <li class="nav-item"><a href="messages.php" class="nav-link <?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages RH/Direction</a></li>
