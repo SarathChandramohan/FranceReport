@@ -88,14 +88,13 @@ function getUserPlanning($conn, $userId, $date) {
             m.end_time,
             m.color,
             (
-                -- *** BUG FIX APPLIED HERE: Added DISTINCT to prevent duplicate names ***
-                SELECT STRING_AGG(DISTINCT u.prenom + ' ' + u.nom, ', ')
+                SELECT STRING_AGG(u.prenom + ' ' + u.nom, ', ')
                 FROM Planning_Assignments pa
                 JOIN Users u ON pa.assigned_user_id = u.user_id
                 WHERE pa.mission_group_id = m.mission_group_id
             ) as assigned_user_names,
             (
-                SELECT STRING_AGG(DISTINCT i.asset_name, ', ')
+                SELECT STRING_AGG(i.asset_name, ', ')
                 FROM Bookings b
                 JOIN Inventory i ON b.asset_id = i.asset_id
                 WHERE b.mission_group_id = m.mission_group_id
