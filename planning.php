@@ -1,5 +1,5 @@
 <?php
-// planning.php (Final version with all fixes)
+// planning.php (Final version with single-day/multi-day logic)
 require_once 'session-management.php';
 require_once 'db-connection.php';
 requireLogin();
@@ -172,6 +172,26 @@ $default_color = $predefined_colors[0];
         <div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirmation</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body" id="confirmationModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-danger" id="confirmActionBtn">Confirmer</button></div></div></div>
     </div>
 
+    <div class="modal fade" id="scopeConfirmationModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmer l'Action</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="scopeConfirmationModalBody"></p>
+                    <p>Voulez-vous appliquer cette modification uniquement pour cette date ou pour toutes les dates de la mission ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-info" id="confirmScopeSingleBtn">Uniquement cette date</button>
+                    <button type="button" class="btn btn-primary" id="confirmScopeAllBtn">Toutes les dates</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="loadingOverlay"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div></div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -193,10 +213,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const $planningContainer = $('#dailyPlanningContainer');
     const $workerList = $('#workerList');
     const $missionModal = $('#missionFormModal');
+    const $scopeModal = $('#scopeConfirmationModal');
 
     // --- HELPERS ---
     const showLoading = (show) => $loading.toggle(show);
-    // ** DATE FIX **: This function now formats the date string without timezone conversion
     const getLocalDateString = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -212,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
         d.setHours(0, 0, 0, 0);
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     }
-
+    
     function getDatesFromModal() {
         const dates = [];
         const isMulti = $('#multi_day_fields').is(':visible');
@@ -307,20 +327,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',').map(id => id.trim()) : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
-        const isConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
-
         const workersHtml = assignedNames.map((name, i) => {
             const workerId = assignedIds[i];
-            const isWorkerConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.includes(workerId);
-            const style = isWorkerConflicting ? 'style="color: red; font-weight: bold;"' : '';
-            return `<li ${style}>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
+            return `<li>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
         }).join('');
-
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
-        const missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''} ${isConflicting ? 'conflicting-assignment' : ''}`;
+        const missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''}`;
 
-        return $(`<div class="${missionCardClass}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
+        return $(`<div class="${missionCardClass}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}" data-mission-group-id="${mission.mission_group_id}">
                 ${actionsHtml}
                 <div class="mission-card-body">
                     <div class="mission-title">${mission.mission_text}</div>
@@ -350,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const workerStatuses = await apiCall('get_worker_status_for_date', 'GET', { date: date });
             state.staff.forEach(worker => {
-                const statusInfo = workerStatuses.find(s => s.user_id === worker.user_id);
+                const statusInfo = workerStatuses.find(s => s.user_id == worker.user_id);
                 worker.status = statusInfo ? statusInfo.status : 'available';
             });
             renderWorkerList();
@@ -360,8 +375,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (manageLoadingState) showLoading(false);
         }
     }
-
-    // --- MODAL WORKER LOGIC ---
+    
+    // --- MODAL WORKER & ASSET LOGIC ---
     function renderAssignedWorkersInModal() {
         const $list = $('#assigned_workers_pills'), $hidden = $('#assigned_user_ids_hidden'), $placeholder = $('#no_workers_assigned_text');
         $list.find('.badge').remove();
@@ -375,7 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
         state.staff.forEach(w => { if (!assignedIds.has(String(w.user_id))) $list.append(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${w.user_id}" data-worker-name="${w.prenom} ${w.nom}">${w.prenom} ${w.nom}</a>`); });
     }
 
-    // --- NEW ASSET ASSIGNMENT LOGIC ---
     function updateAssignedAssetsDisplay() {
         const $display = $('#assigned_assets_display');
         const $hiddenInput = $('#assigned_asset_ids_hidden');
@@ -404,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const bookedAssetIds = new Set();
         state.bookings.forEach(b => {
             if (missionDates.includes(b.booking_date)) {
-                if (currentMission && b.mission === currentMission.mission_text) return;
+                if (currentMission && b.mission_group_id === currentMission.mission_group_id) return;
                 bookedAssetIds.add(String(b.asset_id));
             }
         });
@@ -433,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#modalDateDisplay').hide();
         $('#multi_day_fields').show();
         $('#assign-users-group').show();
-        $('#asset-management-container').hide();
+        $('#asset-management-container').show(); // Show by default for new multi-day
         $('#deleteMissionBtn').hide();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
         renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
@@ -448,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $(this).addClass('selected');
         refreshWorkerListForDate(date);
     });
-
+    
     $planningContainer.on('click', '.add-mission-to-day-btn', function(e) {
         e.stopPropagation();
         openModalForCreate($(this).closest('.day-header').data('date'));
@@ -457,30 +471,105 @@ document.addEventListener('DOMContentLoaded', function() {
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
-    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
-
+    
     async function handleDrop(e) {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         if (!state.draggedWorker) return;
-        const $target = $(e.target);
-        const $missionCard = $target.closest('.mission-card');
-        showLoading(true);
-        try {
-            if ($missionCard.length > 0) {
-                const missionId = $missionCard.data('mission-id');
-                const mission = state.missions.find(m => m.mission_id == missionId);
-                await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_id: missionId, assignment_date: mission.assignment_date });
+
+        const $missionCard = $(e.target).closest('.mission-card');
+        if ($missionCard.length > 0) {
+            const missionId = $missionCard.data('mission-id');
+            const missionGroupId = $missionCard.data('mission-group-id');
+            
+            const missionGroupCount = state.missions.filter(m => m.mission_group_id === missionGroupId).length;
+            const isMultiDay = missionGroupCount > 1;
+
+            if (isMultiDay) {
+                showScopeConfirmation(
+                    `Ajouter ${state.draggedWorker.name} à la mission ?`,
+                    () => assignWorker(missionId, 'day'),
+                    () => assignWorker(missionId, 'series')
+                );
             } else {
-                const date = $target.closest('.day-content').data('date');
+                assignWorker(missionId, 'day');
+            }
+        } else {
+            showLoading(true);
+            try {
+                const date = $(e.target).closest('.day-content').data('date');
                 await apiCall('save_mission', 'POST', {
                     assignment_date: date, mission_text: `Mission pour ${state.draggedWorker.name}`,
                     shift_type: 'custom', start_time: '08:00', end_time: '17:00', color: DEFAULT_COLOR,
                     assigned_user_ids: [state.draggedWorker.id]
                 });
+                await fetchInitialData(false);
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                showLoading(false);
             }
-            await fetchInitialData(false);
-        } catch (error) { alert(`Erreur: ${error.message}`); } finally { state.draggedWorker = null; showLoading(false); }
+        }
+        state.draggedWorker = null;
     }
+
+    async function assignWorker(missionId, scope) {
+        showLoading(true);
+        try {
+            await apiCall('assign_worker_to_mission', 'POST', {
+                worker_id: state.draggedWorker.id,
+                mission_id: missionId,
+                scope: scope
+            });
+            await fetchInitialData(false);
+        } catch (error) {
+            alert(`Erreur lors de l'assignation: ${error.message}`);
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    $planningContainer.on('click', '.remove-worker-btn', function(e) {
+        e.stopPropagation();
+        const $card = $(this).closest('.mission-card');
+        const missionId = $card.data('mission-id');
+        const missionGroupId = $card.data('mission-group-id');
+        const workerId = $(this).data('worker-id');
+        const workerName = $(this).closest('li').text().trim().replace(' ', '');
+
+        const missionGroupCount = state.missions.filter(m => m.mission_group_id === missionGroupId).length;
+        const isMultiDay = missionGroupCount > 1;
+
+        if (isMultiDay) {
+            showScopeConfirmation(
+                `Retirer ${workerName} de la mission ?`,
+                () => removeWorker(missionId, workerId, 'day'),
+                () => removeWorker(missionId, workerId, 'series')
+            );
+        } else {
+            showConfirmation(`Retirer ${workerName} de cette mission ?`, () => {
+                removeWorker(missionId, workerId, 'day');
+            });
+        }
+    });
+
+    async function removeWorker(missionId, workerId, scope) {
+        showLoading(true);
+        try {
+            await apiCall('remove_worker_from_mission', 'POST', {
+                mission_id: missionId,
+                worker_id: workerId,
+                scope: scope
+            });
+            await fetchInitialData(false);
+        } catch (error) {
+            alert(`Erreur: ${error.message}`);
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
 
     // --- MODAL & FORM LOGIC ---
     function setupModalStaticContent() {
@@ -537,13 +626,13 @@ document.addEventListener('DOMContentLoaded', function() {
         $(`.color-swatch[data-color="${mission.color || DEFAULT_COLOR}"]`).addClass('selected');
         $missionModal.find('#missionFormModalLabel').text('Modifier la Mission');
         $missionModal.find('#deleteMissionBtn').show();
-        $('#assign-users-group').hide();
+        // Hide worker assignment for existing missions, as it's handled by drag/drop now.
+        $('#assign-users-group').hide(); 
         $('#asset-management-container').show();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
     });
 
-    // --- EVENT LISTENERS CONTINUED ---
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const dis = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', dis).val(dis ? '' : $('#mission_start_time').val()); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
 
@@ -565,7 +654,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         hideModalError();
         const formData = Object.fromEntries(new FormData(this).entries());
-        if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) { showModalError("Veuillez assigner au moins un ouvrier."); return; }
+        if (!formData.mission_id && (!formData.assigned_user_ids || formData.assigned_user_ids.length === 0)) { showModalError("Veuillez assigner au moins un ouvrier pour une nouvelle mission."); return; }
         if (formData.assigned_user_ids) formData.assigned_user_ids = formData.assigned_user_ids.split(',').filter(id => id);
         if (formData.assigned_asset_ids) formData.assigned_asset_ids = formData.assigned_asset_ids.split(',').filter(id => id); else formData.assigned_asset_ids = [];
         showLoading(true);
@@ -575,24 +664,44 @@ document.addEventListener('DOMContentLoaded', function() {
             $missionModal.modal('hide');
         } catch (error) { showModalError(error.message); } finally { showLoading(false); }
     });
+    
+    function showConfirmation(body, onConfirm) {
+        $('#confirmationModalBody').text(body);
+        $('#confirmActionBtn').off('click').on('click', () => { onConfirm(); $('#confirmationModal').modal('hide'); });
+        $('#confirmationModal').modal('show');
+    }
+
+    function showScopeConfirmation(body, onConfirmSingle, onConfirmAll) {
+        $scopeModal.find('#scopeConfirmationModalBody').text(body);
+        $scopeModal.find('#confirmScopeSingleBtn').off('click').on('click', () => { $scopeModal.modal('hide'); onConfirmSingle(); });
+        $scopeModal.find('#confirmScopeAllBtn').off('click').on('click', () => { $scopeModal.modal('hide'); onConfirmAll(); });
+        $scopeModal.modal('show');
+    }
 
     $missionModal.on('hidden.bs.modal', function () {
         hideModalError();
         assignedAssetsInModal = []; assignedWorkersInModal = [];
-        $('#asset-management-container').hide();
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
     });
+    
+    $('#deleteMissionBtn').on('click', function() { 
+        const missionId = $('#mission_id_form').val(); 
+        if (!missionId) return; 
+        $missionModal.modal('hide'); 
+        showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => { 
+            showLoading(true); 
+            try { 
+                await apiCall('delete_mission_group', 'POST', { mission_id: missionId }); 
+                await fetchInitialData(false); 
+            } catch (error) { 
+                alert(`Erreur: ${error.message}`); 
+            } finally { 
+                showLoading(false); 
+            } 
+        }); 
+    });
 
-    const $confirmationModal = $('#confirmationModal'), $confirmBtn = $('#confirmActionBtn');
-    function showConfirmation(body, onConfirm) {
-        $confirmationModal.find('#confirmationModalBody').text(body);
-        $confirmBtn.off('click').on('click', () => { onConfirm(); $confirmationModal.modal('hide'); });
-        $confirmationModal.modal('show');
-    }
-
-    $planningContainer.on('click', '.remove-worker-btn', function(e) { e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); const workerId = $(this).data('worker-id'); const workerName = $(this).closest('li').text().trim(); showConfirmation(`Retirer ${workerName} de cette mission ?`, async () => { showLoading(true); try { await apiCall('remove_worker_from_mission', 'POST', { mission_id: missionId, worker_id: workerId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
-    $('#deleteMissionBtn').on('click', function() { const missionId = $('#mission_id_form').val(); if (!missionId) return; $missionModal.modal('hide'); showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => { showLoading(true); try { await apiCall('delete_mission_group', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
-
+    // --- INITIAL LOAD ---
     fetchInitialData();
 });
 </script>
