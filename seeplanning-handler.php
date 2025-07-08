@@ -62,6 +62,9 @@ try {
 
 /**
  * Fetches planning assignments for a specific user on a specific date.
+ * This version uses a more optimized query with Common Table Expressions (CTEs)
+ * to avoid correlated subqueries and improve performance.
+ *
  * @param PDO $conn The database connection object.
  * @param int $userId The ID of the logged-in user.
  * @param string|null $date The date to fetch planning for in 'Y-m-d' format.
@@ -71,38 +74,55 @@ function getUserPlanning($conn, $userId, $date) {
         respondWithError('Date non spécifiée.');
     }
 
-    // This query first finds the unique mission groups for the user on a given day,
-    // then aggregates the details for those missions.
-    // MODIFIED: Added DISTINCT to STRING_AGG to prevent duplicate names.
+    // This optimized query builds the data in steps for clarity and performance.
     $sql = "
         WITH UserMissions AS (
+            -- Step 1: Find the mission groups for the current user and date.
             SELECT DISTINCT mission_group_id
             FROM Planning_Assignments
             WHERE assigned_user_id = ? AND assignment_date = ?
+        ),
+        AggregatedUsers AS (
+            -- Step 2: For those missions, get a unique, comma-separated list of team members.
+            SELECT
+                pa.mission_group_id,
+                STRING_AGG(DISTINCT u.prenom + ' ' + u.nom, ', ') as assigned_user_names
+            FROM Planning_Assignments pa
+            JOIN Users u ON pa.assigned_user_id = u.user_id
+            WHERE pa.mission_group_id IN (SELECT mission_group_id FROM UserMissions)
+            GROUP BY pa.mission_group_id
+        ),
+        AggregatedAssets AS (
+            -- Step 3: For those missions, get a unique, comma-separated list of assets.
+            SELECT
+                b.mission_group_id,
+                STRING_AGG(DISTINCT i.asset_name, ', ') as assigned_asset_names
+            FROM Bookings b
+            JOIN Inventory i ON b.asset_id = i.asset_id
+            WHERE b.mission_group_id IN (SELECT mission_group_id FROM UserMissions)
+            GROUP BY b.mission_group_id
         )
+        -- Step 4: Combine the unique mission details with the aggregated lists.
         SELECT
             m.mission_group_id,
-            m.mission_text,
-            m.comments,
-            m.location,
+            MAX(m.mission_text) as mission_text, -- Using MAX() ensures one value is returned per mission group.
+            MAX(m.comments) as comments,
+            MAX(m.location) as location,
             m.start_time,
             m.end_time,
-            m.color,
-            (
-                SELECT STRING_AGG(DISTINCT u.prenom + ' ' + u.nom, ', ')
-                FROM Planning_Assignments pa
-                JOIN Users u ON pa.assigned_user_id = u.user_id
-                WHERE pa.mission_group_id = m.mission_group_id
-            ) as assigned_user_names,
-            (
-                SELECT STRING_AGG(DISTINCT i.asset_name, ', ')
-                FROM Bookings b
-                JOIN Inventory i ON b.asset_id = i.asset_id
-                WHERE b.mission_group_id = m.mission_group_id
-            ) as assigned_asset_names
+            MAX(m.color) as color,
+            u.assigned_user_names,
+            a.assigned_asset_names
         FROM Planning_Assignments m
+        LEFT JOIN AggregatedUsers u ON m.mission_group_id = u.mission_group_id
+        LEFT JOIN AggregatedAssets a ON m.mission_group_id = a.mission_group_id
         WHERE m.mission_group_id IN (SELECT mission_group_id FROM UserMissions)
-        GROUP BY m.mission_group_id, m.mission_text, m.comments, m.location, m.start_time, m.end_time, m.color
+        GROUP BY
+            m.mission_group_id,
+            m.start_time,
+            m.end_time,
+            u.assigned_user_names,
+            a.assigned_asset_names
         ORDER BY m.start_time;
     ";
 
