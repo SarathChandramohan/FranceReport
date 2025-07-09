@@ -85,7 +85,7 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
 
     $conn->beginTransaction();
 
-    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ? FOR UPDATE");
+    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
     $checkStmt->execute([$assetId]);
     $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -120,7 +120,7 @@ function returnItem($conn, $userId, $assetId) {
     
     $conn->beginTransaction();
 
-    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ? FOR UPDATE");
+    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
     $checkStmt->execute([$assetId]);
     $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -151,7 +151,7 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
 
     $conn->beginTransaction();
     
-    $itemStmt = $conn->prepare("SELECT * FROM Inventory WHERE barcode = ? FOR UPDATE");
+    $itemStmt = $conn->prepare("SELECT * FROM Inventory WHERE barcode = ?");
     $itemStmt->execute([$barcode]);
     $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
 
