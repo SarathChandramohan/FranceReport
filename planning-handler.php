@@ -139,26 +139,57 @@ function getInitialData($conn) {
     respondWithSuccess('Données initiales chargées.', ['staff' => $users, 'missions' => $missions, 'inventory' => $inventory, 'bookings' => $bookings]);
 }
 
+// Helper function to get the display name for a leave type key
+function getLeaveTypeName($typeKey) {
+    $types = [
+        'cp' => 'Congés Payés',
+        'rtt' => 'RTT',
+        'sans-solde' => 'Congé Sans Solde',
+        'special' => 'Congé Spécial',
+        'maladie' => 'Arrêt Maladie'
+    ];
+    return $types[$typeKey] ?? ucfirst($typeKey); // Return a user-friendly name
+}
+
 function getWorkerStatusForDate($conn, $date) {
     if (!$date) respondWithError('Date not provided.');
+
+    // Get assigned users
     $stmt_assigned = $conn->prepare("SELECT DISTINCT assigned_user_id FROM Planning_Assignments WHERE assignment_date = ?");
     $stmt_assigned->execute([$date]);
     $assigned_users = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN, 0);
-    $stmt_on_leave = $conn->prepare("SELECT DISTINCT user_id FROM Conges WHERE ? BETWEEN date_debut AND date_fin AND status = 'approved'");
+
+    // Get users on leave with leave type
+    $stmt_on_leave = $conn->prepare("SELECT user_id, type_conge FROM Conges WHERE ? BETWEEN date_debut AND date_fin AND status = 'approved'");
     $stmt_on_leave->execute([$date]);
-    $on_leave_users = $stmt_on_leave->fetchAll(PDO::FETCH_COLUMN, 0);
+    $on_leave_data = $stmt_on_leave->fetchAll(PDO::FETCH_KEY_PAIR); // Fetches into a user_id => type_conge map
+
+    // Get all active users
     $stmt_all_users = $conn->prepare("SELECT user_id FROM Users WHERE status = 'Active'");
     $stmt_all_users->execute();
     $all_users = $stmt_all_users->fetchAll(PDO::FETCH_COLUMN, 0);
+
     $worker_statuses = [];
     foreach ($all_users as $user_id) {
         $status = 'available';
-        if (in_array($user_id, $assigned_users)) $status = 'assigned';
-        elseif (in_array($user_id, $on_leave_users)) $status = 'on_leave';
-        $worker_statuses[] = ['user_id' => $user_id, 'status' => $status];
+        $leave_type = null;
+
+        if (in_array($user_id, $assigned_users)) {
+            $status = 'assigned';
+        } elseif (isset($on_leave_data[$user_id])) {
+            $status = 'on_leave';
+            $leave_type = getLeaveTypeName($on_leave_data[$user_id]); // Use a helper to get display name
+        }
+
+        $worker_statuses[] = [
+            'user_id' => $user_id,
+            'status' => $status,
+            'leave_type' => $leave_type // Add leave_type to the response
+        ];
     }
     respondWithSuccess('Worker statuses retrieved.', $worker_statuses);
 }
+
 
 function saveMission($conn, $creator_id, $data) {
     $mission_id = $data['mission_id'] ?? null;
