@@ -242,7 +242,7 @@ function saveMission($conn, $creator_id, $data) {
         $stmt_insert = $conn->prepare("INSERT INTO Planning_Assignments (assigned_user_id, creator_user_id, assignment_date, start_time, end_time, shift_type, mission_text, comments, color, location, is_validated, mission_group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)");
         $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status, mission_group_id) VALUES (?, NULL, ?, ?, 'booked', ?)");
 
-        // **BUG FIX**: Loop through each day, create a unique group ID, and then create assignments AND bookings for that day.
+        // Loop through each day, create a unique group ID, and then create assignments AND bookings for that day.
         foreach ($dates as $mission_date) {
             // 1. Generate a new, unique ID for this day's group of assignments
             $mission_group_id = $conn->query("SELECT NEWID()")->fetchColumn();
@@ -266,20 +266,43 @@ function saveMission($conn, $creator_id, $data) {
 }
 
 
+/**
+ * Deletes a mission group and its associated bookings.
+ */
 function deleteMissionGroup($conn, $data) {
     $mission_id = $data['mission_id'];
-    if (!$mission_id) respondWithError('ID de mission manquant.');
+    if (!$mission_id) {
+        respondWithError('ID de mission manquant.');
+    }
+
     $conn->beginTransaction();
-    $stmt_find_group = $conn->prepare("SELECT mission_group_id FROM Planning_Assignments WHERE assignment_id = ?");
-    $stmt_find_group->execute([$mission_id]);
-    $mission_group_id = $stmt_find_group->fetchColumn();
-    if (!$mission_group_id) {$conn->rollBack(); respondWithError('Mission à supprimer non trouvée.');}
-    $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission_group_id = ?");
-    $stmt_delete_bookings->execute([$mission_group_id]);
-    $stmt_delete_assignments = $conn->prepare("DELETE FROM Planning_Assignments WHERE mission_group_id = ?");
-    $stmt_delete_assignments->execute([$mission_group_id]);
-    $conn->commit();
-    respondWithSuccess('Mission et toutes ses affectations supprimées.');
+
+    try {
+        // Find the mission_group_id from the specific assignment_id clicked by the user
+        $stmt_find_group = $conn->prepare("SELECT mission_group_id FROM Planning_Assignments WHERE assignment_id = ?");
+        $stmt_find_group->execute([$mission_id]);
+        $mission_group_id = $stmt_find_group->fetchColumn();
+
+        if (!$mission_group_id) {
+            $conn->rollBack();
+            respondWithError('Mission à supprimer non trouvée.');
+        }
+
+        // **NEW**: Delete all bookings associated with this mission group
+        $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission_group_id = ?");
+        $stmt_delete_bookings->execute([$mission_group_id]);
+
+        // Delete all assignments for this mission group
+        $stmt_delete_assignments = $conn->prepare("DELETE FROM Planning_Assignments WHERE mission_group_id = ?");
+        $stmt_delete_assignments->execute([$mission_group_id]);
+
+        $conn->commit();
+        respondWithSuccess('Mission et toutes ses affectations, y compris les réservations de matériel, ont été supprimées.');
+
+    } catch (Exception $e) {
+        $conn->rollBack();
+        respondWithError('Erreur lors de la suppression de la mission: ' . $e->getMessage(), 500);
+    }
 }
 
 function assignWorkerToMission($conn, $creator_id, $data) {
