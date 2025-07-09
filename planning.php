@@ -337,7 +337,13 @@ document.addEventListener('DOMContentLoaded', function() {
         $workerList.empty();
         state.staff.forEach(worker => {
             const isUnavailable = worker.status && worker.status !== 'available';
-            const statusText = worker.status === 'assigned' ? 'Assigné' : 'En Congé';
+            let statusText = '';
+            if (worker.status === 'assigned') {
+                statusText = 'Assigné';
+            } else if (worker.status === 'on_leave') {
+                statusText = worker.leave_type || 'En Congé'; // Use leave_type if available
+            }
+
             $workerList.append(`<div class="worker-item ${isUnavailable ? 'unavailable' : ''}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                 <div>${worker.prenom} ${worker.nom}</div>
                 ${isUnavailable ? `<div class="assignment-count">${statusText}</div>` : ''}
@@ -351,7 +357,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const workerStatuses = await apiCall('get_worker_status_for_date', 'GET', { date: date });
             state.staff.forEach(worker => {
                 const statusInfo = workerStatuses.find(s => s.user_id === worker.user_id);
-                worker.status = statusInfo ? statusInfo.status : 'available';
+                if (statusInfo) {
+                    worker.status = statusInfo.status;
+                    worker.leave_type = statusInfo.leave_type; // Store leave type
+                } else {
+                    worker.status = 'available';
+                    worker.leave_type = null;
+                }
             });
             renderWorkerList();
         } catch (error) {
