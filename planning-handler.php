@@ -266,9 +266,6 @@ function saveMission($conn, $creator_id, $data) {
 }
 
 
-/**
- * Deletes a mission group and its associated bookings.
- */
 function deleteMissionGroup($conn, $data) {
     $mission_id = $data['mission_id'];
     if (!$mission_id) {
@@ -288,7 +285,7 @@ function deleteMissionGroup($conn, $data) {
             respondWithError('Mission à supprimer non trouvée.');
         }
 
-        // **NEW**: Delete all bookings associated with this mission group
+        // Delete all bookings associated with this mission group
         $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission_group_id = ?");
         $stmt_delete_bookings->execute([$mission_group_id]);
 
@@ -348,16 +345,56 @@ function assignWorkerToMission($conn, $creator_id, $data) {
     respondWithSuccess('Ouvrier assigné à toutes les journées de la mission.');
 }
 
+/**
+ * Removes a worker from a mission. 
+ * If it's the last worker on that mission, the associated bookings are also deleted.
+ */
 function removeWorkerFromMission($conn, $data) {
     $worker_id = $data['worker_id'];
-    $mission_id = $data['mission_id'];
-    $stmt_orig = $conn->prepare("SELECT mission_group_id FROM Planning_Assignments WHERE assignment_id = ?");
-    $stmt_orig->execute([$mission_id]);
-    $mission_group_id = $stmt_orig->fetchColumn();
-    if (!$mission_group_id) respondWithError('Mission non trouvée ou mal configurée.');
-    $stmt_delete = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND mission_group_id = ?");
-    $stmt_delete->execute([$worker_id, $mission_group_id]);
-    respondWithSuccess('Ouvrier retiré de la mission.');
+    $mission_id = $data['mission_id']; // This is actually an assignment_id
+
+    if (!$worker_id || !$mission_id) {
+        respondWithError('Worker ID and Mission ID are required.');
+    }
+
+    $conn->beginTransaction();
+
+    try {
+        // 1. Get the mission_group_id from the specific assignment record that was clicked.
+        $stmt_get_group = $conn->prepare("SELECT mission_group_id FROM Planning_Assignments WHERE assignment_id = ?");
+        $stmt_get_group->execute([$mission_id]);
+        $mission_group_id = $stmt_get_group->fetchColumn();
+
+        if (!$mission_group_id) {
+            $conn->rollBack();
+            respondWithError('Mission non trouvée ou mal configurée.');
+            return;
+        }
+
+        // 2. Delete the specific worker's assignment(s) for this mission group.
+        // This is important for multi-day missions where a worker might have multiple assignment rows under one group ID.
+        // However, based on current logic, each day has a unique group ID, so this will only delete one record.
+        $stmt_delete_worker = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND mission_group_id = ?");
+        $stmt_delete_worker->execute([$worker_id, $mission_group_id]);
+
+        // 3. Check if any other assignments (i.e., any other workers) exist for this mission group.
+        $stmt_check_remaining = $conn->prepare("SELECT COUNT(*) FROM Planning_Assignments WHERE mission_group_id = ?");
+        $stmt_check_remaining->execute([$mission_group_id]);
+        $remaining_assignments = $stmt_check_remaining->fetchColumn();
+
+        // 4. If no assignments remain, it was the last worker. Delete the associated bookings.
+        if ($remaining_assignments == 0) {
+            $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission_group_id = ?");
+            $stmt_delete_bookings->execute([$mission_group_id]);
+        }
+
+        $conn->commit();
+        respondWithSuccess('Ouvrier retiré de la mission. Les réservations ont été mises à jour si nécessaire.');
+
+    } catch (Exception $e) {
+        $conn->rollBack();
+        respondWithError('Erreur lors du retrait de l\'ouvrier: ' . $e->getMessage(), 500);
+    }
 }
 
 function toggleMissionValidation($conn, $data) {
