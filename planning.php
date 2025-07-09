@@ -472,11 +472,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 await apiCall('assign_worker_to_mission', 'POST', { worker_id: state.draggedWorker.id, mission_id: missionId, assignment_date: mission.assignment_date });
             } else {
                 const date = $target.closest('.day-content').data('date');
-                await apiCall('save_mission', 'POST', {
-                    assignment_date: date, mission_text: `Mission pour ${state.draggedWorker.name}`,
-                    shift_type: 'custom', start_time: '08:00', end_time: '17:00', color: DEFAULT_COLOR,
-                    assigned_user_ids: [state.draggedWorker.id]
-                });
+                openModalForCreate(date);
             }
             await fetchInitialData(false);
         } catch (error) { alert(`Erreur: ${error.message}`); } finally { state.draggedWorker = null; showLoading(false); }
