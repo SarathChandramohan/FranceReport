@@ -176,13 +176,13 @@ function saveMission($conn, $creator_id, $data) {
         $dates[] = $data['assignment_date'];
     }
     if (empty($dates) && !$mission_id) {$conn->rollBack(); respondWithError('La date de la mission est obligatoire.');}
-    $mission_group_id = null;
+    
     if ($mission_id) {
         $stmt_find_group = $conn->prepare("SELECT mission_group_id FROM Planning_Assignments WHERE assignment_id = ?");
         $stmt_find_group->execute([$mission_id]);
         $mission_group_id = $stmt_find_group->fetchColumn();
     }
-    if (!$mission_group_id) $mission_group_id = $conn->query("SELECT NEWID()")->fetchColumn();
+    
     $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission_group_id = ?");
     $stmt_delete_bookings->execute([$mission_group_id]);
     if (!empty($assigned_asset_ids) && !empty($dates)) {
@@ -199,7 +199,12 @@ function saveMission($conn, $creator_id, $data) {
     } else {
         if (empty($assigned_users)) {$conn->rollBack(); respondWithError('Veuillez assigner au moins un ouvrier.');}
         $stmt_insert = $conn->prepare("INSERT INTO Planning_Assignments (assigned_user_id, creator_user_id, assignment_date, start_time, end_time, shift_type, mission_text, comments, color, location, is_validated, mission_group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)");
-        foreach ($dates as $mission_date) foreach ($assigned_users as $user_id) $stmt_insert->execute([$user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null, $data['shift_type'], $data['mission_text'], $comments, $data['color'], $data['location'] ?: null, $mission_group_id]);
+        foreach ($dates as $mission_date) {
+            $mission_group_id = $conn->query("SELECT NEWID()")->fetchColumn();
+            foreach ($assigned_users as $user_id) {
+                $stmt_insert->execute([$user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null, $data['shift_type'], $data['mission_text'], $comments, $data['color'], $data['location'] ?: null, $mission_group_id]);
+            }
+        }
     }
     if (!empty($assigned_asset_ids) && !empty($dates)) {
         $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status, mission_group_id) VALUES (?, NULL, ?, ?, 'booked', ?)");
