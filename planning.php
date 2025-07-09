@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#modalDateDisplay').hide();
         $('#multi_day_fields').show();
         $('#assign-users-group').show();
-        $('#asset-management-container').hide();
+        $('#asset-management-container').show();
         $('#deleteMissionBtn').hide();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
         renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
