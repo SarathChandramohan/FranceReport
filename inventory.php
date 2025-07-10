@@ -70,6 +70,7 @@ $currentUserId = $currentUser['user_id'];
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
+            <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
             <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
             <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
         </div>
@@ -170,6 +171,20 @@ $currentUserId = $currentUser['user_id'];
              <div class="text-center mt-3">
                 <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
                 <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="missing_items" class="tab-content">
+        <div class="card">
+            <h3 class="mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Matériel Manquant ou Non Retourné</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="thead-dark">
+                        <tr><th>Actif</th><th>Code-barres</th><th>Sorti par</th><th>Date de réservation</th><th>Mission</th></tr>
+                    </thead>
+                    <tbody id="missing-items-table"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -310,6 +325,7 @@ let inventory = [];
 let assetCategories = [];
 let allBookings = { individual: [], mission: [] };
 let usageHistory = [];
+let missingItems = [];
 let allUsers = [];
 let selectedCategoryId = 'all'; 
 let codeReader = null;
@@ -334,11 +350,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function fetchAllData() {
     try {
-        const [inventoryData, bookingsData, categoriesData, historyData, usersData] = await Promise.all([
+        const [inventoryData, bookingsData, categoriesData, historyData, missingItemsData, usersData] = await Promise.all([
             apiCall('get_inventory', 'GET'),
             apiCall('get_all_bookings', 'GET'),
             apiCall('get_categories', 'GET'),
             apiCall('get_booking_history', 'GET'),
+            apiCall('get_missing_items', 'GET'),
             apiCall('get_users', 'GET')
         ]);
         
@@ -346,6 +363,7 @@ async function fetchAllData() {
         allBookings.individual = bookingsData.bookings?.individual || [];
         allBookings.mission = bookingsData.bookings?.mission || [];
         usageHistory = historyData.history || [];
+        missingItems = missingItemsData.missing_items || [];
         assetCategories = categoriesData.categories || [];
         allUsers = usersData.users || [];
         assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
@@ -366,6 +384,19 @@ function renderBookingTab() {
     renderIndividualBookingsTable();
     renderMissionBookingsTable();
     renderUsageHistoryTable();
+}
+
+function renderMissingItemsTab() {
+    const tableBody = document.getElementById('missing-items-table');
+    tableBody.innerHTML = '';
+    if (missingItems.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun matériel manquant.</td></tr>';
+        return;
+    }
+    missingItems.forEach(item => {
+        const row = tableBody.insertRow();
+        row.innerHTML = `<td>${item.asset_name}</td><td>${item.barcode}</td><td>${item.prenom} ${item.nom}</td><td>${new Date(item.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${item.mission || 'N/A'}</td>`;
+    });
 }
 
 function showNotification(message, type = 'success') { 
@@ -475,13 +506,14 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
     if (tabName !== 'scanner' && codeReader) stopScanning();
-    const needsDataRefresh = ['inventory', 'booking', 'manage_categories'].includes(tabName);
+    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items'].includes(tabName);
     if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
         fetchAllData().then(() => {
             if (tabName === 'inventory') renderInventoryTab();
             else if (tabName === 'booking') renderBookingTab();
             else if (tabName === 'manage_categories') renderCategoriesList();
+            else if (tabName === 'missing_items') renderMissingItemsTab();
             loadingOverlay.style.display = 'none';
         });
     }
