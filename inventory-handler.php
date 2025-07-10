@@ -24,8 +24,9 @@ try {
         case 'get_all_bookings': getAllBookings($conn); break;
         case 'get_asset_availability': getAssetAvailability($conn); break;
         case 'get_asset_history': getAssetHistory($conn); break;
-        case 'get_booking_history': getBookingHistory($conn); break; // New Action
+        case 'get_booking_history': getBookingHistory($conn); break; 
         case 'cancel_booking': cancelBooking($conn, $currentUser); break;
+        case 'get_missing_items': getMissingItems($conn); break;
 
         // CATEGORY ACTIONS
         case 'get_categories': getAssetCategories($conn); break;
@@ -56,6 +57,29 @@ function respondWithError($message, $code = 400) {
     http_response_code($code);
     echo json_encode(['status' => 'error', 'message' => $message]);
     exit;
+}
+
+function getMissingItems($conn) {
+    $sql = "
+        SELECT 
+            i.asset_name, 
+            i.barcode, 
+            u.prenom, 
+            u.nom, 
+            b.booking_date, 
+            b.mission
+        FROM Inventory i
+        JOIN Bookings b ON i.asset_id = b.asset_id
+        JOIN Users u ON i.assigned_to_user_id = u.user_id
+        WHERE i.status = 'in-use'
+        AND b.status = 'active' 
+        AND b.booking_date < GETDATE()
+        ORDER BY b.booking_date ASC
+    ";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $missing_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    respondWithSuccess(['missing_items' => $missing_items]);
 }
 
 /**
