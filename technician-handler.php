@@ -1,5 +1,5 @@
 <?php
-// technician-handler.php (Corrected Version)
+// technician-handler.php
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
@@ -18,7 +18,7 @@ try {
             getTechnicianEquipment($conn, $currentUser['user_id']);
             break;
         case 'checkout_item':
-            checkoutItem($conn, $currentUser['user_id'], $_POST['booking_id'], $_POST['asset_id']);
+            checkoutItem($conn, $currentUser['user_id'], $_POST['booking_id'] ?? null, $_POST['asset_id']);
             break;
         case 'return_item':
             returnItem($conn, $currentUser['user_id'], $_POST['asset_id']);
@@ -34,14 +34,11 @@ try {
     json_response('error', 'Erreur: ' . $e->getMessage());
 }
 
-/**
- * Fetches the equipment assigned to a technician for the day, and also items currently in use by the technician.
- */
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
     
     $sql = "
-        SELECT
+        SELECT DISTINCT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
             i.status, i.assigned_to_user_id,
             b.booking_id, b.mission
@@ -52,7 +49,7 @@ function getTechnicianEquipment($conn, $userId) {
         LEFT JOIN
             Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
         WHERE
-            (b.booking_date = :today_b2 AND (b.user_id = :userId1 OR pa.assigned_user_id = :userId2))
+            (b.booking_date = :today_b2 AND b.status = 'booked' AND (b.user_id = :userId1 OR pa.assigned_user_id = :userId2))
             OR
             (i.status = 'in-use' AND i.assigned_to_user_id = :userId3)
         ORDER BY
@@ -73,9 +70,8 @@ function getTechnicianEquipment($conn, $userId) {
     json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
 
-
 function checkoutItem($conn, $userId, $bookingId, $assetId) {
-    if (empty($bookingId) || empty($assetId)) {
+    if (empty($assetId)) {
         throw new Exception("Données de prise manquantes.");
     }
 
@@ -89,8 +85,9 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
         $conn->rollBack();
         throw new Exception("Article non trouvé dans l'inventaire.");
     }
-
-    if ($asset['status'] !== 'available') {
+    
+    // Allow checkout if item is available OR pending verification by an admin
+    if (!in_array($asset['status'], ['available', 'pending_verification'])) {
         $conn->rollBack();
         if ($asset['status'] === 'in-use' && $asset['assigned_to_user_id'] == $userId) {
              throw new Exception("Opération impossible: Vous avez déjà cet article en votre possession.");
@@ -102,8 +99,11 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
     $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
     $updateInvStmt->execute([$userId, $assetId]);
 
-    $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
-    $updateBookingStmt->execute([$bookingId]);
+    // A booking might not exist if taking an unassigned item that was pending verification
+    if ($bookingId) {
+        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
+        $updateBookingStmt->execute([$bookingId]);
+    }
     
     $conn->commit();
     json_response('success', 'Article marqué comme "en cours d\'utilisation".');
@@ -130,15 +130,17 @@ function returnItem($conn, $userId, $assetId) {
         throw new Exception("Retour impossible. Cet article n'est pas actuellement sorti à votre nom.");
     }
 
-    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE asset_id = ?");
+    // Instead of making it available, set it to pending verification.
+    // The assigned_to_user_id is kept to know who returned it.
+    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
     $updateInvStmt->execute([$assetId]);
     
     $today = date('Y-m-d');
-    $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active' AND booking_date <= ?");
-    $updateBookingStmt->execute([$assetId, $today]);
+    $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active' AND user_id = ?");
+    $updateBookingStmt->execute([$assetId, $userId]);
     
     $conn->commit();
-    json_response('success', 'Article retourné avec succès.');
+    json_response('success', 'Article retourné. En attente de vérification par un responsable.');
 }
 
 function pickupUnassignedItem($conn, $userId, $barcode) {
@@ -155,7 +157,8 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
         $conn->rollBack();
         throw new Exception("Aucun article trouvé avec ce code-barres.");
     }
-    if ($item['status'] !== 'available') {
+    // Allow pickup if item is available OR pending verification
+    if (!in_array($item['status'], ['available', 'pending_verification'])) {
         $conn->rollBack();
         throw new Exception("Cet article n'est pas disponible actuellement. Statut: " . $item['status']);
     }
@@ -169,9 +172,11 @@ function pickupUnassignedItem($conn, $userId, $barcode) {
         throw new Exception("Action impossible. Cet article est déjà réservé pour aujourd'hui. S'il vous est assigné, utilisez le bouton 'Prendre' depuis votre liste de matériel.");
     }
 
+    // Create a new booking for this direct pickup
     $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, 'Prise directe', 'active')");
     $bookStmt->execute([$assetId, $userId, $today]);
 
+    // Update inventory to 'in-use'
     $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
     $updateInvStmt->execute([$userId, $assetId]);
 
