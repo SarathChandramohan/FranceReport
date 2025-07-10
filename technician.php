@@ -25,7 +25,6 @@ $user = getCurrentUser();
         .item-actions { margin-left: 1rem; }
         #scanner-modal .modal-content { text-align: center; }
         #scanner-preview { width: 100%; border-radius: 8px; }
-        /* New Notification Style */
         .technician-notification {
             display: none;
             padding: 1rem;
@@ -131,14 +130,21 @@ $user = getCurrentUser();
         let postData = {};
 
         if (itemToProcess.action === 'take' || itemToProcess.action === 'return') {
-            if (scannedBarcode !== itemToProcess.barcode) {
+            
+            // For debugging: log the values being compared to the browser console.
+            console.log("Comparing barcodes:");
+            console.log(` > Scanned: '${scannedBarcode}' (Type: ${typeof scannedBarcode})`);
+            console.log(` > Expected: '${itemToProcess.barcode}' (Type: ${typeof itemToProcess.barcode})`);
+
+            // FIX: Trim whitespace from the scanned code and cast both to String for a reliable comparison.
+            if (scannedBarcode.trim() !== String(itemToProcess.barcode)) {
                 showNotification(`Action annulée. Le code-barres scanné ne correspond pas à "${itemToProcess.itemName}".`, 'danger');
                 return;
             }
             backendAction = itemToProcess.action === 'take' ? 'checkout_item' : 'return_item';
             postData = { asset_id: itemToProcess.assetId, booking_id: itemToProcess.bookingId };
-        } 
-        else if (itemToProcess.action === 'pickup') {
+
+        } else if (itemToProcess.action === 'pickup') {
             backendAction = 'pickup_unassigned_item';
             postData = { barcode: scannedBarcode };
         }
@@ -181,11 +187,12 @@ $user = getCurrentUser();
 
             let actionButton = '';
             if (isTakenByMe) {
-                actionButton = `<button class="btn btn-info action-btn" data-action="return" data-asset-id="${item.asset_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}">Retourner</button>`;
-            } else if (item.status === 'available') {
+                actionButton = `<button class="btn btn-info action-btn" data-action="return" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id || ''}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}">Retourner</button>`;
+            } else if (item.status === 'available' || item.status === 'pending_verification') {
+                 // The button is for a booking that is assigned to the technician for today
                 actionButton = `<button class="btn btn-success action-btn" data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}">Prendre</button>`;
             } else {
-                 actionButton = `<button class="btn btn-secondary" disabled>Pris (autre)</button>`;
+                 actionButton = `<button class="btn btn-secondary" disabled>Indisponible</button>`;
             }
 
             const itemCardHtml = `
@@ -228,11 +235,6 @@ $user = getCurrentUser();
         element.html(`<div class="text-center p-5"><div class="spinner-border text-primary"></div><p class="mt-2">Chargement...</p></div>`);
     }
 
-    /**
-     * Displays a styled notification message on the page.
-     * @param {string} message - The message to display.
-     * @param {string} type - 'success', 'danger', or 'info'.
-     */
     function showNotification(message, type) {
         const notificationArea = $('#notification-area');
         let alertClass = 'alert-info'; // Default
@@ -242,7 +244,6 @@ $user = getCurrentUser();
         notificationArea.removeClass('alert-success alert-danger alert-info').addClass(alertClass);
         notificationArea.text(message).slideDown(300);
 
-        // Hide after 5 seconds
         setTimeout(() => {
             notificationArea.slideUp(300);
         }, 5000);
