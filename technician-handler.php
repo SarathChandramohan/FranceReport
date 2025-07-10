@@ -22,7 +22,7 @@ try {
         case 'return_item':
             returnItem($conn, $currentUser['user_id'], $_POST['asset_id']);
             break;
-        // New endpoints for multi-day pickup flow
+        // Endpoints for multi-day pickup flow
         case 'get_item_availability_for_pickup':
             getItemAvailabilityForPickup($conn, $_POST['barcode']);
             break;
@@ -71,8 +71,8 @@ function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
     $conn->beginTransaction();
 
     try {
-        // Lock the item for update to prevent race conditions
-        $checkStmt = $conn->prepare("SELECT status FROM Inventory WHERE asset_id = ? FOR UPDATE");
+        // CORRECTED: Use SQL Server-compliant locking hint (UPDLOCK, ROWLOCK)
+        $checkStmt = $conn->prepare("SELECT status FROM Inventory WITH (UPDLOCK, ROWLOCK) WHERE asset_id = ?");
         $checkStmt->execute([$assetId]);
         $status = $checkStmt->fetchColumn();
 
@@ -82,18 +82,15 @@ function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
 
         $mission = "Prise directe sur plusieurs jours";
         
-        // Prepare statement for booking
         $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, ?)");
         
         $isFirstDay = true;
         foreach($dates as $date) {
-            // The first day is 'active', subsequent days are 'booked'
             $bookingStatus = $isFirstDay ? 'active' : 'booked';
             $bookStmt->execute([$assetId, $userId, $date, $mission, $bookingStatus]);
             $isFirstDay = false;
         }
 
-        // Update inventory to 'in-use' and assign to the user
         $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
         $updateInvStmt->execute([$userId, $assetId]);
 
@@ -102,6 +99,8 @@ function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
 
     } catch (Exception $e) {
         $conn->rollBack();
+        // Provide a more detailed error message for logging
+        error_log("Booking failed: " . $e->getMessage());
         throw new Exception("Échec de la réservation de l'article. Erreur: " . $e->getMessage());
     }
 }
@@ -194,6 +193,7 @@ function returnItem($conn, $userId, $assetId) {
     $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
     $updateInvStmt->execute([$assetId]);
     
+    // This query should now correctly find and update bookings made via the multi-day feature as well
     $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active' AND user_id = ?");
     $updateBookingStmt->execute([$assetId, $userId]);
     
