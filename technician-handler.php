@@ -35,42 +35,38 @@ try {
 }
 
 /**
- * Fetches the equipment assigned to a technician for the day.
- * This function has been rewritten with a more reliable SQL query.
+ * Fetches the equipment assigned to a technician for the day, and also items currently in use by the technician.
  */
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
     
-    // This SQL query is now more direct and less prone to errors.
     $sql = "
-        SELECT DISTINCT
+        SELECT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
             i.status, i.assigned_to_user_id,
             b.booking_id, b.mission
         FROM
             Inventory i
-        INNER JOIN
-            Bookings b ON i.asset_id = b.asset_id
+        LEFT JOIN
+            Bookings b ON i.asset_id = b.asset_id AND b.booking_date = :today_b AND b.status IN ('booked', 'active')
         LEFT JOIN
             Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
         WHERE
-            b.booking_date = :today_b
-            AND b.status IN ('booked', 'active')
-            AND (
-                b.user_id = :userId1 -- Case 1: Booking is directly for the user
-                OR
-                pa.assigned_user_id = :userId2 -- Case 2: User is part of a mission that has the booking
-            )
+            (b.booking_date = :today_b2 AND (b.user_id = :userId1 OR pa.assigned_user_id = :userId2))
+            OR
+            (i.status = 'in-use' AND i.assigned_to_user_id = :userId3)
         ORDER BY
             i.asset_name;
     ";
     
     $stmt = $conn->prepare($sql);
     $stmt->execute([
-        ':today_pa' => $today,
         ':today_b' => $today,
+        ':today_pa' => $today,
+        ':today_b2' => $today,
         ':userId1' => $userId,
-        ':userId2' => $userId
+        ':userId2' => $userId,
+        ':userId3' => $userId,
     ]);
     
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
