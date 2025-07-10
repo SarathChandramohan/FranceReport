@@ -3,6 +3,7 @@ require_once 'session-management.php';
 requireLogin();
 $currentUser = getCurrentUser();
 $currentUserId = $currentUser['user_id'];
+$isAdmin = ($currentUser['role'] === 'admin');
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -30,6 +31,7 @@ $currentUserId = $currentUser['user_id'];
         .asset-card.vehicle { border-left-color: #007bff; }
         .asset-card.maintenance { border-left-color: #ffc107; background-color: #ffc1071a; }
         .asset-card.in-use { border-left-color: #dc3545; background-color: #dc35461a; }
+        .asset-card.pending_verification { border-left-color: #17a2b8; background-color: #17a2b81a; }
         .asset-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; margin-right: 10px; cursor: pointer; transition: color 0.2s; }
         .asset-title:hover { color: #0056b3; }
@@ -37,6 +39,7 @@ $currentUserId = $currentUser['user_id'];
         .status-available { background: #d4edda; color: #155724; }
         .status-in-use { background: #f8d7da; color: #721c24; }
         .status-maintenance { background: #fff3cd; color: #856404; }
+        .status-pending_verification { background: #d1ecf1; color: #0c5460; }
         .asset-details { color: #6c757d; line-height: 1.6; margin-bottom: 15px; font-size: 0.9em; word-break: break-word; }
         .asset-details strong { color: #495057; }
         .asset-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
@@ -69,10 +72,15 @@ $currentUserId = $currentUser['user_id'];
         <div class="tabs">
             <div class="tab active" data-tab="inventory"><i class="fas fa-boxes"></i> Inventaire</div>
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
+            <?php if ($isAdmin): ?>
+                <div class="tab" data-tab="verify_return"><i class="fas fa-user-check"></i> Vérifier Retour</div>
+                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
+            <?php endif; ?>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
-            <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
-            <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
-            <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
+            <?php if ($isAdmin): ?>
+                <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
+                <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -90,6 +98,7 @@ $currentUserId = $currentUser['user_id'];
                     <option value="all">Tous les statuts</option>
                     <option value="available">Disponible</option>
                     <option value="in-use">En cours d'utilisation</option>
+                    <option value="pending_verification">En attente de vérification</option>
                     <option value="maintenance">En maintenance</option>
                 </select>
             </div>
@@ -175,12 +184,33 @@ $currentUserId = $currentUser['user_id'];
         </div>
     </div>
 
+    <?php if ($isAdmin): ?>
+    <div id="verify_return" class="tab-content">
+        <div class="card">
+            <h3 class="mb-3"><i class="fas fa-user-check mr-2"></i>Vérification des Retours</h3>
+             <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Actif</th>
+                            <th>Code-barres</th>
+                            <th>Retourné par</th>
+                            <th>Date de retour</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="verify-return-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
     <div id="missing_items" class="tab-content">
         <div class="card">
             <h3 class="mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Matériel Manquant ou Non Retourné</h3>
             <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="thead-dark">
+                <table class="table table-hover">
+                    <thead class="thead-light">
                         <tr><th>Actif</th><th>Code-barres</th><th>Sorti par</th><th>Date de réservation</th><th>Mission</th></tr>
                     </thead>
                     <tbody id="missing-items-table"></tbody>
@@ -235,6 +265,7 @@ $currentUserId = $currentUser['user_id'];
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="modal fade" id="editAssetModal" tabindex="-1" role="dialog">
@@ -319,13 +350,14 @@ $currentUserId = $currentUser['user_id'];
 
 <script>
 const HANDLER_URL = 'inventory-handler.php';
-const IS_ADMIN = <?php echo ($currentUser['role'] === 'admin') ? 'true' : 'false'; ?>;
+const IS_ADMIN = <?php echo $isAdmin ? 'true' : 'false'; ?>;
 const CURRENT_USER_ID = <?php echo $currentUserId; ?>;
 let inventory = [];
 let assetCategories = [];
 let allBookings = { individual: [], mission: [] };
 let usageHistory = [];
 let missingItems = [];
+let itemsForVerification = [];
 let allUsers = [];
 let selectedCategoryId = 'all'; 
 let codeReader = null;
@@ -337,8 +369,10 @@ const addAssetFormContent = `<div class="form-row"><div class="form-group col-md
 const editAssetFormContent = `<input type="hidden" id="edit_asset_id"><div class="form-row"><div class="form-group col-md-6"><label for="edit_asset_type">Type d'actif *</label><select id="edit_asset_type" class="form-control" required><option value="tool">🔧 Outil</option><option value="vehicle">🚗 Véhicule</option></select></div><div class="form-group col-md-6"><label for="edit_barcode">Code-barres / ID Unique *</label><input type="text" class="form-control" id="edit_barcode" required></div></div><div class="form-group"><label for="edit_asset_name">Nom de l'actif *</label><input type="text" class="form-control" id="edit_asset_name" required></div><div class="form-row"><div class="form-group col-md-6"><label for="edit_brand">Marque</label><input type="text" class="form-control" id="edit_brand"></div><div class="form-group col-md-6"><label for="edit_category_id">Catégorie</label><select id="edit_category_id" class="form-control"></select></div></div><div id="edit_tool_fields"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_tool">Numéro de série</label><input type="text" class="form-control" id="edit_serial_or_plate_tool"></div><div class="form-group col-md-6"><label for="edit_position_or_info_tool">Position / Emplacement</label><input type="text" class="form-control" id="edit_position_or_info_tool"></div></div></div><div id="edit_vehicle_fields" style="display: none;"><div class="form-row"><div class="form-group col-md-6"><label for="edit_serial_or_plate_vehicle">Plaque d'immatriculation</label><input type="text" class="form-control" id="edit_serial_or_plate_vehicle"></div><div class="form-group col-md-6"><label for="edit_fuel_level">Niveau de carburant</label><select id="edit_fuel_level" class="form-control"><option value="">Non spécifié</option><option value="full">Plein</option><option value="three-quarter">3/4</option><option value="half">Moitié</option><option value="quarter">1/4</option><option value="empty">Vide</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary" id="saveAssetUpdateBtn"><i class="fas fa-save"></i> Sauvegarder</button></div>`;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    document.getElementById('addAssetForm').innerHTML = addAssetFormContent;
-    document.getElementById('editAssetForm').innerHTML = editAssetFormContent;
+    if (IS_ADMIN) {
+        document.getElementById('addAssetForm').innerHTML = addAssetFormContent;
+        document.getElementById('editAssetForm').innerHTML = editAssetFormContent;
+    }
     setupEventListeners();
     initializeBookingTabFilters();
     loadingOverlay.style.display = 'flex';
@@ -350,23 +384,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function fetchAllData() {
     try {
-        const [inventoryData, bookingsData, categoriesData, historyData, missingItemsData, usersData] = await Promise.all([
+        const apiCalls = [
             apiCall('get_inventory', 'GET'),
             apiCall('get_all_bookings', 'GET'),
             apiCall('get_categories', 'GET'),
             apiCall('get_booking_history', 'GET'),
-            apiCall('get_missing_items', 'GET'),
             apiCall('get_users', 'GET')
-        ]);
+        ];
+
+        if (IS_ADMIN) {
+            apiCalls.push(apiCall('get_missing_items', 'GET'));
+            apiCalls.push(apiCall('get_items_for_verification', 'GET'));
+        }
+
+        const results = await Promise.all(apiCalls);
         
-        inventory = inventoryData.inventory || [];
-        allBookings.individual = bookingsData.bookings?.individual || [];
-        allBookings.mission = bookingsData.bookings?.mission || [];
-        usageHistory = historyData.history || [];
-        missingItems = missingItemsData.missing_items || [];
-        assetCategories = categoriesData.categories || [];
-        allUsers = usersData.users || [];
+        inventory = results[0].inventory || [];
+        allBookings.individual = results[1].bookings?.individual || [];
+        allBookings.mission = results[1].bookings?.mission || [];
+        assetCategories = results[2].categories || [];
+        usageHistory = results[3].history || [];
+        allUsers = results[4].users || [];
+        
+        if (IS_ADMIN) {
+            missingItems = results[5].missing_items || [];
+            itemsForVerification = results[6].items_for_verification || [];
+        }
+
         assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
+
     } catch (error) {
         console.error("Erreur lors du chargement des données:", error);
         showNotification("Impossible de charger toutes les données.", "error");
@@ -376,7 +422,9 @@ async function fetchAllData() {
 function renderInventoryTab() {
     renderCategoryFilters();
     renderInventory();
-    populateCategoryDropdowns('add');
+    if(IS_ADMIN) {
+        populateCategoryDropdowns('add');
+    }
 }
 
 function renderBookingTab() {
@@ -390,7 +438,7 @@ function renderMissingItemsTab() {
     const tableBody = document.getElementById('missing-items-table');
     tableBody.innerHTML = '';
     if (missingItems.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun matériel manquant.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun matériel manquant.</td></tr>';
         return;
     }
     missingItems.forEach(item => {
@@ -398,6 +446,53 @@ function renderMissingItemsTab() {
         row.innerHTML = `<td>${item.asset_name}</td><td>${item.barcode}</td><td>${item.prenom} ${item.nom}</td><td>${new Date(item.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${item.mission || 'N/A'}</td>`;
     });
 }
+
+function renderVerifyReturnTab() {
+    const tableBody = document.getElementById('verify-return-table');
+    tableBody.innerHTML = '';
+    if (itemsForVerification.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun retour à vérifier.</td></tr>';
+        return;
+    }
+    itemsForVerification.forEach(item => {
+        const row = tableBody.insertRow();
+        row.dataset.assetId = item.asset_id;
+        const returnDate = item.last_modified ? new Date(item.last_modified).toLocaleString('fr-FR') : 'N/A';
+        row.innerHTML = `
+            <td>${item.asset_name}</td>
+            <td>${item.barcode}</td>
+            <td>${item.returned_by_prenom} ${item.returned_by_nom}</td>
+            <td>${returnDate}</td>
+            <td class="text-center">
+                <button class="btn btn-success btn-sm" onclick="handleVerifyReturn(${item.asset_id})">
+                    <i class="fas fa-check"></i> Confirmer
+                </button>
+            </td>
+        `;
+    });
+}
+
+async function handleVerifyReturn(assetId) {
+    loadingOverlay.style.display = 'flex';
+    try {
+        await apiCall('verify_item_return', 'POST', { asset_id: assetId });
+        showNotification('Retour de l\'article vérifié.', 'success');
+        
+        // Optimistic update
+        itemsForVerification = itemsForVerification.filter(item => item.asset_id != assetId);
+        const assetInInventory = inventory.find(item => item.asset_id == assetId);
+        if (assetInInventory) {
+            assetInInventory.status = 'available';
+            assetInInventory.assigned_to_user_id = null;
+        }
+        renderVerifyReturnTab();
+        renderInventory(); // Refresh the main grid to show the updated status
+
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
 
 function showNotification(message, type = 'success') { 
     const notification = document.createElement('div');
@@ -442,12 +537,21 @@ function setupEventListeners() {
         renderCategoryFilters(); 
     });
     document.getElementById('filterStatus').addEventListener('change', updateFiltersAndRender);
-    document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
-        if (e.target.matches('.btn[data-category-id]')) {
-            selectedCategoryId = e.target.dataset.categoryId;
-            updateFiltersAndRender();
-        }
-    });
+
+    if (IS_ADMIN) {
+        document.getElementById('categoryFilterContainer').addEventListener('click', (e) => {
+            if (e.target.matches('.btn[data-category-id]')) {
+                selectedCategoryId = e.target.dataset.categoryId;
+                updateFiltersAndRender();
+            }
+        });
+        document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
+        document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
+        document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
+        document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
+        document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
+        document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
+    }
     
     document.querySelector('.booking-sub-nav').addEventListener('click', (e) => {
         const button = e.target.closest('.booking-sub-nav-btn');
@@ -464,16 +568,10 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('addAssetForm').addEventListener('submit', handleAddAsset);
-    document.getElementById('editAssetForm').addEventListener('submit', handleUpdateAsset);
-    document.getElementById('add_asset_type').addEventListener('change', () => toggleAssetFields('add'));
-    document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
-    document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
-    document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
-
+    
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterUser').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterMission').addEventListener('input', renderIndividualBookingsTable);
@@ -505,15 +603,21 @@ function showTab(tabName) {
     document.querySelectorAll('.tab-content, .tab').forEach(el => el.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
+    
     if (tabName !== 'scanner' && codeReader) stopScanning();
-    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items'].includes(tabName);
+
+    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items', 'verify_return'].includes(tabName);
+    
     if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
         fetchAllData().then(() => {
             if (tabName === 'inventory') renderInventoryTab();
             else if (tabName === 'booking') renderBookingTab();
-            else if (tabName === 'manage_categories') renderCategoriesList();
-            else if (tabName === 'missing_items') renderMissingItemsTab();
+            else if (IS_ADMIN) {
+                if (tabName === 'manage_categories') renderCategoriesList();
+                else if (tabName === 'missing_items') renderMissingItemsTab();
+                else if (tabName === 'verify_return') renderVerifyReturnTab();
+            }
             loadingOverlay.style.display = 'none';
         });
     }
@@ -589,6 +693,7 @@ async function handleDeleteCategory(categoryId, categoryName) {
 
 function renderCategoryFilters() {
     const container = document.getElementById('categoryFilterContainer');
+    if (!container) return;
     const typeFilter = document.getElementById('filterType').value;
     const relevantCategories = assetCategories.filter(cat => typeFilter === 'all' || cat.category_type === typeFilter);
     container.style.display = relevantCategories.length < 1 ? 'none' : 'flex';
@@ -601,7 +706,9 @@ function renderCategoryFilters() {
 
 function updateFiltersAndRender() {
     renderInventory();
-    renderCategoryFilters();
+    if(IS_ADMIN) {
+        renderCategoryFilters();
+    }
 }
 
 function renderInventory() {
@@ -612,7 +719,7 @@ function renderInventory() {
         (((asset.serial_or_plate || '') + (asset.asset_name || '') + (asset.brand || '') + (asset.barcode || '')).toLowerCase().includes(searchTerm)) &&
         (typeFilter === 'all' || asset.asset_type === typeFilter) &&
         (statusFilter === 'all' || asset.status === statusFilter) &&
-        (selectedCategoryId === 'all' || String(asset.category_id) === selectedCategoryId)
+        (selectedCategoryId === 'all' || !IS_ADMIN || String(asset.category_id) === selectedCategoryId)
     );
     inventoryGrid.innerHTML = '';
     if (filtered.length === 0) inventoryGrid.innerHTML = `<div class="col-12 text-center text-muted mt-5"><h4>Aucun actif trouvé.</h4></div>`;
@@ -622,33 +729,48 @@ function renderInventory() {
 function createAssetCard(asset) {
     const card = document.createElement('div');
     let assignedToText = '', statusText = '', cardStatusClass = asset.status;
-    if (asset.status === 'in-use') {
-        statusText = 'En utilisation';
-        assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
-    } else if (asset.status === 'available') {
-        const isBookedForToday = asset.todays_booking_user_id != null;
-        if (isBookedForToday) {
-            statusText = 'Réservé';
-            cardStatusClass = 'in-use';
-            assignedToText = `<strong>Réservé par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
-        } else {
-            statusText = 'Disponible';
-        }
-    } else if (asset.status === 'maintenance') {
-        statusText = 'En maintenance';
+
+    switch(asset.status) {
+        case 'in-use':
+            statusText = 'En utilisation';
+            assignedToText = `<strong>Assigné à:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br><strong>Mission:</strong> ${asset.assigned_mission || 'N/A'}<br>`;
+            break;
+        case 'available':
+             if (asset.todays_booking_user_id != null) {
+                statusText = 'Réservé';
+                cardStatusClass = 'in-use'; // Use same visual cue as in-use
+                assignedToText = `<strong>Réservé par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
+            } else {
+                statusText = 'Disponible';
+            }
+            break;
+        case 'maintenance':
+            statusText = 'En maintenance';
+            break;
+        case 'pending_verification':
+            statusText = 'Attente Vérification';
+             assignedToText = `<strong>Retourné par:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br>`;
+            break;
     }
+    
     card.className = `asset-card ${asset.asset_type} ${cardStatusClass}`;
-    const bookingInfo = asset.status === 'available' && asset.next_future_booking_date ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` : '';
+    const bookingInfo = (asset.status === 'available' || asset.status === 'pending_verification') && asset.next_future_booking_date ? `<div class="booking-info mt-2"><i class="fas fa-calendar-check"></i> Prochaine résa: ${new Date(asset.next_future_booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</div>` : '';
     const details = asset.asset_type === 'tool' ? `<strong>N° série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Lieu:</strong> ${asset.position_or_info || 'N/A'}<br>` : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
+    
     let buttons = '';
-    if (asset.status === 'available') {
-        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button> <button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
-    } else if (asset.status === 'maintenance') {
+    if (asset.status === 'available' || asset.status === 'pending_verification') {
+        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
+        if (IS_ADMIN) {
+             buttons += ` <button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
+        }
+    } else if (asset.status === 'maintenance' && IS_ADMIN) {
         buttons += `<button class="btn btn-info btn-small" onclick="setAssetAvailable(${asset.asset_id})"><i class="fas fa-check-circle"></i> Rendre Dispo.</button>`;
     }
+    
     if (IS_ADMIN) {
         buttons += ` <button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button> <button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
     }
+    
     card.innerHTML = `<div><div class="asset-header"><span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span><span class="asset-status status-${cardStatusClass}">${statusText}</span></div><div class="asset-details"><strong>Code-barres:</strong> ${asset.barcode}<br>${details}${assignedToText}</div>${bookingInfo}</div><div class="asset-actions mt-3">${buttons}</div>`;
     return card;
 }
@@ -811,13 +933,20 @@ async function processScanResult(barcode) {
     try {
         const data = await apiCall('process_scan', 'POST', { barcode });
         showNotification(data.message, 'info');
+        
+        const fullRefreshAndSwitchToInventory = async () => {
+             await fetchAllData();
+             renderInventoryTab();
+             if (IS_ADMIN) {
+                renderVerifyReturnTab();
+             }
+             showTab('inventory');
+        }
+
         switch(data.scan_code) {
             case 'return_success':
             case 'checkout_success':
-                await fetchAllData();
-                renderInventoryTab();
-                renderBookingTab();
-                showTab('inventory');
+                await fullRefreshAndSwitchToInventory();
                 break;
             case 'prompt_booking':
                 const asset = data.asset;
@@ -845,7 +974,7 @@ async function processScanResult(barcode) {
                 }
                 break;
             case 'asset_not_found':
-                if (confirm(data.message)) {
+                if (IS_ADMIN && confirm(data.message)) {
                     showTab('add_asset');
                     $('#add_barcode').val(data.barcode);
                 }
