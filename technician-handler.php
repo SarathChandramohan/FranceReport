@@ -71,19 +71,34 @@ function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
     $conn->beginTransaction();
 
     try {
-        // CORRECTED: Use SQL Server-compliant locking hint (UPDLOCK, ROWLOCK)
+        // Step 1: Lock the inventory item and check its general status.
         $checkStmt = $conn->prepare("SELECT status FROM Inventory WITH (UPDLOCK, ROWLOCK) WHERE asset_id = ?");
         $checkStmt->execute([$assetId]);
         $status = $checkStmt->fetchColumn();
 
         if (!in_array($status, ['available', 'pending_verification'])) {
-             throw new Exception("L'article n'est plus disponible.");
+             throw new Exception("L'article n'est plus disponible. Un autre utilisateur l'a peut-être pris.");
+        }
+        
+        // Step 2 (CRITICAL FIX): Re-verify that the requested dates have no conflicts *within the transaction*.
+        // This prevents the race condition that caused the UNIQUE KEY violation.
+        $placeholders = implode(',', array_fill(0, count($dates), '?'));
+        $checkDatesSql = "SELECT booking_date FROM Bookings WHERE asset_id = ? AND booking_date IN ($placeholders) AND status IN ('booked', 'active')";
+        $params = array_merge([$assetId], $dates);
+        
+        $checkDatesStmt = $conn->prepare($checkDatesSql);
+        $checkDatesStmt->execute($params);
+        $conflictingDates = $checkDatesStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+        if (!empty($conflictingDates)) {
+            // A conflict was found. Abort with a user-friendly message.
+            throw new Exception("Conflit de réservation. La ou les dates suivantes ne sont plus disponibles : " . implode(', ', $conflictingDates));
         }
 
+        // Step 3: If no conflicts, proceed with creating the bookings.
         $mission = "Prise directe sur plusieurs jours";
-        
         $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, ?)");
-        
+
         $isFirstDay = true;
         foreach($dates as $date) {
             $bookingStatus = $isFirstDay ? 'active' : 'booked';
@@ -91,15 +106,16 @@ function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
             $isFirstDay = false;
         }
 
+        // Step 4: Update the inventory to 'in-use'.
         $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
         $updateInvStmt->execute([$userId, $assetId]);
 
+        // Step 5: Commit the transaction.
         $conn->commit();
         json_response('success', "Article pris et réservé avec succès pour les dates sélectionnées.");
 
     } catch (Exception $e) {
         $conn->rollBack();
-        // Provide a more detailed error message for logging
         error_log("Booking failed: " . $e->getMessage());
         throw new Exception("Échec de la réservation de l'article. Erreur: " . $e->getMessage());
     }
@@ -193,7 +209,6 @@ function returnItem($conn, $userId, $assetId) {
     $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
     $updateInvStmt->execute([$assetId]);
     
-    // This query should now correctly find and update bookings made via the multi-day feature as well
     $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active' AND user_id = ?");
     $updateBookingStmt->execute([$assetId, $userId]);
     
