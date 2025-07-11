@@ -2,8 +2,10 @@
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
+// Set headers for JSON response
 header('Content-Type: application/json');
 
+// Ensure user is logged in
 if (!isLoggedIn()) {
     json_response('error', 'Session expirée. Veuillez vous reconnecter.');
 }
@@ -13,6 +15,7 @@ $action = $_REQUEST['action'] ?? '';
 
 try {
     switch ($action) {
+        // Existing actions for managing already-assigned equipment
         case 'get_technician_equipment':
             getTechnicianEquipment($conn, $currentUser['user_id']);
             break;
@@ -22,24 +25,39 @@ try {
         case 'return_item':
             returnItem($conn, $currentUser['user_id'], $_POST['asset_id']);
             break;
-        // Endpoints for multi-day pickup flow
+
+        // New flow for picking up an unassigned item
         case 'get_item_availability_for_pickup':
             getItemAvailabilityForPickup($conn, $_POST['barcode']);
             break;
-        case 'book_and_pickup_multiple_days':
-            bookAndPickupMultipleDays($conn, $currentUser['user_id'], $_POST['asset_id'], $_POST['dates']);
+        case 'book_and_pickup_range':
+            bookAndPickupRange($conn, $currentUser['user_id'], $_POST['asset_id'], $_POST['return_date']);
             break;
         default:
-            json_response('error', 'Action non valide.');
+            json_response('error', 'Action non valide ou non spécifiée.');
+    }
+} catch (PDOException $e) {
+    // Catch database-specific errors
+    error_log("Database Error in technician-handler: " . $e->getMessage());
+    // Check for unique key violation (SQLSTATE 23000 is for integrity constraint violations)
+    if ($e->getCode() == '23000') {
+        json_response('error', 'Conflit de réservation. Un autre utilisateur a réservé cet article en même temps. Veuillez réessayer.');
+    } else {
+        json_response('error', 'Erreur de base de données: ' . $e->getMessage());
     }
 } catch (Exception $e) {
-    error_log("Technician handler error: " . $e->getMessage());
+    // Catch general application errors
+    error_log("General Error in technician-handler: " . $e->getMessage());
     json_response('error', 'Erreur: ' . $e->getMessage());
 }
 
+/**
+ * Retrieves the availability of a specific item for the pickup flow.
+ * Informs the frontend about the next booking date to adjust the calendar.
+ */
 function getItemAvailabilityForPickup($conn, $barcode) {
     if (empty($barcode)) {
-        throw new Exception("Code-barres manquant.");
+        throw new Exception("Le code-barres est manquant.");
     }
 
     $stmt_asset = $conn->prepare("SELECT asset_id, asset_name, status FROM Inventory WHERE barcode = ?");
@@ -50,175 +68,214 @@ function getItemAvailabilityForPickup($conn, $barcode) {
         throw new Exception("Aucun article trouvé avec ce code-barres.");
     }
     if (!in_array($asset['status'], ['available', 'pending_verification'])) {
-        throw new Exception("Cet article n'est pas disponible pour une prise. Statut actuel: " . $asset['status']);
+        throw new Exception("Cet article n'est pas disponible. Statut actuel: " . $asset['status']);
     }
 
-    $stmt_bookings = $conn->prepare("
-        SELECT booking_date FROM Bookings
+    $today = date('Y-m-d');
+
+    // Find the earliest booking date from today onwards.
+    $stmt_next_booking = $conn->prepare("
+        SELECT MIN(booking_date) as next_booking_date
+        FROM Bookings
         WHERE asset_id = ? AND status IN ('booked', 'active') AND booking_date >= ?
     ");
-    $stmt_bookings->execute([$asset['asset_id'], date('Y-m-d')]);
-    $booked_dates = $stmt_bookings->fetchAll(PDO::FETCH_COLUMN, 0);
+    $stmt_next_booking->execute([$asset['asset_id'], $today]);
+    $next_booking_date = $stmt_next_booking->fetchColumn();
 
-    json_response('success', 'Disponibilité récupérée.', ['asset' => $asset, 'booked_dates' => $booked_dates]);
+    // Specifically check if the item is booked for today.
+    $is_booked_today = ($next_booking_date === $today);
+
+    json_response('success', 'Disponibilité récupérée.', [
+        'asset' => $asset,
+        'next_booking_date' => $next_booking_date, // Can be null if no future bookings
+        'booked_today' => $is_booked_today
+    ]);
 }
 
-function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
-    if (empty($assetId) || empty($dates) || !is_array($dates)) {
-        throw new Exception("Données de réservation manquantes ou incorrectes.");
+/**
+ * Books an item for a consecutive range of dates and marks it as picked up.
+ * This is the core transactional logic to prevent race conditions.
+ */
+function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
+    if (empty($assetId) || empty($returnDateStr)) {
+        throw new Exception("Données de réservation manquantes (ID article ou date de retour).");
     }
-    
+
+    try {
+        $startDate = new DateTime(); // Today
+        $endDate = new DateTime($returnDateStr);
+        $startDate->setTime(0, 0, 0); // Normalize to beginning of day
+        $endDate->setTime(0, 0, 0);   // Normalize to beginning of day
+    } catch (Exception $e) {
+        throw new Exception("Format de date de retour invalide.");
+    }
+
+    if ($startDate > $endDate) {
+        throw new Exception("La date de retour doit être aujourd'hui ou une date future.");
+    }
+
     $conn->beginTransaction();
 
     try {
-        // Step 1: Lock the inventory item and check its general status.
-        $checkStmt = $conn->prepare("SELECT status FROM Inventory WITH (UPDLOCK, ROWLOCK) WHERE asset_id = ?");
-        $checkStmt->execute([$assetId]);
-        $status = $checkStmt->fetchColumn();
+        // Step 1: Lock the inventory item row and verify its status.
+        // WITH (UPDLOCK, ROWLOCK) is specific to SQL Server for placing an update lock.
+        $stmt_check_inv = $conn->prepare("SELECT status FROM Inventory WHERE asset_id = ? WITH (UPDLOCK, ROWLOCK)");
+        $stmt_check_inv->execute([$assetId]);
+        $currentStatus = $stmt_check_inv->fetchColumn();
 
-        if (!in_array($status, ['available', 'pending_verification'])) {
-             throw new Exception("L'article n'est plus disponible. Un autre utilisateur l'a peut-être pris.");
+        if ($currentStatus === false) {
+            throw new Exception("L'article avec l'ID $assetId n'existe pas.");
         }
-        
-        // Step 2 (CRITICAL FIX): Re-verify that the requested dates have no conflicts *within the transaction*.
-        // This prevents the race condition that caused the UNIQUE KEY violation.
-        $placeholders = implode(',', array_fill(0, count($dates), '?'));
-        $checkDatesSql = "SELECT booking_date FROM Bookings WHERE asset_id = ? AND booking_date IN ($placeholders) AND status IN ('booked', 'active')";
-        $params = array_merge([$assetId], $dates);
-        
-        $checkDatesStmt = $conn->prepare($checkDatesSql);
-        $checkDatesStmt->execute($params);
-        $conflictingDates = $checkDatesStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+        if (!in_array($currentStatus, ['available', 'pending_verification'])) {
+            throw new Exception("L'article n'est plus disponible. Un autre utilisateur l'a probablement pris. Statut actuel: $currentStatus");
+        }
+
+        // Step 2: Within the same transaction, check for booking conflicts in the desired range.
+        $stmt_check_bookings = $conn->prepare("
+            SELECT booking_date FROM Bookings
+            WHERE asset_id = ? AND status IN ('booked', 'active') AND booking_date BETWEEN ? AND ?
+        ");
+        $stmt_check_bookings->execute([$assetId, $startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $conflictingDates = $stmt_check_bookings->fetchAll(PDO::FETCH_COLUMN, 0);
 
         if (!empty($conflictingDates)) {
-            // A conflict was found. Abort with a user-friendly message.
-            throw new Exception("Conflit de réservation. La ou les dates suivantes ne sont plus disponibles : " . implode(', ', $conflictingDates));
+            throw new Exception("Conflit de réservation. L'article est déjà réservé pour le(s) jour(s) : " . implode(', ', $conflictingDates));
         }
 
-        // Step 3: If no conflicts, proceed with creating the bookings.
-        $mission = "Prise directe sur plusieurs jours";
-        $bookStmt = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, ?)");
+        // Step 3: If no conflicts, insert all the new booking records.
+        $stmt_insert_booking = $conn->prepare(
+            "INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, ?)"
+        );
+        $mission = "Prise directe par technicien";
+        $dateIterator = new DatePeriod($startDate, new DateInterval('P1D'), (clone $endDate)->modify('+1 day')); // Include end date in iteration
 
         $isFirstDay = true;
-        foreach($dates as $date) {
+        foreach ($dateIterator as $date) {
             $bookingStatus = $isFirstDay ? 'active' : 'booked';
-            $bookStmt->execute([$assetId, $userId, $date, $mission, $bookingStatus]);
+            $stmt_insert_booking->execute([$assetId, $userId, $date->format('Y-m-d'), $mission, $bookingStatus]);
             $isFirstDay = false;
         }
 
-        // Step 4: Update the inventory to 'in-use'.
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
-        $updateInvStmt->execute([$userId, $assetId]);
+        // Step 4: Update the inventory item's status to 'in-use'.
+        $stmt_update_inv = $conn->prepare(
+            "UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?"
+        );
+        $stmt_update_inv->execute([$userId, $assetId]);
 
-        // Step 5: Commit the transaction.
+        // Step 5: If everything succeeded, commit the transaction.
         $conn->commit();
-        json_response('success', "Article pris et réservé avec succès pour les dates sélectionnées.");
+        json_response('success', "Article pris et réservé avec succès jusqu'au " . $endDate->format('d/m/Y') . ".");
 
     } catch (Exception $e) {
+        // If any step fails, roll back the entire transaction.
         $conn->rollBack();
-        error_log("Booking failed: " . $e->getMessage());
-        throw new Exception("Échec de la réservation de l'article. Erreur: " . $e->getMessage());
+        // Re-throw the exception to be caught by the main handler.
+        throw $e;
     }
 }
 
 
+/**
+ * Retrieves equipment assigned or booked for the technician for today, or currently in their possession.
+ */
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
-    
     $sql = "
         SELECT DISTINCT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
             i.status, i.assigned_to_user_id,
             b.booking_id, b.mission
-        FROM
-            Inventory i
-        LEFT JOIN
-            Bookings b ON i.asset_id = b.asset_id AND b.booking_date = ? AND b.status = 'booked'
-        LEFT JOIN
-            Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = ?
+        FROM Inventory i
+        LEFT JOIN Bookings b ON i.asset_id = b.asset_id AND b.booking_date = ? AND b.status = 'booked'
+        LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = ?
         WHERE
             (b.booking_date = ? AND (b.user_id = ? OR pa.assigned_user_id = ?))
             OR
             (i.status = 'in-use' AND i.assigned_to_user_id = ?)
-        ORDER BY
-            i.asset_name;
+        ORDER BY i.asset_name;
     ";
-    
     $stmt = $conn->prepare($sql);
     $stmt->execute([$today, $today, $today, $userId, $userId, $userId]);
-    
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
     json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
 
+/**
+ * Marks an item from the daily list as 'in-use'.
+ */
 function checkoutItem($conn, $userId, $bookingId, $assetId) {
-    if (empty($assetId)) {
-        throw new Exception("Données de prise manquantes.");
-    }
-    $conn->beginTransaction();
-    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
-    $checkStmt->execute([$assetId]);
-    $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
+    if (empty($assetId)) throw new Exception("Données de prise manquantes.");
 
-    if (!$asset) {
-        $conn->rollBack();
-        throw new Exception("Article non trouvé dans l'inventaire.");
-    }
-    
-    if (!in_array($asset['status'], ['available', 'pending_verification'])) {
-        $conn->rollBack();
-        if ($asset['status'] === 'in-use' && $asset['assigned_to_user_id'] == $userId) {
-             throw new Exception("Opération impossible: Vous avez déjà cet article.");
-        } else {
-             throw new Exception("Opération impossible: Article non disponible. Statut: " . $asset['status']);
+    $conn->beginTransaction();
+    try {
+        $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+        $checkStmt->execute([$assetId]);
+        $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$asset) throw new Exception("Article non trouvé.");
+        if (!in_array($asset['status'], ['available', 'pending_verification'])) {
+            if ($asset['status'] === 'in-use' && $asset['assigned_to_user_id'] == $userId) {
+                throw new Exception("Opération impossible: Vous avez déjà cet article.");
+            } else {
+                throw new Exception("Opération impossible: Article non disponible. Statut: " . $asset['status']);
+            }
         }
-    }
 
-    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
-    $updateInvStmt->execute([$userId, $assetId]);
+        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'in-use', assigned_to_user_id = ? WHERE asset_id = ?");
+        $updateInvStmt->execute([$userId, $assetId]);
 
-    if ($bookingId) {
-        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
-        $updateBookingStmt->execute([$bookingId]);
+        if ($bookingId) {
+            $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'active' WHERE booking_id = ? AND status = 'booked'");
+            $updateBookingStmt->execute([$bookingId]);
+        }
+
+        $conn->commit();
+        json_response('success', 'Article marqué comme "en cours d\'utilisation".');
+    } catch (Exception $e) {
+        $conn->rollBack();
+        throw $e;
     }
-    
-    $conn->commit();
-    json_response('success', 'Article marqué comme "en cours d\'utilisation".');
 }
 
+/**
+ * Returns an item, setting its status to 'pending_verification' and completing relevant bookings.
+ */
 function returnItem($conn, $userId, $assetId) {
-    if (empty($assetId)) {
-        throw new Exception("Données de retour manquantes.");
-    }
-    
+    if (empty($assetId)) throw new Exception("Données de retour manquantes.");
+
     $conn->beginTransaction();
-    $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
-    $checkStmt->execute([$assetId]);
-    $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+        $checkStmt->execute([$assetId]);
+        $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$asset) {
-        $conn->rollBack();
-        throw new Exception("Article non trouvé.");
-    }
-    
-    if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
-        $conn->rollBack();
-        throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
-    }
+        if (!$asset) throw new Exception("Article non trouvé.");
+        if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
+            throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
+        }
 
-    $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
-    $updateInvStmt->execute([$assetId]);
-    
-    $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND status = 'active' AND user_id = ?");
-    $updateBookingStmt->execute([$assetId, $userId]);
-    
-    $conn->commit();
-    json_response('success', 'Article retourné. En attente de vérification.');
+        // Update inventory: set to pending verification and clear the user assignment.
+        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE(), assigned_to_user_id = NULL WHERE asset_id = ?");
+        $updateInvStmt->execute([$assetId]);
+
+        // Complete all of this user's past, present, and future bookings for this item.
+        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked')");
+        $updateBookingStmt->execute([$assetId, $userId]);
+
+        $conn->commit();
+        json_response('success', 'Article retourné. En attente de vérification.');
+    } catch (Exception $e) {
+        $conn->rollBack();
+        throw $e;
+    }
 }
 
+/**
+ * Helper function to standardize and send JSON responses, then terminate the script.
+ */
 function json_response($status, $message, $data = []) {
     http_response_code($status === 'error' ? 400 : 200);
-    echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
-    exit;
+    // Ensure that the script execution stops after sending the response.
+    exit(json_encode(['status' => $status, 'message' => $message, 'data' => $data]));
 }
 ?>
