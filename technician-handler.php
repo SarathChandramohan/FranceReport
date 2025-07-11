@@ -83,7 +83,7 @@ function bookAndPickupMultipleDays($conn, $userId, $assetId, $dates) {
         // Step 2 (CRITICAL FIX): Re-verify that the requested dates have no conflicts *within the transaction*.
         // This prevents the race condition that caused the UNIQUE KEY violation.
         $placeholders = implode(',', array_fill(0, count($dates), '?'));
-        $checkDatesSql = "SELECT booking_date FROM Bookings WHERE asset_id = ? AND booking_date IN ($placeholders) AND status IN ('booked', 'active')";
+        $checkDatesSql = "SELECT booking_date FROM Bookings WITH (UPDLOCK) WHERE asset_id = ? AND booking_date IN ($placeholders) AND status IN ('booked', 'active')";
         $params = array_merge([$assetId], $dates);
         
         $checkDatesStmt = $conn->prepare($checkDatesSql);
