@@ -118,8 +118,9 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
 
     try {
         // Step 1: Lock the inventory item row and verify its status.
-        // WITH (UPDLOCK, ROWLOCK) is specific to SQL Server for placing an update lock.
-        $stmt_check_inv = $conn->prepare("SELECT status FROM Inventory WHERE asset_id = ? WITH (UPDLOCK, ROWLOCK)");
+        // **CORRECTED SQL SYNTAX HERE**
+        // The WITH (UPDLOCK, ROWLOCK) hint is placed directly after the table name.
+        $stmt_check_inv = $conn->prepare("SELECT status FROM Inventory WITH (UPDLOCK, ROWLOCK) WHERE asset_id = ?");
         $stmt_check_inv->execute([$assetId]);
         $currentStatus = $stmt_check_inv->fetchColumn();
 
