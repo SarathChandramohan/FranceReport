@@ -54,7 +54,7 @@ function getItemAvailabilityForPickup($conn, $barcode) {
     }
 
     $stmt_bookings = $conn->prepare("
-        SELECT booking_date FROM Bookings 
+        SELECT booking_date FROM Bookings
         WHERE asset_id = ? AND status IN ('booked', 'active') AND booking_date >= ?
     ");
     $stmt_bookings->execute([$asset['asset_id'], date('Y-m-d')]);
