@@ -181,11 +181,8 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr, $assignmen
  */
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
-    // This query uses a UNION to combine two distinct sets of items:
-    // 1. Items currently 'in-use' by the technician. This part of the query is designed to return only one row per item.
-    // 2. Items 'booked' for the technician for today (but not yet taken).
     $sql = "
-        -- Part 1: Get items currently IN USE by the technician. This will not cause duplicates.
+        -- Part 1: Get items currently IN USE by the technician.
         SELECT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
             i.status, i.assigned_to_user_id,
@@ -197,7 +194,8 @@ function getTechnicianEquipment($conn, $userId) {
 
         UNION ALL
 
-        -- Part 2: Get items BOOKED for today (via direct booking or planning) but NOT yet taken.
+        -- Part 2: Get items BOOKED for today but NOT yet taken.
+        -- BUG FIX: Added 'b.status = 'booked'' to prevent showing items that have been returned.
         SELECT DISTINCT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
             i.status, i.assigned_to_user_id,
@@ -208,9 +206,8 @@ function getTechnicianEquipment($conn, $userId) {
         JOIN Bookings b ON i.asset_id = b.asset_id
         LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
         WHERE b.booking_date = :today_b
+          AND b.status = 'booked' -- <-- THE FIX IS HERE
           AND (b.user_id = :user_id_booked OR pa.assigned_user_id = :user_id_pa)
-          -- Exclude items that are already listed in the 'in-use' part above
-          AND i.asset_id NOT IN (SELECT asset_id FROM Inventory WHERE status = 'in-use' AND assigned_to_user_id = :user_id_not_in)
     ";
 
     $stmt = $conn->prepare($sql);
@@ -220,7 +217,6 @@ function getTechnicianEquipment($conn, $userId) {
         ':today_b'        => $today,
         ':user_id_booked' => $userId,
         ':user_id_pa'     => $userId,
-        ':user_id_not_in' => $userId
     ]);
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
