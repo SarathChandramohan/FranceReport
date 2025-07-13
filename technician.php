@@ -11,11 +11,9 @@ $user = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion du Matériel Technicien</title>
-    <!-- External Libraries -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <!-- Barcode scanner library -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style>
         body {
@@ -108,10 +106,8 @@ $user = getCurrentUser();
                 <div class="card-body p-4">
                     <h2 class="card-title mb-4">Mon Matériel de Mission</h2>
 
-                    <!-- This section will be populated by JavaScript with the list of equipment -->
                     <div id="equipment-list-section"></div>
 
-                    <!-- Placeholder shown when the equipment list is empty -->
                     <div id="equipment-placeholder" class="text-center p-5" style="display: none;">
                         <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
                         <p class="text-muted">Aucun matériel assigné ou en votre possession.</p>
@@ -129,7 +125,6 @@ $user = getCurrentUser();
     </div>
 </div>
 
-<!-- Modal for Barcode Scanner -->
 <div class="modal fade" id="scanner-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -145,7 +140,6 @@ $user = getCurrentUser();
     </div>
 </div>
 
-<!-- Modal for Manual Barcode Entry -->
 <div class="modal fade" id="manual-entry-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -166,7 +160,6 @@ $user = getCurrentUser();
     </div>
 </div>
 
-<!-- Modal for Booking an Item for a Date Range -->
 <div class="modal fade" id="range-booking-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -177,6 +170,10 @@ $user = getCurrentUser();
             <div class="modal-body">
                 <p>Veuillez choisir la <strong>date de retour</strong> pour <strong><span id="range-booking-item-name"></span></strong>.</p>
                 <p class="text-muted small">L'article sera réservé pour tous les jours consécutifs à partir d'aujourd'hui jusqu'à la date de retour incluse. Les dates déjà réservées par d'autres ne sont pas sélectionnables.</p>
+                <div class="form-group">
+                    <label for="assignment-name"><strong>Nom de la mission *</strong></label>
+                    <input type="text" id="assignment-name" class="form-control" placeholder="Entrez le nom de la mission" required>
+                </div>
                 <div class="form-group">
                     <input type="text" id="return-date-calendar" class="form-control" placeholder="Cliquez pour choisir la date de retour...">
                 </div>
@@ -189,7 +186,7 @@ $user = getCurrentUser();
     </div>
 </div>
 
-<!-- Generic Modal for Notifications -->
+
 <div class="modal fade" id="info-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -364,6 +361,11 @@ $user = getCurrentUser();
                     showNotification("Veuillez sélectionner une date de retour.", "danger");
                     return;
                 }
+                const assignmentName = $('#assignment-name').val();
+                if (!assignmentName.trim()) {
+                    showNotification("Veuillez entrer un nom de mission.", "danger");
+                    return;
+                }
 
                 const returnDateStr = returnDatePicker.formatDate(selectedReturnDate, "Y-m-d");
 
@@ -371,7 +373,8 @@ $user = getCurrentUser();
                 // Call the backend to create the bookings and check out the item
                 performAjaxCall('book_and_pickup_range', {
                     asset_id: asset.asset_id,
-                    return_date: returnDateStr
+                    return_date: returnDateStr,
+                    assignment_name: assignmentName
                 });
             });
         });
