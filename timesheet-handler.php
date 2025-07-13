@@ -232,7 +232,7 @@ function returnItem($conn, $userId, $assetId) {
             throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
         }
 
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE(), assigned_to_user_id = NULL WHERE asset_id = ?");
+        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
         $updateInvStmt->execute([$assetId]);
 
         $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked')");
