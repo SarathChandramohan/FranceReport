@@ -31,7 +31,7 @@ try {
             getItemAvailabilityForPickup($conn, $_POST['barcode']);
             break;
         case 'book_and_pickup_range':
-            bookAndPickupRange($conn, $currentUser['user_id'], $_POST['asset_id'], $_POST['return_date']);
+            bookAndPickupRange($conn, $currentUser['user_id'], $_POST['asset_id'], $_POST['return_date'], $_POST['assignment_name']);
             break;
         default:
             json_response('error', 'Action non valide ou non spécifiée.');
@@ -96,15 +96,12 @@ function getItemAvailabilityForPickup($conn, $barcode) {
  * Books an item for a consecutive range of dates and marks it as picked up.
  * This is the core transactional logic to prevent race conditions.
  */
-function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
+function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr, $assignmentName) {
     if (empty($assetId) || empty($returnDateStr)) {
         throw new Exception("Données de réservation manquantes (ID article ou date de retour).");
     }
 
-    $assignmentName = isset($_POST['assignment_name']) ? trim($_POST['assignment_name']) : 'Prise directe par technicien';
-    if (empty($assignmentName)) {
-        $assignmentName = "Prise directe par technicien";
-    }
+    $assignmentName = !empty(trim($assignmentName)) ? trim($assignmentName) : 'Prise directe par technicien';
 
 
     try {
@@ -124,8 +121,6 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
 
     try {
         // Step 1: Lock the inventory item row and verify its status.
-        // **CORRECTED SQL SYNTAX HERE**
-        // The WITH (UPDLOCK, ROWLOCK) hint is placed directly after the table name.
         $stmt_check_inv = $conn->prepare("SELECT status FROM Inventory WITH (UPDLOCK, ROWLOCK) WHERE asset_id = ?");
         $stmt_check_inv->execute([$assetId]);
         $currentStatus = $stmt_check_inv->fetchColumn();
@@ -153,13 +148,12 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
         $stmt_insert_booking = $conn->prepare(
             "INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, ?)"
         );
-        $mission = $assignmentName;
         $dateIterator = new DatePeriod($startDate, new DateInterval('P1D'), (clone $endDate)->modify('+1 day')); // Include end date in iteration
 
         $isFirstDay = true;
         foreach ($dateIterator as $date) {
             $bookingStatus = $isFirstDay ? 'active' : 'booked';
-            $stmt_insert_booking->execute([$assetId, $userId, $date->format('Y-m-d'), $mission, $bookingStatus]);
+            $stmt_insert_booking->execute([$assetId, $userId, $date->format('Y-m-d'), $assignmentName, $bookingStatus]);
             $isFirstDay = false;
         }
 
@@ -188,21 +182,34 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
     $sql = "
-        SELECT DISTINCT
-            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
-            i.status, i.assigned_to_user_id,
-            b.booking_id, b.mission
-        FROM Inventory i
-        LEFT JOIN Bookings b ON i.asset_id = b.asset_id AND b.booking_date = ? AND b.status = 'booked'
-        LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = ?
-        WHERE
-            (b.booking_date = ? AND (b.user_id = ? OR pa.assigned_user_id = ?))
-            OR
-            (i.status = 'in-use' AND i.assigned_to_user_id = ?)
-        ORDER BY i.asset_name;
+        WITH UserItems AS (
+            SELECT DISTINCT
+                i.asset_id,
+                i.asset_name,
+                i.asset_type,
+                i.serial_or_plate,
+                i.barcode,
+                i.status,
+                i.assigned_to_user_id,
+                b.booking_id,
+                b.mission
+            FROM Inventory i
+            LEFT JOIN Bookings b ON i.asset_id = b.asset_id
+            WHERE
+                (b.booking_date = ? AND b.user_id = ? AND b.status = 'booked') -- Booked for today
+                OR
+                (i.status = 'in-use' AND i.assigned_to_user_id = ?) -- Currently in possession
+        )
+        SELECT
+            ui.*,
+            (SELECT MAX(booking_date) FROM Bookings WHERE asset_id = ui.asset_id AND user_id = ? AND status IN ('active', 'booked')) as return_date
+        FROM UserItems ui
+        ORDER BY
+            CASE WHEN ui.status = 'in-use' AND (SELECT MAX(booking_date) FROM Bookings WHERE asset_id = ui.asset_id AND user_id = ? AND status = 'active') < ? THEN 0 ELSE 1 END,
+            ui.asset_name;
     ";
     $stmt = $conn->prepare($sql);
-    $stmt->execute([$today, $today, $today, $userId, $userId, $userId]);
+    $stmt->execute([$today, $userId, $userId, $userId, $userId, $today]);
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
     json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
