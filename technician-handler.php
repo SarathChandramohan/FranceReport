@@ -181,38 +181,78 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr, $assignmen
  */
 function getTechnicianEquipment($conn, $userId) {
     $today = date('Y-m-d');
+    // This query uses a UNION to combine two distinct sets of items:
+    // 1. Items currently 'in-use' by the technician. This part of the query is designed to return only one row per item.
+    // 2. Items 'booked' for the technician for today (but not yet taken).
     $sql = "
-        WITH UserItems AS (
-            SELECT DISTINCT
-                i.asset_id,
-                i.asset_name,
-                i.asset_type,
-                i.serial_or_plate,
-                i.barcode,
-                i.status,
-                i.assigned_to_user_id,
-                b.booking_id,
-                b.mission
-            FROM Inventory i
-            LEFT JOIN Bookings b ON i.asset_id = b.asset_id
-            WHERE
-                (b.booking_date = ? AND b.user_id = ? AND b.status = 'booked') -- Booked for today
-                OR
-                (i.status = 'in-use' AND i.assigned_to_user_id = ?) -- Currently in possession
-        )
+        -- Part 1: Get items currently IN USE by the technician. This will not cause duplicates.
         SELECT
-            ui.*,
-            (SELECT MAX(booking_date) FROM Bookings WHERE asset_id = ui.asset_id AND user_id = ? AND status IN ('active', 'booked')) as return_date
-        FROM UserItems ui
-        ORDER BY
-            CASE WHEN ui.status = 'in-use' AND (SELECT MAX(booking_date) FROM Bookings WHERE asset_id = ui.asset_id AND user_id = ? AND status = 'active') < ? THEN 0 ELSE 1 END,
-            ui.asset_name;
+            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
+            i.status, i.assigned_to_user_id,
+            (SELECT TOP 1 b.booking_id FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status = 'active') as booking_id,
+            (SELECT TOP 1 b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status IN ('active', 'booked') ORDER BY b.booking_date) AS mission,
+            (SELECT MAX(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status IN ('active', 'booked')) AS return_date
+        FROM Inventory i
+        WHERE i.status = 'in-use' AND i.assigned_to_user_id = :user_id_in_use
+
+        UNION ALL
+
+        -- Part 2: Get items BOOKED for today (via direct booking or planning) but NOT yet taken.
+        SELECT DISTINCT
+            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
+            i.status, i.assigned_to_user_id,
+            b.booking_id,
+            b.mission,
+            b.booking_date AS return_date
+        FROM Inventory i
+        JOIN Bookings b ON i.asset_id = b.asset_id
+        LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
+        WHERE b.booking_date = :today_b
+          AND (b.user_id = :user_id_booked OR pa.assigned_user_id = :user_id_pa)
+          -- Exclude items that are already listed in the 'in-use' part above
+          AND i.asset_id NOT IN (SELECT asset_id FROM Inventory WHERE status = 'in-use' AND assigned_to_user_id = :user_id_not_in)
     ";
+
     $stmt = $conn->prepare($sql);
-    $stmt->execute([$today, $userId, $userId, $userId, $userId, $today]);
+    $stmt->execute([
+        ':user_id_in_use' => $userId,
+        ':today_pa'       => $today,
+        ':today_b'        => $today,
+        ':user_id_booked' => $userId,
+        ':user_id_pa'     => $userId,
+        ':user_id_not_in' => $userId
+    ]);
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Sort the results in PHP to enforce the display order (overdue items first).
+    $today_dt = new DateTime($today);
+    $today_dt->setTime(0, 0, 0);
+
+    usort($equipment, function($a, $b) use ($today_dt) {
+        $a_return_date = $a['return_date'] ? (new DateTime($a['return_date']))->setTime(0,0,0) : null;
+        $b_return_date = $b['return_date'] ? (new DateTime($b['return_date']))->setTime(0,0,0) : null;
+
+        // Check for overdue status only for items 'in-use'.
+        $is_a_overdue = ($a['status'] === 'in-use' && $a_return_date && $a_return_date < $today_dt);
+        $is_b_overdue = ($b['status'] === 'in-use' && $b_return_date && $b_return_date < $today_dt);
+
+        // Priority 1: Overdue items first.
+        if ($is_a_overdue && !$is_b_overdue) return -1;
+        if (!$is_a_overdue && $is_b_overdue) return 1;
+
+        // Priority 2: Items to be taken today (status is not 'in-use').
+        $a_is_for_today = ($a['status'] !== 'in-use');
+        $b_is_for_today = ($b['status'] !== 'in-use');
+        if ($a_is_for_today && !$b_is_for_today) return -1;
+        if (!$a_is_for_today && $b_is_for_today) return 1;
+
+        // Default sort by asset name.
+        return strcmp($a['asset_name'], $b['asset_name']);
+    });
+
     json_response('success', 'Données récupérées.', ['equipment' => $equipment]);
 }
+
 
 /**
  * Marks an item from the daily list as 'in-use'.
@@ -269,7 +309,7 @@ function returnItem($conn, $userId, $assetId) {
         }
 
         // Update inventory: set to pending verification and clear the user assignment.
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
+        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', assigned_to_user_id = NULL, last_modified = GETDATE() WHERE asset_id = ?");
         $updateInvStmt->execute([$assetId]);
 
         // Complete all of this user's past, present, and future bookings for this item.
