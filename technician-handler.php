@@ -101,6 +101,12 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
         throw new Exception("Données de réservation manquantes (ID article ou date de retour).");
     }
 
+    $assignmentName = isset($_POST['assignment_name']) ? trim($_POST['assignment_name']) : 'Prise directe par technicien';
+    if (empty($assignmentName)) {
+        $assignmentName = "Prise directe par technicien";
+    }
+
+
     try {
         $startDate = new DateTime(); // Today
         $endDate = new DateTime($returnDateStr);
@@ -147,7 +153,7 @@ function bookAndPickupRange($conn, $userId, $assetId, $returnDateStr) {
         $stmt_insert_booking = $conn->prepare(
             "INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status) VALUES (?, ?, ?, ?, ?)"
         );
-        $mission = "Prise directe par technicien";
+        $mission = $assignmentName;
         $dateIterator = new DatePeriod($startDate, new DateInterval('P1D'), (clone $endDate)->modify('+1 day')); // Include end date in iteration
 
         $isFirstDay = true;
