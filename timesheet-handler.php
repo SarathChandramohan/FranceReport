@@ -1,4 +1,3 @@
-
 <?php
 // timesheet-handler.php - Handles all AJAX requests for timesheet operations
 
