@@ -291,32 +291,41 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
  * Returns an item, setting its status to 'pending_verification' and completing relevant bookings.
  */
 function returnItem($conn, $userId, $assetId) {
-    if (empty($assetId)) throw new Exception("Données de retour manquantes.");
+    if (empty($assetId)) {
+        throw new Exception("Données de retour manquantes.");
+    }
 
     $conn->beginTransaction();
     try {
+        // First, check the item's current status and who it's assigned to.
         $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
         $checkStmt->execute([$assetId]);
         $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$asset) throw new Exception("Article non trouvé.");
+        if (!$asset) {
+            throw new Exception("Article non trouvé.");
+        }
         if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
             throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
         }
 
-        // Update inventory: set to pending verification and clear the user assignment.
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', assigned_to_user_id = NULL, last_modified = GETDATE() WHERE asset_id = ?");
+        // **FIX**: Update the inventory status to 'pending_verification' and clear the user assignment.
+        $updateInvStmt = $conn->prepare(
+            "UPDATE Inventory SET status = 'pending_verification', assigned_to_user_id = NULL, last_modified = GETDATE() WHERE asset_id = ?"
+        );
         $updateInvStmt->execute([$assetId]);
 
-        // Complete all of this user's past, present, and future bookings for this item.
-        $updateBookingStmt = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked')");
+        // Now, complete all of this user's bookings for this item (past, present, and future).
+        $updateBookingStmt = $conn->prepare(
+            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked')"
+        );
         $updateBookingStmt->execute([$assetId, $userId]);
 
         $conn->commit();
         json_response('success', 'Article retourné. En attente de vérification.');
     } catch (Exception $e) {
         $conn->rollBack();
-        throw $e;
+        throw $e; // Re-throw the exception to be caught by the main handler.
     }
 }
 
