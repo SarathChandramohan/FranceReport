@@ -93,6 +93,9 @@ $user = getCurrentUser();
             background-color: #0069d9;
             border-color: #0062cc;
         }
+        .overdue {
+            background-color: #fff3cd; /* Yellow highlight for overdue items */
+        }
     </style>
 </head>
 <body>
@@ -392,18 +395,35 @@ $user = getCurrentUser();
         listContainer.empty();
         $('#equipment-placeholder').hide();
 
-        const items = response.data.equipment;
+        let items = response.data.equipment;
         if (!items || items.length === 0) {
             $('#equipment-placeholder').show();
             return;
         }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Sort items: overdue items first, then by name
+        items.sort((a, b) => {
+            const a_return_date = a.return_date ? new Date(a.return_date) : null;
+            const b_return_date = b.return_date ? new Date(b.return_date) : null;
+
+            const a_is_overdue = a.status === 'in-use' && a_return_date && a_return_date < today;
+            const b_is_overdue = b.status === 'in-use' && b_return_date && b_return_date < today;
+
+            if (a_is_overdue && !b_is_overdue) return -1;
+            if (!a_is_overdue && b_is_overdue) return 1;
+
+            return a.asset_name.localeCompare(b.asset_name);
+        });
+
 
         items.forEach(item => {
             const iconClass = item.asset_type === 'vehicle' ? 'fa-car' : 'fa-tools';
             const isTakenByMe = item.status === 'in-use' && item.assigned_to_user_id == currentUserId;
 
             let actionButtonHtml = '';
-            // Data attributes to store item info directly on the buttons
             const itemDataReturn = `data-action="return" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id || ''}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}"`;
             const itemDataTake = `data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}"`;
 
@@ -415,13 +435,24 @@ $user = getCurrentUser();
                  actionButtonHtml = `<button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>`;
             }
 
+            let returnDateStr = 'N/A';
+            let cardClass = 'item-card';
+            if (item.return_date) {
+                const returnDate = new Date(item.return_date);
+                returnDateStr = returnDate.toLocaleDateString('fr-FR');
+                if (isTakenByMe && returnDate < today) {
+                    cardClass += ' overdue'; // Add yellow highlight for overdue items
+                }
+            }
+
             const itemCardHtml = `
-                <div class="item-card">
+                <div class="${cardClass}">
                     <div class="item-icon"><i class="fas ${iconClass}"></i></div>
                     <div class="item-details">
                         <div class="item-name">${item.asset_name}</div>
                         <div class="item-meta">
                             <div><strong>Mission:</strong> ${item.mission || 'N/A'}</div>
+                            <div><strong>Date de retour:</strong> ${returnDateStr}</div>
                             <div><strong>Code:</strong> ${item.serial_or_plate || 'N/A'} | <strong>Code-barres:</strong> ${item.barcode || 'N/A'}</div>
                         </div>
                     </div>
