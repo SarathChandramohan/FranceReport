@@ -256,7 +256,7 @@ function returnItem($conn, $userId, $assetId) {
         }
 
         // Update inventory: set to pending verification and clear the user assignment.
-        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE(), assigned_to_user_id = NULL WHERE asset_id = ?");
+        $updateInvStmt = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
         $updateInvStmt->execute([$assetId]);
 
         // Complete all of this user's past, present, and future bookings for this item.
