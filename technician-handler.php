@@ -290,6 +290,8 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
 /**
  * Returns an item, setting its status to 'pending_verification' and completing relevant bookings.
  */
+// technician-handler.php
+
 function returnItem($conn, $userId, $assetId) {
     if (empty($assetId)) {
         throw new Exception("Données de retour manquantes.");
@@ -309,17 +311,25 @@ function returnItem($conn, $userId, $assetId) {
             throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
         }
 
-        // **FIX**: Update the inventory status to 'pending_verification' but keep the user assignment for tracking.
+        // Update the inventory status to 'pending_verification' but keep the user assignment for tracking.
         $updateInvStmt = $conn->prepare(
             "UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?"
         );
         $updateInvStmt->execute([$assetId]);
 
-        // Now, complete all of this user's bookings for this item (past, present, and future).
-        $updateBookingStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked')"
+        $today = date('Y-m-d');
+
+        // Mark only past bookings as 'completed'
+        $updatePastBookingsStmt = $conn->prepare(
+            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date < ?"
         );
-        $updateBookingStmt->execute([$assetId, $userId]);
+        $updatePastBookingsStmt->execute([$assetId, $userId, $today]);
+
+        // Cancel today's and all future bookings
+        $cancelFutureBookingsStmt = $conn->prepare(
+            "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date >= ?"
+        );
+        $cancelFutureBookingsStmt->execute([$assetId, $userId, $today]);
 
         $conn->commit();
         json_response('success', 'Article retourné. En attente de vérification.');
