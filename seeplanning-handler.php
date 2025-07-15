@@ -77,7 +77,7 @@ function getUserPlanning($conn, $userId, $date) {
         WITH UserMissions AS (
             SELECT DISTINCT mission_group_id
             FROM Planning_Assignments
-            WHERE assigned_user_id = ? AND assignment_date = ?
+            WHERE assigned_user_id = ? AND assignment_date = ? AND is_validated = 1
         )
         SELECT
             m.mission_group_id,
