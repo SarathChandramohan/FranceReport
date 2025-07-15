@@ -309,9 +309,9 @@ function returnItem($conn, $userId, $assetId) {
             throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
         }
 
-        // **FIX**: Update the inventory status to 'pending_verification' and clear the user assignment.
+        // **FIX**: Update the inventory status to 'pending_verification' but keep the user assignment for tracking.
         $updateInvStmt = $conn->prepare(
-            "UPDATE Inventory SET status = 'pending_verification', assigned_to_user_id = NULL, last_modified = GETDATE() WHERE asset_id = ?"
+            "UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?"
         );
         $updateInvStmt->execute([$assetId]);
 
