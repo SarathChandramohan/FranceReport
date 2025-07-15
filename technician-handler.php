@@ -188,7 +188,8 @@ function getTechnicianEquipment($conn, $userId) {
             i.status, i.assigned_to_user_id,
             (SELECT TOP 1 b.booking_id FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status = 'active') as booking_id,
             (SELECT TOP 1 b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status IN ('active', 'booked') ORDER BY b.booking_date) AS mission,
-            (SELECT MAX(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status IN ('active', 'booked')) AS return_date
+            (SELECT MAX(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status IN ('active', 'booked')) AS return_date,
+            1 as is_validated -- Assume in-use items are for validated missions
         FROM Inventory i
         WHERE i.status = 'in-use' AND i.assigned_to_user_id = :user_id_in_use
 
@@ -201,13 +202,15 @@ function getTechnicianEquipment($conn, $userId) {
             i.status, i.assigned_to_user_id,
             b.booking_id,
             b.mission,
-            b.booking_date AS return_date
+            b.booking_date AS return_date,
+            pa.is_validated
         FROM Inventory i
         JOIN Bookings b ON i.asset_id = b.asset_id
         LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
         WHERE b.booking_date = :today_b
           AND b.status = 'booked' -- <-- THE FIX IS HERE
           AND (b.user_id = :user_id_booked OR pa.assigned_user_id = :user_id_pa)
+          AND (pa.is_validated = 1 OR pa.is_validated IS NULL)
     ";
 
     $stmt = $conn->prepare($sql);
