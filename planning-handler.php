@@ -56,6 +56,9 @@ try {
         case 'get_worker_status_for_date':
             getWorkerStatusForDate($conn, $_GET['date']);
             break;
+        case 'validate_all_for_week':
+            validateAllForWeek($conn, $input);
+            break;
         default:
             respondWithError('Action non valide.', 400);
     }
@@ -64,6 +67,18 @@ try {
 } catch (Exception $e) {
     respondWithError($e->getMessage(), 500);
 }
+
+function validateAllForWeek($conn, $data) {
+    if (empty($data['start_date']) || empty($data['end_date'])) {
+        respondWithError('Les dates de début et de fin de la semaine sont requises.');
+    }
+
+    $stmt = $conn->prepare("UPDATE Planning_Assignments SET is_validated = 1 WHERE assignment_date BETWEEN ? AND ?");
+    $stmt->execute([$data['start_date'], $data['end_date']]);
+
+    respondWithSuccess('Toutes les planifications pour la semaine ont été activées.');
+}
+
 
 // --- Functions ---
 function getInitialData($conn) {
