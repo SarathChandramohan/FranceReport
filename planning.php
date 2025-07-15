@@ -78,7 +78,10 @@ $default_color = $predefined_colors[0];
                     <button class="btn btn-outline-secondary" id="nextWeekBtn"><i class="fas fa-chevron-right"></i></button>
                 </div>
                 <h4 id="currentWeekRange" class="mb-0 mx-3 text-center"></h4>
-                <button class="btn btn-primary" id="addMultiDayMissionBtn"><i class="fas fa-calendar-plus"></i> Ajouter une mission sur plusieurs jours</button>
+                <div>
+                    <button class="btn btn-success" id="activateAllBtn">Tout Activer</button>
+                    <button class="btn btn-primary" id="addMultiDayMissionBtn"><i class="fas fa-calendar-plus"></i> Mission sur plusieurs jours</button>
+                </div>
             </div>
             <div id="dailyPlanningContainer" class="daily-planning-container"></div>
         </div>
@@ -317,7 +320,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
 
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
-        const actionsHtml = `<div class="mission-actions"><i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i></div>`;
+        const actionsHtml = `<div class="mission-actions">
+            <i class="fas fa-trash-alt action-btn delete-btn" title="Supprimer"></i>
+            <i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i>
+        </div>`;
         const missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''} ${isConflicting ? 'conflicting-assignment' : ''}`;
 
         return $(`<div class="${missionCardClass}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
@@ -469,7 +475,56 @@ document.addEventListener('DOMContentLoaded', function() {
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
-    $planningContainer.on('click', '.validate-btn', async function(e){ e.stopPropagation(); const missionId = $(this).closest('.mission-card').data('mission-id'); showLoading(true); try { await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } });
+    
+    $planningContainer.on('click', '.validate-btn', async function(e){ 
+        e.stopPropagation(); 
+        const missionId = $(this).closest('.mission-card').data('mission-id'); 
+        showLoading(true); 
+        try { 
+            await apiCall('toggle_mission_validation', 'POST', { mission_id: missionId }); 
+            await fetchInitialData(false); 
+        } catch (error) { 
+            alert(`Erreur: ${error.message}`); 
+        } finally { 
+            showLoading(false); 
+        } 
+    });
+    
+    $planningContainer.on('click', '.delete-btn', function(e) {
+        e.stopPropagation();
+        const missionId = $(this).closest('.mission-card').data('mission-id');
+        showConfirmation('Voulez-vous vraiment supprimer cette mission ?', async () => {
+            showLoading(true);
+            try {
+                await apiCall('delete_mission_group', 'POST', { mission_id: missionId });
+                await fetchInitialData(false);
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        });
+    });
+    
+    $('#activateAllBtn').on('click', async function() {
+        const endDate = new Date(state.currentWeekStart);
+        endDate.setDate(endDate.getDate() + 6);
+        showConfirmation('Voulez-vous activer toutes les planifications pour la semaine en cours ?', async () => {
+            showLoading(true);
+            try {
+                await apiCall('validate_all_for_week', 'POST', { 
+                    start_date: getLocalDateString(state.currentWeekStart),
+                    end_date: getLocalDateString(endDate)
+                });
+                await fetchInitialData(false);
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        });
+    });
+
 
     async function handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
