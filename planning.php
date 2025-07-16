@@ -37,10 +37,8 @@ $default_color = $predefined_colors[0];
         .assignment-count { font-size: 0.5rem; color: #fff; background-color: #dc3545; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
-        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; cursor: pointer; }
+        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:center; align-items:center; cursor: pointer; }
         .day-header.selected { background-color: var(--primary); color: white; }
-        .add-mission-to-day-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.7rem; }
-        .day-header.selected .add-mission-to-day-btn { color: white; }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.conflicting-assignment { border: 2px solid red !important; }
         .mission-card.on-leave-assignment { border: 2px solid var(--dark-yellow) !important; }
@@ -64,8 +62,6 @@ $default_color = $predefined_colors[0];
         label.list-group-item.disabled { background-color: #f8f9fa; cursor: not-allowed; }
         .mission-placeholder-bottom { padding: 15px; margin-top: 10px; border: 2px dashed #ced4da; border-radius: 6px; text-align: center; color: #6c757d; font-size: 0.7rem; transition: background-color 0.2s ease, border-color 0.2s ease; }
         .mission-placeholder-bottom:hover { background-color: #e9ecef; border-color: #007bff; }
-        
-        /* Compact modal styles */
         #missionFormModal.compact-modal .modal-body { padding: 1rem; }
         #missionFormModal.compact-modal .modal-title { font-size: 0.9rem; }
         #missionFormModal.compact-modal .form-group { margin-bottom: 0.5rem; }
@@ -111,12 +107,10 @@ $default_color = $predefined_colors[0];
                         <input type="hidden" id="mission_id_form" name="mission_id">
                         <input type="hidden" id="assignment_date_form" name="assignment_date">
                         <div class="alert alert-info" id="modalDateDisplay"></div>
-
                         <div class="form-row" id="multi_day_fields" style="display: none;">
                             <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date"></div>
                             <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date"></div>
                         </div>
-
                         <div class="form-group"><label>Titre de la mission *</label><input type="text" class="form-control" name="mission_text" required></div>
                         <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="3"></textarea></div>
                         <div class="form-row">
@@ -129,7 +123,6 @@ $default_color = $predefined_colors[0];
                             <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
                         </div>
                         <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
-
                         <div id="assign-users-group" style="display:none;">
                              <hr>
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
@@ -138,7 +131,6 @@ $default_color = $predefined_colors[0];
                             <label>Cliquer pour assigner un ouvrier :</label>
                             <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
                         </div>
-
                         <div id="asset-management-container" style="display: none;">
                             <hr>
                             <div class="form-group">
@@ -150,7 +142,6 @@ $default_color = $predefined_colors[0];
                                 <button type="button" class="btn btn-sm btn-info" id="manageAssetsBtn">Gérer le Matériel</button>
                             </div>
                         </div>
-
                         <div id="modal_error_message" class="alert alert-danger mt-3" style="display: none;"></div>
                     </div>
                     <div class="modal-footer">
@@ -172,8 +163,7 @@ $default_color = $predefined_colors[0];
                 </div>
                 <div class="modal-body">
                     <input type="text" id="asset_assignment_search" class="form-control mb-3" placeholder="Rechercher par nom ou n° de série...">
-                    <div id="asset_assignment_list" class="list-group" style="max-height: 400px; overflow-y: auto;">
-                        </div>
+                    <div id="asset_assignment_list" class="list-group" style="max-height: 400px; overflow-y: auto;"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
@@ -305,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateStr = getLocalDateString(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
             const isSelected = dateStr === state.selectedDate;
-            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-mission-to-day-btn" title="Ajouter une mission"><i class="fas fa-plus-circle"></i></button></div>`);
+            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span></div>`);
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
             const $dayContent = $(`<div class="day-content p-2" data-date="${dateStr}"></div>`).appendTo($dayColumn);
             $planningContainer.append($dayColumn);
@@ -499,11 +489,6 @@ document.addEventListener('DOMContentLoaded', function() {
         refreshWorkerListForDate(date);
     });
 
-    $planningContainer.on('click', '.add-mission-to-day-btn', function(e) {
-        e.stopPropagation();
-        openModalForCreate($(this).closest('.day-header').data('date'), false);
-    });
-
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
     $planningContainer.on('dragover', '.day-content, .mission-card, .mission-placeholder-bottom', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
@@ -560,6 +545,7 @@ document.addEventListener('DOMContentLoaded', function() {
             $missionModal.removeClass('compact-modal');
             $('#assign-users-group').show();
             $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
+            renderAssignedWorkersInModal();
             renderAvailableWorkersInModal();
         }
         $missionModal.modal('show');
@@ -618,14 +604,14 @@ document.addEventListener('DOMContentLoaded', function() {
         hideModalError();
         const formData = Object.fromEntries(new FormData(this).entries());
         if (!formData.mission_id) { 
-            if ($missionModal.hasClass('compact-modal')) { // Drag-and-drop creation
+            if ($missionModal.hasClass('compact-modal')) {
                 if (state.draggedWorker) {
                     formData.assigned_user_ids = [state.draggedWorker.id];
                 } else {
                     showModalError("Erreur: L'ouvrier n'a pas été trouvé. Veuillez fermer et réessayer.");
                     return;
                 }
-            } else { // Click creation
+            } else {
                 if (!assignedWorkersInModal.length) {
                     showModalError("Veuillez assigner au moins un ouvrier.");
                     return;
@@ -646,7 +632,7 @@ document.addEventListener('DOMContentLoaded', function() {
         hideModalError();
         assignedAssetsInModal = []; assignedWorkersInModal = [];
         if (state.shouldRefreshOnModalClose) { fetchInitialData(); state.shouldRefreshOnModalClose = false; }
-        state.draggedWorker = null; // Clear dragged worker state after modal is closed
+        state.draggedWorker = null;
     });
 
     const $confirmationModal = $('#confirmationModal'), $confirmBtn = $('#confirmActionBtn');
