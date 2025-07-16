@@ -364,26 +364,28 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderWorkerList() {
         $workerList.empty();
         state.staff.forEach(worker => {
-            let isUnavailable = false;
             let statusText = '';
             let customClass = '';
+            let showStatus = false;
 
             if (worker.status === 'assigned') {
                 statusText = 'Assigné';
-                isUnavailable = true;
-                customClass = 'unavailable';
+                customClass = 'unavailable'; // Keep the red color
+                showStatus = true;
             } else if (worker.status === 'on_leave' || worker.status === 'on_sick_leave') {
                 statusText = worker.leave_type || 'En Congé';
-                isUnavailable = true;
-                customClass = 'on-leave';
+                customClass = 'on-leave'; // Keep the yellow color
+                showStatus = true;
             }
 
-            $workerList.append(`<div class="worker-item ${customClass}" draggable="${!isUnavailable}" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
+            // *** BUG FIX: All workers are now draggable="true" ***
+            $workerList.append(`<div class="worker-item ${customClass}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                 <div>${worker.prenom} ${worker.nom}</div>
-                ${isUnavailable ? `<div class="assignment-count">${statusText}</div>` : ''}
+                ${showStatus ? `<div class="assignment-count">${statusText}</div>` : ''}
             </div>`);
         });
     }
+
 
     async function refreshWorkerListForDate(date, manageLoadingState = true) {
         if (manageLoadingState) showLoading(true);
