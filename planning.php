@@ -63,6 +63,23 @@ $default_color = $predefined_colors[0];
         .remove-assigned-worker { cursor: pointer; }
         label.list-group-item.disabled { background-color: #f8f9fa; cursor: not-allowed; }
         label.list-group-item.disabled, label.list-group-item.disabled span, label.list-group-item.disabled small { color: #6c757d; }
+        
+        /* New style for the bottom drop zone */
+        .mission-placeholder-bottom {
+            padding: 15px;
+            margin-top: 10px;
+            border: 2px dashed #ced4da;
+            border-radius: 6px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.7rem;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .mission-placeholder-bottom:hover {
+            background-color: #e9ecef;
+            border-color: #007bff;
+        }
+
     </style>
 </head>
 <body>
@@ -202,7 +219,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- HELPERS ---
     const showLoading = (show) => $loading.toggle(show);
-    // ** DATE FIX **: This function now formats the date string without timezone conversion
     const getLocalDateString = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -296,19 +312,25 @@ document.addEventListener('DOMContentLoaded', function() {
             dayDate.setDate(dayDate.getDate() + i);
             const dateStr = getLocalDateString(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
+
             const isSelected = dateStr === state.selectedDate;
             const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-mission-to-day-btn" title="Ajouter une mission"><i class="fas fa-plus-circle"></i></button></div>`);
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
             const $dayContent = $(`<div class="day-content p-2" data-date="${dateStr}"></div>`).appendTo($dayColumn);
             $planningContainer.append($dayColumn);
+
             const dayMissions = state.missions.filter(m => m.assignment_date === dateStr);
             if (dayMissions.length > 0) {
                 dayMissions.forEach(mission => $dayContent.append(createMissionCard(mission)));
+                // Add the dedicated drop zone at the bottom if there are missions
+                $dayContent.append(`<div class="mission-placeholder-bottom"><span>Glissez ici pour ajouter une mission</span></div>`);
             } else {
+                // Use the full-size placeholder for empty days
                 $dayContent.append(`<div class="mission-placeholder"><span>Glissez un ouvrier ici</span></div>`);
             }
         }
     }
+
 
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',').map(id => id.trim()) : [];
@@ -393,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const statusInfo = workerStatuses.find(s => s.user_id === worker.user_id);
                 if (statusInfo) {
                     worker.status = statusInfo.status;
-                    worker.leave_type = statusInfo.leave_type; // Store leave type
+                    worker.leave_type = statusInfo.leave_type;
                 } else {
                     worker.status = 'available';
                     worker.leave_type = null;
@@ -501,7 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
-    $planningContainer.on('dragover', '.day-content, .mission-card', (e) => e.preventDefault());
+    $planningContainer.on('dragover', '.day-content, .mission-card, .mission-placeholder-bottom', (e) => e.preventDefault());
     $planningContainer.on('drop', '.day-content', handleDrop);
     
     $planningContainer.on('click', '.validate-btn', async function(e){ 
