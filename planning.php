@@ -99,7 +99,7 @@ $default_color = $predefined_colors[0];
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form id="missionForm">
-                    <div class="modal-header bg-primary text-white">
+                    <div class="modal-header bg-light">
                         <h5 class="modal-title" id="missionFormModalLabel">Nouvelle Mission</h5>
                         <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                     </div>
