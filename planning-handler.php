@@ -120,6 +120,7 @@ function getInitialData($conn) {
             STRING_AGG(CAST(pa.assigned_user_id AS VARCHAR(10)), ',') WITHIN GROUP (ORDER BY u.nom) as assigned_user_ids,
             STRING_AGG(u.prenom + ' ' + u.nom, ', ') WITHIN GROUP (ORDER BY u.nom) as assigned_user_names,
             STRING_AGG(CAST(pa.is_sick_leave AS VARCHAR(1)), ',') WITHIN GROUP (ORDER BY u.nom) as sick_leave_flags,
+            STRING_AGG(CAST(pa.is_on_leave AS VARCHAR(1)), ',') WITHIN GROUP (ORDER BY u.nom) as on_leave_flags,
             (SELECT STRING_AGG(CAST(conflict_pa.assigned_user_id AS VARCHAR(10)), ',') 
              FROM MissionAssignments conflict_pa 
              WHERE conflict_pa.assignment_date = pa.assignment_date AND conflict_pa.daily_assignment_count > 1) as conflicting_assignments
