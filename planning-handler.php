@@ -99,9 +99,16 @@ function getInitialData($conn) {
 
     $stmt_missions = $conn->prepare("
         WITH MissionAssignments AS (
-            SELECT *, COUNT(*) OVER (PARTITION BY assigned_user_id, assignment_date) as daily_assignment_count
-            FROM Planning_Assignments
-            WHERE assignment_date BETWEEN ? AND ?
+            SELECT 
+                pa.*, 
+                c.type_conge,
+                CASE WHEN c.type_conge = 'maladie' OR c.type_conge = 'Arrêt maladie' THEN 1 ELSE 0 END as is_sick_leave,
+                COUNT(*) OVER (PARTITION BY pa.assigned_user_id, pa.assignment_date) as daily_assignment_count
+            FROM Planning_Assignments pa
+            LEFT JOIN Conges c ON pa.assigned_user_id = c.user_id 
+                               AND pa.assignment_date BETWEEN c.date_debut AND c.date_fin 
+                               AND c.status = 'approved'
+            WHERE pa.assignment_date BETWEEN ? AND ?
         )
         SELECT
             MIN(pa.assignment_id) as mission_id,
@@ -110,6 +117,7 @@ function getInitialData($conn) {
             pa.end_time, pa.shift_type, pa.color, pa.is_validated,
             STRING_AGG(CAST(pa.assigned_user_id AS VARCHAR(10)), ',') WITHIN GROUP (ORDER BY u.nom) as assigned_user_ids,
             STRING_AGG(u.prenom + ' ' + u.nom, ', ') WITHIN GROUP (ORDER BY u.nom) as assigned_user_names,
+            STRING_AGG(CAST(pa.is_sick_leave AS VARCHAR(1)), ',') WITHIN GROUP (ORDER BY u.nom) as sick_leave_flags,
             (SELECT STRING_AGG(CAST(conflict_pa.assigned_user_id AS VARCHAR(10)), ',') 
              FROM MissionAssignments conflict_pa 
              WHERE conflict_pa.assignment_date = pa.assignment_date AND conflict_pa.daily_assignment_count > 1) as conflicting_assignments
@@ -170,7 +178,7 @@ function getWorkerStatusForDate($conn, $date) {
     if (!$date) respondWithError('Date not provided.');
 
     // Get assigned users
-    $stmt_assigned = $conn->prepare("SELECT DISTINCT assigned_user_id FROM Planning_Assignments WHERE assignment_date = ?");
+    $stmt_assigned = $conn->prepare("SELECT DISTINCT assigned_user_id FROM Planning_Assignments WHERE assignment_date = ? AND is_validated = 1 AND (shift_type IS NULL OR shift_type <> 'repos')");
     $stmt_assigned->execute([$date]);
     $assigned_users = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN, 0);
 
@@ -188,18 +196,26 @@ function getWorkerStatusForDate($conn, $date) {
     foreach ($all_users as $user_id) {
         $status = 'available';
         $leave_type = null;
+        $is_sick_leave = false;
 
-        if (in_array($user_id, $assigned_users)) {
+        if (isset($on_leave_data[$user_id])) {
+            $leave_type_key = $on_leave_data[$user_id];
+            $leave_type = getLeaveTypeName($leave_type_key);
+            if ($leave_type_key === 'maladie' || $leave_type_key === 'Arrêt maladie') {
+                $status = 'on_sick_leave';
+                $is_sick_leave = true;
+            } else {
+                $status = 'on_leave';
+            }
+        } elseif (in_array($user_id, $assigned_users)) {
             $status = 'assigned';
-        } elseif (isset($on_leave_data[$user_id])) {
-            $status = 'on_leave';
-            $leave_type = getLeaveTypeName($on_leave_data[$user_id]); // Use a helper to get display name
         }
 
         $worker_statuses[] = [
             'user_id' => $user_id,
             'status' => $status,
-            'leave_type' => $leave_type // Add leave_type to the response
+            'leave_type' => $leave_type,
+            'is_sick_leave' => $is_sick_leave
         ];
     }
     respondWithSuccess('Worker statuses retrieved.', $worker_statuses);
