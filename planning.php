@@ -33,6 +33,7 @@ $default_color = $predefined_colors[0];
         .planning-col { flex: 1; }
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
         .worker-item.unavailable { background-color: #f8d7da; border-color: #f5c6cb; }
+        .worker-item.on-leave { background-color: #fff3cd; border-color: #ffeeba; } /* Yellow for leave */
         .assignment-count { font-size: 0.5rem; color: #fff; background-color: #dc3545; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
@@ -310,12 +311,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',').map(id => id.trim()) : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
+        const sickLeaveFlags = mission.sick_leave_flags ? mission.sick_leave_flags.split(',') : [];
+
         const isConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
+
+        let isAnyoneOnSickLeave = sickLeaveFlags.includes('1');
 
         const workersHtml = assignedNames.map((name, i) => {
             const workerId = assignedIds[i];
+            const isWorkerOnSickLeave = sickLeaveFlags[i] === '1';
             const isWorkerConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.includes(workerId);
-            const style = isWorkerConflicting ? 'style="color: red; font-weight: bold;"' : '';
+            
+            let style = '';
+            if (isWorkerOnSickLeave) {
+                style = 'style="background-color: #fff3cd; color: #856404; font-weight: bold;"';
+            } else if (isWorkerConflicting) {
+                style = 'style="color: red; font-weight: bold;"';
+            }
+
             return `<li ${style}>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
         }).join('');
 
@@ -324,9 +337,18 @@ document.addEventListener('DOMContentLoaded', function() {
             <i class="fas fa-trash-alt action-btn delete-btn" title="Supprimer"></i>
             <i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i>
         </div>`;
-        const missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''} ${isConflicting ? 'conflicting-assignment' : ''}`;
+        
+        let missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''}`;
+        if (isConflicting) {
+            missionCardClass += ' conflicting-assignment';
+        }
 
-        return $(`<div class="${missionCardClass}" style="border-left-color: ${mission.color || '#6c757d'};" data-mission-id="${mission.mission_id}">
+        let missionCardStyle = `border-left-color: ${mission.color || '#6c757d'};`;
+        if(isAnyoneOnSickLeave) {
+            missionCardStyle += `background-color: #fff3cd;`;
+        }
+
+        return $(`<div class="${missionCardClass}" style="${missionCardStyle}" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
                 <div class="mission-card-body">
                     <div class="mission-title">${mission.mission_text}</div>
@@ -342,15 +364,21 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderWorkerList() {
         $workerList.empty();
         state.staff.forEach(worker => {
-            const isUnavailable = worker.status && worker.status !== 'available';
+            let isUnavailable = false;
             let statusText = '';
+            let customClass = '';
+
             if (worker.status === 'assigned') {
                 statusText = 'Assigné';
-            } else if (worker.status === 'on_leave') {
-                statusText = worker.leave_type || 'En Congé'; // Use leave_type if available
+                isUnavailable = true;
+                customClass = 'unavailable';
+            } else if (worker.status === 'on_leave' || worker.status === 'on_sick_leave') {
+                statusText = worker.leave_type || 'En Congé';
+                isUnavailable = true;
+                customClass = 'on-leave';
             }
 
-            $workerList.append(`<div class="worker-item ${isUnavailable ? 'unavailable' : ''}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
+            $workerList.append(`<div class="worker-item ${customClass}" draggable="${!isUnavailable}" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                 <div>${worker.prenom} ${worker.nom}</div>
                 ${isUnavailable ? `<div class="assignment-count">${statusText}</div>` : ''}
             </div>`);
