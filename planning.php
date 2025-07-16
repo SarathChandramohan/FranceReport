@@ -22,7 +22,7 @@ $default_color = $predefined_colors[0];
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
-        :root { --primary: #007bff; --light-gray: #f0f2f5; --card-bg: #ffffff; --border-color: #dee2e6; }
+        :root { --primary: #007bff; --light-gray: #f0f2f5; --card-bg: #ffffff; --border-color: #dee2e6; --dark-yellow: #ffc107; --light-yellow: #fff8e1;}
         html, body { height: 100%; overflow: hidden; }
         body { background-color: var(--light-gray); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 0.8rem; }
         h4 { font-size: 1rem; }
@@ -33,7 +33,7 @@ $default_color = $predefined_colors[0];
         .planning-col { flex: 1; }
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
         .worker-item.unavailable { background-color: #f8d7da; border-color: #f5c6cb; }
-        .worker-item.on-leave { background-color: #fff3cd; border-color: #ffeeba; } /* Yellow for leave */
+        .worker-item.on-leave { background-color: var(--light-yellow); border-color: var(--dark-yellow); } /* Dark Yellow for leave */
         .assignment-count { font-size: 0.5rem; color: #fff; background-color: #dc3545; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
@@ -43,13 +43,14 @@ $default_color = $predefined_colors[0];
         .day-header.selected .add-mission-to-day-btn { color: white; }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.conflicting-assignment { border: 2px solid red !important; }
-        .mission-card.on-leave-assignment { border: 2px solid #ffc107 !important; } /* Yellow border for leave assignment */
+        .mission-card.on-leave-assignment { border: 2px solid var(--dark-yellow) !important; } /* Dark Yellow border for leave assignment */
         .mission-card.validated { opacity: 0.8; background-color: #e6ffed; }
         .mission-card-body { cursor: pointer; }
         .mission-title { font-weight: 600; font-size: 0.6rem; margin-bottom: 5px; }
         .mission-meta { font-size: 0.5rem; color: #6c757d; margin-bottom: 8px; }
         .assigned-workers-list { list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.5rem; }
         .assigned-workers-list li { background-color: #e7f1ff; padding: 3px 8px; border-radius: 4px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .assigned-workers-list li.on-leave { background-color: var(--light-yellow); color: #856404; font-weight: bold; }
         .remove-worker-btn { cursor: pointer; color: #dc3545; }
         .mission-placeholder { font-size: 0.55rem; color: #6c757d; text-align: center; padding: 20px; border: 2px dashed #ced4da; border-radius: 6px; height: 100%; display: flex; align-items: center; justify-content: center;}
         .mission-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; background: rgba(255,255,255,0.8); border-radius: 5px; padding: 2px;}
@@ -312,26 +313,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMissionCard(mission) {
         const assignedIds = mission.assigned_user_ids ? mission.assigned_user_ids.split(',').map(id => id.trim()) : [];
         const assignedNames = mission.assigned_user_names ? mission.assigned_user_names.split(', ') : [];
-        const sickLeaveFlags = mission.sick_leave_flags ? mission.sick_leave_flags.split(',') : [];
-
+        const onLeaveFlags = mission.on_leave_flags ? mission.on_leave_flags.split(',') : [];
         const isConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
         const isOnLeaveAssignment = mission.is_on_leave_assignment == 1;
 
-        let isAnyoneOnSickLeave = sickLeaveFlags.includes('1');
-
         const workersHtml = assignedNames.map((name, i) => {
             const workerId = assignedIds[i];
-            const isWorkerOnSickLeave = sickLeaveFlags[i] === '1';
+            const isWorkerOnLeave = onLeaveFlags[i] === '1';
             const isWorkerConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.includes(workerId);
             
-            let style = '';
-            if (isWorkerOnSickLeave) {
-                style = 'style="background-color: #fff3cd; color: #856404; font-weight: bold;"';
-            } else if (isWorkerConflicting) {
-                style = 'style="color: red; font-weight: bold;"';
+            let liClass = '';
+            let nameStyle = '';
+            if (isWorkerConflicting) {
+                nameStyle = 'style="color: red; font-weight: bold;"';
+            } else if (isWorkerOnLeave) {
+                liClass = 'on-leave';
             }
 
-            return `<li ${style}>${name} <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
+            return `<li class="${liClass}"><span ${nameStyle}>${name}</span> <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
         }).join('');
 
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
@@ -347,10 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
             missionCardClass += ' on-leave-assignment';
         }
 
-        let missionCardStyle = `border-left-color: ${mission.color || '#6c757d'};`;
-        if(isAnyoneOnSickLeave && !isOnLeaveAssignment) { // Don't double-highlight if the whole card is already highlighted
-            missionCardStyle += `background-color: #fff3cd;`;
-        }
+        const missionCardStyle = `border-left-color: ${mission.color || '#6c757d'};`;
 
         return $(`<div class="${missionCardClass}" style="${missionCardStyle}" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
@@ -374,15 +370,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (worker.status === 'assigned') {
                 statusText = 'Assigné';
-                customClass = 'unavailable'; // Keep the red color
+                customClass = 'unavailable'; 
                 showStatus = true;
             } else if (worker.status === 'on_leave' || worker.status === 'on_sick_leave') {
                 statusText = worker.leave_type || 'En Congé';
-                customClass = 'on-leave'; // Keep the yellow color
+                customClass = 'on-leave';
                 showStatus = true;
             }
 
-            // All workers are draggable="true"
             $workerList.append(`<div class="worker-item ${customClass}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                 <div>${worker.prenom} ${worker.nom}</div>
                 ${showStatus ? `<div class="assignment-count">${statusText}</div>` : ''}
