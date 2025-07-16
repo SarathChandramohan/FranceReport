@@ -43,6 +43,7 @@ $default_color = $predefined_colors[0];
         .day-header.selected .add-mission-to-day-btn { color: white; }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.conflicting-assignment { border: 2px solid red !important; }
+        .mission-card.on-leave-assignment { border: 2px solid #ffc107 !important; } /* Yellow border for leave assignment */
         .mission-card.validated { opacity: 0.8; background-color: #e6ffed; }
         .mission-card-body { cursor: pointer; }
         .mission-title { font-weight: 600; font-size: 0.6rem; margin-bottom: 5px; }
@@ -314,6 +315,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const sickLeaveFlags = mission.sick_leave_flags ? mission.sick_leave_flags.split(',') : [];
 
         const isConflicting = Array.isArray(mission.conflicting_assignments) && mission.conflicting_assignments.some(userId => assignedIds.includes(String(userId)));
+        const isOnLeaveAssignment = mission.is_on_leave_assignment == 1;
 
         let isAnyoneOnSickLeave = sickLeaveFlags.includes('1');
 
@@ -341,10 +343,12 @@ document.addEventListener('DOMContentLoaded', function() {
         let missionCardClass = `mission-card ${mission.is_validated == 1 ? 'validated' : ''}`;
         if (isConflicting) {
             missionCardClass += ' conflicting-assignment';
+        } else if (isOnLeaveAssignment) {
+            missionCardClass += ' on-leave-assignment';
         }
 
         let missionCardStyle = `border-left-color: ${mission.color || '#6c757d'};`;
-        if(isAnyoneOnSickLeave) {
+        if(isAnyoneOnSickLeave && !isOnLeaveAssignment) { // Don't double-highlight if the whole card is already highlighted
             missionCardStyle += `background-color: #fff3cd;`;
         }
 
@@ -378,14 +382,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 showStatus = true;
             }
 
-            // *** BUG FIX: All workers are now draggable="true" ***
+            // All workers are draggable="true"
             $workerList.append(`<div class="worker-item ${customClass}" draggable="true" data-worker-id="${worker.user_id}" data-worker-name="${worker.prenom} ${worker.nom}">
                 <div>${worker.prenom} ${worker.nom}</div>
                 ${showStatus ? `<div class="assignment-count">${statusText}</div>` : ''}
             </div>`);
         });
     }
-
 
     async function refreshWorkerListForDate(date, manageLoadingState = true) {
         if (manageLoadingState) showLoading(true);
