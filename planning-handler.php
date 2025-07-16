@@ -102,6 +102,7 @@ function getInitialData($conn) {
             SELECT 
                 pa.*, 
                 c.type_conge,
+                CASE WHEN c.type_conge IS NOT NULL THEN 1 ELSE 0 END as is_on_leave,
                 CASE WHEN c.type_conge = 'maladie' OR c.type_conge = 'Arrêt maladie' THEN 1 ELSE 0 END as is_sick_leave,
                 COUNT(*) OVER (PARTITION BY pa.assigned_user_id, pa.assignment_date) as daily_assignment_count
             FROM Planning_Assignments pa
@@ -115,6 +116,7 @@ function getInitialData($conn) {
             pa.mission_group_id,
             pa.assignment_date, pa.mission_text, pa.comments, pa.location, pa.start_time,
             pa.end_time, pa.shift_type, pa.color, pa.is_validated,
+            MAX(pa.is_on_leave) as is_on_leave_assignment,
             STRING_AGG(CAST(pa.assigned_user_id AS VARCHAR(10)), ',') WITHIN GROUP (ORDER BY u.nom) as assigned_user_ids,
             STRING_AGG(u.prenom + ' ' + u.nom, ', ') WITHIN GROUP (ORDER BY u.nom) as assigned_user_names,
             STRING_AGG(CAST(pa.is_sick_leave AS VARCHAR(1)), ',') WITHIN GROUP (ORDER BY u.nom) as sick_leave_flags,
