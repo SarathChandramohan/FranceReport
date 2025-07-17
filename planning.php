@@ -57,18 +57,26 @@ $default_color = $predefined_colors[0];
         .action-btn { background: none; border: none; color: #6c757d; font-size: 0.5rem; cursor: pointer; padding: 3px; }
         .action-btn.validate-btn.validated { color: #28a545; }
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
-        .color-swatch { width:25px; height:25px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
+        .color-swatch { width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; margin:2px; border: 2px solid transparent; }
         .color-swatch.selected { border-color: #333; }
         .mission-placeholder-bottom { padding: 15px; margin-top: 10px; border: 2px dashed #ced4da; border-radius: 6px; text-align: center; color: #6c757d; font-size: 0.7rem; transition: background-color 0.2s ease, border-color 0.2s ease; }
         .mission-placeholder-bottom:hover { background-color: #e9ecef; border-color: #007bff; }
-        #missionFormView { background-color: var(--card-bg); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; height: 100%; }
-        .form-header { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
-        .form-body { flex-grow: 1; overflow-y: auto; padding-right: 15px; margin-right: -15px; }
-        .form-footer { border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 20px; }
-        #assigned_workers_drop_zone { border: 2px dashed #ced4da; border-radius: 6px; padding: 15px; background-color: #f8f9fa; min-height: 100px; transition: background-color 0.2s ease; }
+        
+        /* Compact Form Styles */
+        #missionFormView { background-color: var(--card-bg); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; height: 100%; }
+        #missionFormView .form-header { padding-bottom: 10px; margin-bottom: 15px; }
+        #missionFormView .form-body { flex-grow: 1; overflow-y: auto; padding-right: 15px; margin-right: -15px; }
+        #missionFormView .form-footer { padding-top: 10px; margin-top: 15px; }
+        #missionFormView h5 { font-size: 0.75rem; font-weight: 600; }
+        #missionFormView label { font-size: 0.65rem; font-weight: 500; margin-bottom: 2px; }
+        #missionFormView .form-group { margin-bottom: 0.6rem; }
+        #missionFormView .form-control, #missionFormView .btn { font-size: 0.7rem; padding: 0.25rem 0.5rem; height: auto; }
+        #missionFormView textarea.form-control { min-height: 40px; }
+        #missionFormView .alert { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
+        #assigned_workers_drop_zone { border: 2px dashed #ced4da; border-radius: 6px; padding: 10px; background-color: #f8f9fa; min-height: 80px; transition: background-color 0.2s ease; }
         #assigned_workers_drop_zone.drag-over { background-color: #e2e6ea; border-color: var(--primary); }
-        #assigned_workers_pills .badge { margin: 2px; font-size: 0.7rem; padding: 0.4em 0.8em; }
-        .remove-assigned-worker { cursor: pointer; margin-left: 8px; }
+        #assigned_workers_pills .badge { margin: 2px; font-size: 0.65rem; padding: 0.3em 0.6em; }
+        .remove-assigned-worker { cursor: pointer; margin-left: 6px; }
     </style>
 </head>
 <body>
@@ -108,11 +116,11 @@ $default_color = $predefined_colors[0];
                     <input type="hidden" id="mission_id_form" name="mission_id">
                     <input type="hidden" id="assignment_date_form" name="assignment_date">
                     <div class="form-row" id="multi_day_fields_form" style="display: none;">
-                        <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date" required></div>
-                        <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date" required></div>
+                        <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date"></div>
+                        <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date"></div>
                     </div>
                     <div class="form-group"><label>Titre de la mission *</label><input type="text" class="form-control" name="mission_text" required></div>
-                    <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="3"></textarea></div>
+                    <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="2"></textarea></div>
                     <div class="form-row">
                         <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control" name="start_time" id="mission_start_time"></div>
                         <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control" name="end_time" id="mission_end_time"></div>
@@ -121,8 +129,8 @@ $default_color = $predefined_colors[0];
                     <div class="form-group"><label>Type</label><div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons_form"></div></div>
                     <div class="form-group"><label>Couleur</label><div id="mission_color_swatches_form"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
                     <div id="assign-users-group-form">
-                        <hr><input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden_form">
-                        <label>Ouvriers assignés * (Glissez et déposez depuis la liste)</label>
+                        <hr class="my-2"><input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden_form">
+                        <label>Ouvriers assignés * (Glissez et déposez)</label>
                         <div id="assigned_workers_drop_zone">
                             <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center">
                                 <span class="text-muted small p-2" id="drop_placeholder_text">Déposez les ouvriers ici.</span>
@@ -130,10 +138,10 @@ $default_color = $predefined_colors[0];
                         </div>
                     </div>
                     <div id="asset-management-container-form" class="mt-3">
-                        <hr><div class="form-group">
+                        <hr class="my-2"><div class="form-group">
                             <input type="hidden" name="assigned_asset_ids" id="assigned_asset_ids_hidden_form">
                             <label>Matériel assigné</label>
-                            <div id="assigned_assets_display_form" class="d-flex flex-wrap align-items-center border rounded p-2 mb-2 bg-light" style="min-height: 50px;"><span class="text-muted small p-2">Aucun matériel assigné.</span></div>
+                            <div id="assigned_assets_display_form" class="d-flex flex-wrap align-items-center border rounded p-2 mb-2 bg-light" style="min-height: 40px;"><span class="text-muted small p-2">Aucun matériel assigné.</span></div>
                             <button type="button" class="btn btn-sm btn-info" id="manageAssetsBtnForm">Gérer le Matériel</button>
                         </div>
                     </div>
@@ -341,50 +349,55 @@ document.addEventListener('DOMContentLoaded', function() {
         $planningView.show();
     }
     function resetAndConfigureForm(config) {
-        $missionForm[0].reset();
-        hideFormError();
-        assignedWorkersInForm = [];
-        assignedAssetsInForm = [];
+        $missionForm[0].reset(); hideFormError();
+        assignedWorkersInForm = []; assignedAssetsInForm = [];
         $('#shift_type_buttons_form label').removeClass('active');
         $('#deleteMissionBtnForm').hide();
         $('#assign-users-group-form').show();
+
+        const $startDateInput = $missionForm.find('input[name="start_date"]');
+        const $endDateInput = $missionForm.find('input[name="end_date"]');
 
         if (config.isMultiDay) {
             $('#missionFormTitle').text('Nouvelle Mission sur Plusieurs Jours');
             $('#formDateDisplay').hide();
             $('#multi_day_fields_form').show();
             $('#assignment_date_form').val('');
-        } else if (config.mission) { // Editing
-            const mission = config.mission;
-            $('#missionFormTitle').text('Modifier la Mission');
+            $startDateInput.prop('required', true); // BUG FIX
+            $endDateInput.prop('required', true);   // BUG FIX
+        } else { // Single day (create or edit)
             $('#multi_day_fields_form').hide();
-            $('#formDateDisplay').show();
-            setFormDate(mission.assignment_date);
-
-            $('#mission_id_form').val(mission.mission_id);
-            $('#assignment_date_form').val(mission.assignment_date);
-            $missionForm.find('input[name="mission_text"]').val(mission.mission_text);
-            $missionForm.find('textarea[name="comments"]').val(mission.comments);
-            $missionForm.find('input[name="start_time"]').val(mission.start_time);
-            $missionForm.find('input[name="end_time"]').val(mission.end_time);
-            $missionForm.find('input[name="location"]').val(mission.location);
-            $missionForm.find(`input[name="shift_type"][value="${mission.shift_type}"]`).prop('checked', true).parent().addClass('active');
-            assignedAssetsInForm = mission.assigned_assets || [];
+            $startDateInput.prop('required', false); // BUG FIX
+            $endDateInput.prop('required', false);  // BUG FIX
             
-            $('#assign-users-group-form').hide(); // Cannot re-assign when editing a single instance
-            $('#deleteMissionBtnForm').show();
-            updateColorSwatches(mission.color || DEFAULT_COLOR);
-        } else { // Creating single day
-            $('#missionFormTitle').text('Nouvelle Mission');
-            $('#multi_day_fields_form').hide();
-            $('#formDateDisplay').show();
-            setFormDate(config.date);
-            $('#assignment_date_form').val(config.date);
-            if (config.worker) {
-                assignedWorkersInForm.push(config.worker);
-                $('#missionFormTitle').text(`Nouvelle Mission pour ${config.worker.name}`);
+            if (config.mission) { // Editing
+                const mission = config.mission;
+                $('#missionFormTitle').text('Modifier la Mission');
+                $('#formDateDisplay').show();
+                setFormDate(mission.assignment_date);
+                $('#mission_id_form').val(mission.mission_id);
+                $('#assignment_date_form').val(mission.assignment_date);
+                $missionForm.find('input[name="mission_text"]').val(mission.mission_text);
+                $missionForm.find('textarea[name="comments"]').val(mission.comments);
+                $missionForm.find('input[name="start_time"]').val(mission.start_time);
+                $missionForm.find('input[name="end_time"]').val(mission.end_time);
+                $missionForm.find('input[name="location"]').val(mission.location);
+                $missionForm.find(`input[name="shift_type"][value="${mission.shift_type}"]`).prop('checked', true).parent().addClass('active');
+                assignedAssetsInForm = mission.assigned_assets || [];
+                $('#assign-users-group-form').hide();
+                $('#deleteMissionBtnForm').show();
+                updateColorSwatches(mission.color || DEFAULT_COLOR);
+            } else { // Creating single day
+                $('#missionFormTitle').text('Nouvelle Mission');
+                $('#formDateDisplay').show();
+                setFormDate(config.date);
+                $('#assignment_date_form').val(config.date);
+                if (config.worker) {
+                    assignedWorkersInForm.push(config.worker);
+                    $('#missionFormTitle').text(`Nouvelle Mission pour ${config.worker.name}`);
+                }
+                updateColorSwatches(DEFAULT_COLOR);
             }
-            updateColorSwatches(DEFAULT_COLOR);
         }
         
         renderAssignedWorkersInForm();
@@ -510,7 +523,6 @@ document.addEventListener('DOMContentLoaded', function() {
         hideFormError();
         const formData = Object.fromEntries(new FormData(this).entries());
         
-        // BUG FIX: Convert assigned IDs to comma-separated strings for the backend
         formData.assigned_user_ids = assignedWorkersInForm.map(w => w.id).join(',');
         formData.assigned_asset_ids = assignedAssetsInForm.map(a => a.id).join(',');
 
@@ -522,7 +534,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             await apiCall('save_mission', 'POST', formData);
             hideMissionFormView();
-            await fetchInitialData(false); // Refresh data after successful save
+            await fetchInitialData(false);
         } catch (error) { 
             showFormError(error.message); 
         } finally { 
