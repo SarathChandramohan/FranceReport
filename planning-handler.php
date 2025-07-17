@@ -104,7 +104,7 @@ function getInitialData($conn) {
                 c.type_conge,
                 CASE WHEN c.type_conge IS NOT NULL THEN 1 ELSE 0 END as is_on_leave,
                 CASE WHEN c.type_conge = 'maladie' OR c.type_conge = 'Arrêt maladie' THEN 1 ELSE 0 END as is_sick_leave,
-                COUNT(pa.assigned_user_id) OVER (PARTITION BY pa.assigned_user_id, pa.assignment_date) as daily_assignment_count
+                COUNT(*) OVER (PARTITION BY pa.assigned_user_id, pa.assignment_date) as daily_assignment_count
             FROM Planning_Assignments pa
             LEFT JOIN Conges c ON pa.assigned_user_id = c.user_id 
                                AND pa.assignment_date BETWEEN c.date_debut AND c.date_fin 
@@ -125,7 +125,7 @@ function getInitialData($conn) {
              FROM MissionAssignments conflict_pa 
              WHERE conflict_pa.assignment_date = pa.assignment_date AND conflict_pa.daily_assignment_count > 1) as conflicting_assignments
         FROM MissionAssignments pa
-        LEFT JOIN Users u ON pa.assigned_user_id = u.user_id
+        JOIN Users u ON pa.assigned_user_id = u.user_id
         GROUP BY
             pa.mission_group_id, pa.assignment_date, pa.mission_text, pa.comments, pa.location, pa.start_time,
             pa.end_time, pa.shift_type, pa.color, pa.is_validated
@@ -230,7 +230,6 @@ function saveMission($conn, $creator_id, $data) {
     $assigned_users = $data['assigned_user_ids'] ?? [];
     $assigned_asset_ids = $data['assigned_asset_ids'] ?? [];
     $comments = $data['comments'] ?? '';
-    $create_empty_mission = isset($data['create_empty_mission']) && $data['create_empty_mission'] == '1';
 
     if (empty($data['mission_text'])) respondWithError('Le titre de la mission est obligatoire.');
 
@@ -300,7 +299,7 @@ function saveMission($conn, $creator_id, $data) {
         }
 
     } else { // CREATE new mission
-        if (empty($assigned_users) && !$create_empty_mission) {
+        if (empty($assigned_users)) {
             $conn->rollBack();
             respondWithError('Veuillez assigner au moins un ouvrier.');
         }
@@ -308,17 +307,17 @@ function saveMission($conn, $creator_id, $data) {
         $stmt_insert = $conn->prepare("INSERT INTO Planning_Assignments (assigned_user_id, creator_user_id, assignment_date, start_time, end_time, shift_type, mission_text, comments, color, location, is_validated, mission_group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)");
         $stmt_book = $conn->prepare("INSERT INTO Bookings (asset_id, user_id, booking_date, mission, status, mission_group_id) VALUES (?, NULL, ?, ?, 'booked', ?)");
 
+        // Loop through each day, create a unique group ID, and then create assignments AND bookings for that day.
         foreach ($dates as $mission_date) {
+            // 1. Generate a new, unique ID for this day's group of assignments
             $mission_group_id = $conn->query("SELECT NEWID()")->fetchColumn();
 
-            if ($create_empty_mission) {
-                $stmt_insert->execute([null, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null, $data['shift_type'], $data['mission_text'], $comments, $data['color'], $data['location'] ?: null, $mission_group_id]);
-            } else {
-                foreach ($assigned_users as $user_id) {
-                    $stmt_insert->execute([$user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null, $data['shift_type'], $data['mission_text'], $comments, $data['color'], $data['location'] ?: null, $mission_group_id]);
-                }
+            // 2. Create user assignments for this day
+            foreach ($assigned_users as $user_id) {
+                $stmt_insert->execute([$user_id, $creator_id, $mission_date, $data['start_time'] ?: null, $data['end_time'] ?: null, $data['shift_type'], $data['mission_text'], $comments, $data['color'], $data['location'] ?: null, $mission_group_id]);
             }
-            
+
+            // 3. Create asset bookings for this day
             if (!empty($assigned_asset_ids)) {
                 foreach ($assigned_asset_ids as $asset_id) {
                     $stmt_book->execute([$asset_id, $mission_date, $data['mission_text'], $mission_group_id]);
@@ -341,6 +340,7 @@ function deleteMissionGroup($conn, $data) {
     $conn->beginTransaction();
 
     try {
+        // Find the mission_group_id from the specific assignment_id clicked by the user
         $stmt_find_group = $conn->prepare("SELECT mission_group_id FROM Planning_Assignments WHERE assignment_id = ?");
         $stmt_find_group->execute([$mission_id]);
         $mission_group_id = $stmt_find_group->fetchColumn();
@@ -350,9 +350,11 @@ function deleteMissionGroup($conn, $data) {
             respondWithError('Mission à supprimer non trouvée.');
         }
 
+        // Delete all bookings associated with this mission group
         $stmt_delete_bookings = $conn->prepare("DELETE FROM Bookings WHERE mission_group_id = ?");
         $stmt_delete_bookings->execute([$mission_group_id]);
 
+        // Delete all assignments for this mission group
         $stmt_delete_assignments = $conn->prepare("DELETE FROM Planning_Assignments WHERE mission_group_id = ?");
         $stmt_delete_assignments->execute([$mission_group_id]);
 
@@ -404,10 +406,6 @@ function assignWorkerToMission($conn, $creator_id, $data) {
         $stmt_insert->execute([$worker_id, $creator_id, $date, $mission_template['start_time'], $mission_template['end_time'], $mission_template['shift_type'], $mission_template['mission_text'], $mission_template['comments'], $mission_template['color'], $mission_template['location'], $mission_template['is_validated'], $mission_group_id]);
     }
     
-    // After adding the new worker, delete any placeholder assignment in the same group
-    $stmt_delete_placeholder = $conn->prepare("DELETE FROM Planning_Assignments WHERE mission_group_id = ? AND assigned_user_id IS NULL");
-    $stmt_delete_placeholder->execute([$mission_group_id]);
-    
     $conn->commit();
     respondWithSuccess('Ouvrier assigné à toutes les journées de la mission.');
 }
@@ -439,6 +437,8 @@ function removeWorkerFromMission($conn, $data) {
         }
 
         // 2. Delete the specific worker's assignment(s) for this mission group.
+        // This is important for multi-day missions where a worker might have multiple assignment rows under one group ID.
+        // However, based on current logic, each day has a unique group ID, so this will only delete one record.
         $stmt_delete_worker = $conn->prepare("DELETE FROM Planning_Assignments WHERE assigned_user_id = ? AND mission_group_id = ?");
         $stmt_delete_worker->execute([$worker_id, $mission_group_id]);
 
