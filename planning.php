@@ -28,9 +28,9 @@ $default_color = $predefined_colors[0];
         h4 { font-size: 1rem; }
         h5 { font-size: 0.85rem; }
         .main-container { display: flex; height: calc(100vh - 78px); }
-        .workers-list-col, .planning-col { height: 100%; overflow-y: auto; padding: 15px; }
-        .workers-list-col { flex: 0 0 280px; background: var(--card-bg); border-right: 1px solid var(--border-color); }
-        .planning-col { flex: 1; }
+        .workers-list-col, .planning-col { height: 100%; padding: 15px; }
+        .workers-list-col { flex: 0 0 280px; background: var(--card-bg); border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .planning-col { flex: 1; overflow-y: auto; }
         .worker-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 8px; background-color: #fcfdff; cursor: grab; transition: all 0.2s ease; user-select: none; }
         .worker-item.unavailable { background-color: #f8d7da; border-color: #f5c6cb; cursor: not-allowed; }
         .worker-item.on-leave { background-color: var(--light-yellow); border-color: var(--dark-yellow); }
@@ -61,7 +61,7 @@ $default_color = $predefined_colors[0];
         .color-swatch.selected { border-color: #333; }
         .mission-placeholder-bottom { padding: 15px; margin-top: 10px; border: 2px dashed #ced4da; border-radius: 6px; text-align: center; color: #6c757d; font-size: 0.7rem; transition: background-color 0.2s ease, border-color 0.2s ease; }
         .mission-placeholder-bottom:hover { background-color: #e9ecef; border-color: #007bff; }
-        #missionFormContainer { background-color: var(--card-bg); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; height: 100%; }
+        #missionFormView { background-color: var(--card-bg); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; height: 100%; }
         .form-header { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
         .form-body { flex-grow: 1; overflow-y: auto; padding-right: 15px; margin-right: -15px; }
         .form-footer { border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 20px; }
@@ -98,18 +98,18 @@ $default_color = $predefined_colors[0];
             </div>
         </div>
 
-        <div class="planning-col" id="missionFormContainer" style="display: none;">
+        <div class="planning-col" id="missionFormView" style="display: none;">
             <form id="missionForm" class="d-flex flex-column h-100">
                 <div class="form-header">
                     <h5 id="missionFormTitle">Nouvelle Mission</h5>
-                    <div class="alert alert-info mt-2" id="formDateDisplay"></div>
+                    <div class="alert alert-info mt-2" id="formDateDisplay" style="display: none;"></div>
                 </div>
                 <div class="form-body">
                     <input type="hidden" id="mission_id_form" name="mission_id">
                     <input type="hidden" id="assignment_date_form" name="assignment_date">
                     <div class="form-row" id="multi_day_fields_form" style="display: none;">
-                        <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date"></div>
-                        <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date"></div>
+                        <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date" required></div>
+                        <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date" required></div>
                     </div>
                     <div class="form-group"><label>Titre de la mission *</label><input type="text" class="form-control" name="mission_text" required></div>
                     <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="3"></textarea></div>
@@ -150,7 +150,6 @@ $default_color = $predefined_colors[0];
         </div>
     </div>
 
-    <div class="modal fade" id="multiDayMissionInfoModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Info</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body"><p>La création de missions sur plusieurs jours se fait désormais depuis le même formulaire. Bientôt, vous pourrez sélectionner plusieurs dates directement.</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Fermer</button></div></div></div></div>
     <div class="modal fade" id="assetAssignmentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Assigner du Matériel</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body"><input type="text" id="asset_assignment_search" class="form-control mb-3" placeholder="Rechercher par nom ou n° de série..."><div id="asset_assignment_list" class="list-group" style="max-height: 400px; overflow-y: auto;"></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-primary" id="confirmAssetAssignmentBtn">Confirmer la Sélection</button></div></div></div></div>
     <div class="modal fade" id="confirmationModal" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Confirmation</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body" id="confirmationModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="button" class="btn btn-danger" id="confirmActionBtn">Confirmer</button></div></div></div></div>
     <div id="loadingOverlay"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div></div>
@@ -172,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- DOM ELEMENTS ---
     const $loading = $('#loadingOverlay');
     const $planningView = $('#planningView');
-    const $missionFormView = $('#missionFormContainer');
+    const $missionFormView = $('#missionFormView');
     const $planningContainer = $('#dailyPlanningContainer');
     const $workerList = $('#workerList');
     const $missionForm = $('#missionForm');
@@ -191,17 +190,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function getFormDates() {
         const dates = [];
-        const isMulti = $('#multi_day_fields_form').is(':visible');
-        const start = $('#missionForm input[name="start_date"]').val();
-        const end = $('#missionForm input[name="end_date"]').val();
-        const single = $('#assignment_date_form').val();
-
-        if (isMulti && start && end) {
-            for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
-                dates.push(getLocalDateString(new Date(d)));
+        if ($('#multi_day_fields_form').is(':visible')) {
+            const start = $missionForm.find('input[name="start_date"]').val();
+            const end = $missionForm.find('input[name="end_date"]').val();
+            if (start && end) {
+                for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
+                    dates.push(getLocalDateString(d));
+                }
             }
-        } else if (single) {
-            dates.push(single);
+        } else {
+            const single = $('#assignment_date_form').val();
+            if(single) dates.push(single);
         }
         return dates;
     }
@@ -284,7 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
 
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
-
         const actionsHtml = `<div class="mission-actions">
             <i class="fas fa-trash-alt action-btn delete-btn" title="Supprimer"></i>
             <i class="fas fa-check-circle action-btn validate-btn ${mission.is_validated == 1 ? 'validated' : ''}" title="Valider"></i>
@@ -293,7 +291,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isConflicting) missionCardClass += ' conflicting-assignment';
         else if (isOnLeaveAssignment) missionCardClass += ' on-leave-assignment';
         const missionCardStyle = `border-left-color: ${mission.color || '#6c757d'};`;
-
         return $(`<div class="${missionCardClass}" style="${missionCardStyle}" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
                 <div class="mission-card-body">
@@ -344,20 +341,28 @@ document.addEventListener('DOMContentLoaded', function() {
         $planningView.show();
     }
     function resetAndConfigureForm(config) {
-        $missionForm[0].reset(); hideFormError();
-        assignedWorkersInForm = []; assignedAssetsInForm = [];
+        $missionForm[0].reset();
+        hideFormError();
+        assignedWorkersInForm = [];
+        assignedAssetsInForm = [];
         $('#shift_type_buttons_form label').removeClass('active');
         $('#deleteMissionBtnForm').hide();
-        $('#multi_day_fields_form').hide();
         $('#assign-users-group-form').show();
 
-        let title = 'Nouvelle Mission';
-        if (config.mission) { // Editing
+        if (config.isMultiDay) {
+            $('#missionFormTitle').text('Nouvelle Mission sur Plusieurs Jours');
+            $('#formDateDisplay').hide();
+            $('#multi_day_fields_form').show();
+            $('#assignment_date_form').val('');
+        } else if (config.mission) { // Editing
             const mission = config.mission;
-            title = 'Modifier la Mission';
+            $('#missionFormTitle').text('Modifier la Mission');
+            $('#multi_day_fields_form').hide();
+            $('#formDateDisplay').show();
+            setFormDate(mission.assignment_date);
+
             $('#mission_id_form').val(mission.mission_id);
             $('#assignment_date_form').val(mission.assignment_date);
-            setFormDate(mission.assignment_date);
             $missionForm.find('input[name="mission_text"]').val(mission.mission_text);
             $missionForm.find('textarea[name="comments"]').val(mission.comments);
             $missionForm.find('input[name="start_time"]').val(mission.start_time);
@@ -365,29 +370,34 @@ document.addEventListener('DOMContentLoaded', function() {
             $missionForm.find('input[name="location"]').val(mission.location);
             $missionForm.find(`input[name="shift_type"][value="${mission.shift_type}"]`).prop('checked', true).parent().addClass('active');
             assignedAssetsInForm = mission.assigned_assets || [];
-            $('#assign-users-group-form').hide();
+            
+            $('#assign-users-group-form').hide(); // Cannot re-assign when editing a single instance
             $('#deleteMissionBtnForm').show();
-        } else { // Creating
+            updateColorSwatches(mission.color || DEFAULT_COLOR);
+        } else { // Creating single day
+            $('#missionFormTitle').text('Nouvelle Mission');
+            $('#multi_day_fields_form').hide();
+            $('#formDateDisplay').show();
             setFormDate(config.date);
             $('#assignment_date_form').val(config.date);
             if (config.worker) {
                 assignedWorkersInForm.push(config.worker);
-                title = `Nouvelle Mission pour ${config.worker.name}`;
+                $('#missionFormTitle').text(`Nouvelle Mission pour ${config.worker.name}`);
             }
+            updateColorSwatches(DEFAULT_COLOR);
         }
-        $('#missionFormTitle').text(title);
+        
         renderAssignedWorkersInForm();
         updateAssignedAssetsDisplay();
-        updateColorSwatches(config.mission ? config.mission.color : DEFAULT_COLOR);
     }
     function setFormDate(dateStr) {
         const [year, month, day] = dateStr.split('-').map(Number);
         const date = new Date(Date.UTC(year, month - 1, day));
         const displayDate = date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-        $('#formDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`).show();
+        $('#formDateDisplay').html(`Mission pour le: <strong>${displayDate}</strong>`);
     }
     function setupFormStaticContent() {
-        $('#shift_type_buttons_form').html(Object.entries({matin:'Matin', 'apres-midi':'Après-midi', nuit:'Nuit', repos:'Repos', custom:'Personnalisé'}).map(([v, l]) => `<label class="btn btn-sm btn-outline-secondary"><input type="radio" name="shift_type" value="${v}" required> ${l}</label>`).join(''));
+        $('#shift_type_buttons_form').html(Object.entries({matin:'Matin', 'apres-midi':'Après-midi', nuit:'Nuit', repos:'Repos', custom:'Personnalisé'}).map(([v, l]) => `<label class="btn btn-sm btn-outline-secondary"><input type="radio" name="shift_type" value="${v}"> ${l}</label>`).join(''));
         $('#mission_color_swatches_form').html(PREDEFINED_COLORS.map(c => `<div class="color-swatch" style="background-color:${c};" data-color="${c}"></div>`).join(''));
     }
 
@@ -447,7 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- GLOBAL EVENT HANDLERS ---
     $('#prevWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7); fetchInitialData(); });
     $('#nextWeekBtn').on('click', () => { state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7); fetchInitialData(); });
-    $('#addMultiDayMissionBtn').on('click', () => $('#multiDayMissionInfoModal').modal('show'));
+    $('#addMultiDayMissionBtn').on('click', () => showMissionFormView({ isMultiDay: true }));
     $('#activateAllBtn').on('click', function() { const endDate = new Date(state.currentWeekStart); endDate.setDate(endDate.getDate() + 6); showConfirmation('Voulez-vous activer toutes les planifications pour la semaine en cours ?', async () => { showLoading(true); try { await apiCall('validate_all_for_week', 'POST', { start_date: getLocalDateString(state.currentWeekStart), end_date: getLocalDateString(endDate) }); await fetchInitialData(false); } catch (error) { alert(`Erreur: ${error.message}`); } finally { showLoading(false); } }); });
 
     // --- PLANNING VIEW HANDLERS ---
@@ -471,9 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (state.draggedWorker) showMissionFormView({ date: $(this).data('date'), worker: state.draggedWorker });
     });
     $planningContainer.on('drop', '.mission-card', async function(e) {
-        e.preventDefault(); e.stopPropagation();
-        if (!state.draggedWorker) return;
-        showLoading(true);
+        e.preventDefault(); e.stopPropagation(); if (!state.draggedWorker) return; showLoading(true);
         try {
             const missionId = $(this).data('mission-id');
             const mission = state.missions.find(m => m.mission_id == missionId);
@@ -498,20 +506,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     $('#cancelMissionFormBtn').on('click', hideMissionFormView);
     $missionForm.on('submit', async function(e) {
-        e.preventDefault(); hideFormError();
+        e.preventDefault();
+        hideFormError();
         const formData = Object.fromEntries(new FormData(this).entries());
-        if ($('#assign-users-group-form').is(':visible') && !assignedWorkersInForm.length) {
+        
+        // BUG FIX: Convert assigned IDs to comma-separated strings for the backend
+        formData.assigned_user_ids = assignedWorkersInForm.map(w => w.id).join(',');
+        formData.assigned_asset_ids = assignedAssetsInForm.map(a => a.id).join(',');
+
+        if ($('#assign-users-group-form').is(':visible') && !formData.assigned_user_ids) {
             showFormError("Veuillez assigner au moins un ouvrier."); return;
         }
-        formData.assigned_user_ids = assignedWorkersInForm.map(w => w.id);
-        formData.assigned_asset_ids = assignedAssetsInForm.map(a => a.id);
+
         showLoading(true);
         try {
             await apiCall('save_mission', 'POST', formData);
             hideMissionFormView();
-            await fetchInitialData(false);
-        } catch (error) { showFormError(error.message); }
-        finally { showLoading(false); }
+            await fetchInitialData(false); // Refresh data after successful save
+        } catch (error) { 
+            showFormError(error.message); 
+        } finally { 
+            showLoading(false); 
+        }
     });
 
     $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() {
@@ -531,7 +547,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAssignedAssetsDisplay();
         $('#assetAssignmentModal').modal('hide');
     });
-     $('#deleteMissionBtnForm').on('click', function() {
+    $('#deleteMissionBtnForm').on('click', function() {
         const missionId = $('#mission_id_form').val(); if (!missionId) return;
         hideMissionFormView();
         showConfirmation('Supprimer cette mission, ses affectations, et ses réservations de matériel ?', async () => {
