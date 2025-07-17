@@ -37,8 +37,9 @@ $default_color = $predefined_colors[0];
         .assignment-count { font-size: 0.5rem; color: #fff; background-color: #dc3545; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
-        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:center; align-items:center; cursor: pointer; }
+        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:space-between; align-items:center; cursor: pointer; }
         .day-header.selected { background-color: var(--primary); color: white; }
+        .add-daily-mission-btn { background-color: var(--primary); color: white; border-radius: 50%; width: 24px; height: 24px; line-height: 24px; text-align: center; padding: 0; font-size: 16px; font-weight: bold; border: none; cursor: pointer; }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.conflicting-assignment { border: 2px solid red !important; }
         .mission-card.on-leave-assignment { border: 2px solid var(--dark-yellow) !important; }
@@ -126,10 +127,8 @@ $default_color = $predefined_colors[0];
                         <div id="assign-users-group" style="display:none;">
                              <hr>
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
-                            <label>Ouvriers assignés *</label>
-                            <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;"><span class="text-muted small p-2" id="no_workers_assigned_text">Aucun ouvrier assigné.</span></div>
-                            <label>Cliquer pour assigner un ouvrier :</label>
-                            <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+                            <label>Ouvriers assignés * (Glissez et déposez depuis la liste)</label>
+                            <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;"><span class="text-muted small p-2" id="no_workers_assigned_text">Déposez les ouvriers ici.</span></div>
                         </div>
                         <div id="asset-management-container" style="display: none;">
                             <hr>
@@ -295,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateStr = getLocalDateString(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
             const isSelected = dateStr === state.selectedDate;
-            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span></div>`);
+            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span><button class="add-daily-mission-btn" data-date="${dateStr}">+</button></div>`);
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
             const $dayContent = $(`<div class="day-content p-2" data-date="${dateStr}"></div>`).appendTo($dayColumn);
             $planningContainer.append($dayColumn);
@@ -330,7 +329,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return `<li class="${liClass}"><span ${nameStyle}>${name}</span> <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
         }).join('');
 
-        // *** BUG FIX: Restored the logic to display assigned assets on the mission card ***
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         
         const actionsHtml = `<div class="mission-actions">
@@ -410,11 +408,6 @@ document.addEventListener('DOMContentLoaded', function() {
         assignedWorkersInModal.forEach(w => $list.append(`<span class="badge badge-primary p-2 m-1">${w.name}<i class="fas fa-times ml-2 remove-assigned-worker" data-worker-id="${w.id}"></i></span>`));
         $hidden.val(assignedWorkersInModal.map(w => w.id).join(','));
     }
-    function renderAvailableWorkersInModal() {
-        const $list = $('#modal_available_workers'); $list.empty();
-        const assignedIds = new Set(assignedWorkersInModal.map(w => String(w.id)));
-        state.staff.forEach(w => { if (!assignedIds.has(String(w.user_id))) $list.append(`<a href="#" class="list-group-item list-group-item-action py-2" data-worker-id="${w.user_id}" data-worker-name="${w.prenom} ${w.nom}">${w.prenom} ${w.nom}</a>`); });
-    }
 
     // --- ASSET ASSIGNMENT LOGIC ---
     function updateAssignedAssetsDisplay() {
@@ -478,9 +471,15 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#asset-management-container').show();
         $('#deleteMissionBtn').hide();
         $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission sur Plusieurs Jours');
-        renderAssignedWorkersInModal(); renderAvailableWorkersInModal();
+        renderAssignedWorkersInModal();
         updateAssignedAssetsDisplay();
         $missionModal.modal('show');
+    });
+    
+    $planningContainer.on('click', '.add-daily-mission-btn', function(e) {
+        e.stopPropagation();
+        const date = $(this).data('date');
+        openModalForCreate(date, false, true);
     });
 
     $planningContainer.on('click', '.day-header', function() {
@@ -524,7 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#mission_color_swatches').html(PREDEFINED_COLORS.map(c => `<div class="color-swatch" style="background-color:${c};" data-color="${c}"></div>`).join(''));
     }
 
-    function openModalForCreate(date, fromDragDrop = false) {
+    function openModalForCreate(date, fromDragDrop = false, isDailyPlanning = false) {
         assignedWorkersInModal = []; assignedAssetsInModal = [];
         $missionModal.find('form')[0].reset(); hideModalError();
         $('#shift_type_buttons label').removeClass('active');
@@ -539,7 +538,13 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#asset-management-container').show();
         updateAssignedAssetsDisplay();
 
-        if (fromDragDrop && state.draggedWorker) {
+        if (isDailyPlanning) {
+            $missionModal.removeClass('compact-modal');
+            $('#assign-users-group').show();
+            $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission Journalière');
+            renderAssignedWorkersInModal();
+            setupAssigneeDropZone();
+        } else if (fromDragDrop && state.draggedWorker) {
             $missionModal.addClass('compact-modal');
             $('#assign-users-group').hide();
             $missionModal.find('#missionFormModalLabel').text(`Nouvelle Mission pour ${state.draggedWorker.name}`);
@@ -548,9 +553,31 @@ document.addEventListener('DOMContentLoaded', function() {
             $('#assign-users-group').show();
             $missionModal.find('#missionFormModalLabel').text('Nouvelle Mission');
             renderAssignedWorkersInModal();
-            renderAvailableWorkersInModal();
         }
         $missionModal.modal('show');
+    }
+    
+    function setupAssigneeDropZone() {
+        const dropZone = document.getElementById('assigned_workers_pills');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#e9ecef';
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.backgroundColor = '';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '';
+            if (state.draggedWorker) {
+                const alreadyAssigned = assignedWorkersInModal.some(w => String(w.id) === String(state.draggedWorker.id));
+                if (!alreadyAssigned) {
+                    assignedWorkersInModal.push(state.draggedWorker);
+                    renderAssignedWorkersInModal();
+                }
+                state.draggedWorker = null;
+            }
+        });
     }
 
     $planningContainer.on('click', '.mission-card-body', function() {
@@ -588,8 +615,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- EVENT LISTENERS CONTINUED ---
     $('#shift_type_buttons').on('change', 'input[name="shift_type"]', function() { const dis = $(this).val() === 'repos'; $('#mission_start_time, #mission_end_time').prop('disabled', dis).val(dis ? '' : $('#mission_start_time').val()); });
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
-    $('#modal_available_workers').on('click', '.list-group-item', function(e) { e.preventDefault(); assignedWorkersInModal.push({ id: $(this).data('worker-id'), name: $(this).data('worker-name') }); renderAssignedWorkersInModal(); $(this).remove(); });
-    $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() { const id = $(this).data('worker-id'); assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(id)); renderAssignedWorkersInModal(); renderAvailableWorkersInModal(); });
+    $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() { const id = $(this).data('worker-id'); assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(id)); renderAssignedWorkersInModal(); });
     $('#manageAssetsBtn').on('click', function() { populateAssetAssignmentModal(); $('#assetAssignmentModal').modal('show'); });
     $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
     $('#confirmAssetAssignmentBtn').on('click', function() {
