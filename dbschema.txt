@@ -1,0 +1,370 @@
+-- Publisher XML settings
+/*
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <TargetDatabaseName>DatabaseProjectFrancerecord</TargetDatabaseName>
+    <AllowIncompatiblePlatform>True</AllowIncompatiblePlatform>
+    <DropPermissionsNotInSource>True</DropPermissionsNotInSource>
+    <DropObjectsNotInSource>True</DropObjectsNotInSource>
+    <DropRoleMembersNotInSource>True</DropRoleMembersNotInSource>
+    <IgnoreKeywordCasing>False</IgnoreKeywordCasing>
+    <IgnoreSemicolonBetweenStatements>False</IgnoreSemicolonBetweenStatements>
+    <AllowDropBlockingAssemblies>True</AllowDropBlockingAssemblies>
+    <ProfileVersionNumber>1</ProfileVersionNumber>
+  </PropertyGroup>
+</Project>
+*/
+
+-- Table: dbo.Users
+CREATE TABLE [dbo].[Users] (
+    [user_id]       INT            IDENTITY (1, 1) NOT NULL,
+    [nom]           NVARCHAR (255) NOT NULL,
+    [prenom]        NVARCHAR (255) NOT NULL,
+    [email]         NVARCHAR (255) NOT NULL,
+    [role]          VARCHAR (50)   DEFAULT ('User') NOT NULL,
+    [status]        VARCHAR (20)   DEFAULT ('Active') NOT NULL,
+    [password_hash] NVARCHAR (255) NOT NULL,
+    [date_creation] DATETIME       DEFAULT (getdate()) NULL,
+    PRIMARY KEY CLUSTERED ([user_id] ASC),
+    UNIQUE NONCLUSTERED ([email] ASC)
+);
+
+
+GO
+
+-- Table: dbo.AssetCategories
+CREATE TABLE [dbo].[AssetCategories] (
+    [category_id]        INT            IDENTITY (1, 1) NOT NULL,
+    [category_name]      NVARCHAR (100) NOT NULL,
+    [category_type]      VARCHAR (50)   NOT NULL,
+    [parent_category_id] INT            NULL,
+    PRIMARY KEY CLUSTERED ([category_id] ASC),
+    CONSTRAINT [FK_AssetCategories_Parent] FOREIGN KEY ([parent_category_id]) REFERENCES [dbo].[AssetCategories] ([category_id])
+);
+
+
+GO
+
+-- Table: dbo.Inventory
+CREATE TABLE [dbo].[Inventory] (
+    [asset_id]            INT            IDENTITY (1, 1) NOT NULL,
+    [barcode]             VARCHAR (255)  NOT NULL,
+    [asset_type]          VARCHAR (50)   NOT NULL,
+    [category_id]         INT            NULL,
+    [asset_name]          NVARCHAR (255) NOT NULL,
+    [brand]               NVARCHAR (255) NULL,
+    [serial_or_plate]     NVARCHAR (255) NULL,
+    [position_or_info]    NVARCHAR (500) NULL,
+    [status]              VARCHAR (50)   DEFAULT ('available') NULL,
+    [fuel_level]          VARCHAR (50)   NULL,
+    [assigned_to_user_id] INT            NULL,
+    [assigned_mission]    NVARCHAR (500) NULL,
+    [date_added]          DATETIME       DEFAULT (getdate()) NULL,
+    [last_modified]       DATETIME       DEFAULT (getdate()) NULL,
+    PRIMARY KEY CLUSTERED ([asset_id] ASC),
+    CONSTRAINT [FK_Inventory_AssignedUser] FOREIGN KEY ([assigned_to_user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE SET NULL,
+    CONSTRAINT [FK_Inventory_Category] FOREIGN KEY ([category_id]) REFERENCES [dbo].[AssetCategories] ([category_id]) ON DELETE SET NULL,
+    UNIQUE NONCLUSTERED ([barcode] ASC)
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Inventory_AssetType]
+    ON [dbo].[Inventory]([asset_type] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Inventory_Barcode]
+    ON [dbo].[Inventory]([barcode] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Inventory_Status]
+    ON [dbo].[Inventory]([status] ASC);
+
+
+GO
+
+-- Table: dbo.Events
+CREATE TABLE [dbo].[Events] (
+    [event_id]         INT            IDENTITY (1, 1) NOT NULL,
+    [title]            NVARCHAR (255) NOT NULL,
+    [description]      NVARCHAR (MAX) NULL,
+    [start_datetime]   DATETIME       NOT NULL,
+    [end_datetime]     DATETIME       NOT NULL,
+    [color]            VARCHAR (7)    DEFAULT ('#007bff') NULL,
+    [creator_user_id]  INT            NOT NULL,
+    [assigned_user_id] INT            NULL,
+    [date_creation]    DATETIME       DEFAULT (getdate()) NULL,
+    PRIMARY KEY CLUSTERED ([event_id] ASC),
+    CONSTRAINT [FK_Events_AssignedUser] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[Users] ([user_id]),
+    CONSTRAINT [FK_Events_CreatorUser] FOREIGN KEY ([creator_user_id]) REFERENCES [dbo].[Users] ([user_id])
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Events_DateTime]
+    ON [dbo].[Events]([start_datetime] ASC, [end_datetime] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Events_AssignedUser]
+    ON [dbo].[Events]([assigned_user_id] ASC);
+
+
+GO
+
+-- Table: dbo.Planning_Teams
+CREATE TABLE [dbo].[Planning_Teams] (
+    [team_id]         INT            IDENTITY (1, 1) NOT NULL,
+    [team_name]       NVARCHAR (255) NOT NULL,
+    [creator_user_id] INT            NOT NULL,
+    [date_creation]   DATETIME       DEFAULT (getdate()) NULL,
+    PRIMARY KEY CLUSTERED ([team_id] ASC),
+    CONSTRAINT [FK_Planning_Teams_CreatorUser] FOREIGN KEY ([creator_user_id]) REFERENCES [dbo].[Users] ([user_id])
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Planning_Teams_Name]
+    ON [dbo].[Planning_Teams]([team_name] ASC);
+
+
+GO
+
+-- Table: dbo.Messages
+CREATE TABLE [dbo].[Messages] (
+    [message_id]        INT            IDENTITY (1, 1) NOT NULL,
+    [sender_user_id]    INT            NOT NULL,
+    [recipient_type]    VARCHAR (50)   NOT NULL,
+    [subject]           NVARCHAR (255) NOT NULL,
+    [content]           NVARCHAR (MAX) NOT NULL,
+    [priority]          VARCHAR (50)   DEFAULT ('normale') NOT NULL,
+    [attachment_path]   NVARCHAR (255) NULL,
+    [sent_at]           DATETIME       DEFAULT (getdate()) NOT NULL,
+    [parent_message_id] INT            NULL,
+    PRIMARY KEY CLUSTERED ([message_id] ASC),
+    CONSTRAINT [FK_Messages_ParentMessage] FOREIGN KEY ([parent_message_id]) REFERENCES [dbo].[Messages] ([message_id]),
+    CONSTRAINT [FK_Messages_SenderUser] FOREIGN KEY ([sender_user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Messages_Sender]
+    ON [dbo].[Messages]([sender_user_id] ASC);
+
+
+GO
+
+-- Table: dbo.Event_AssignedUsers
+CREATE TABLE [dbo].[Event_AssignedUsers] (
+    [event_id] INT NOT NULL,
+    [user_id]  INT NOT NULL,
+    PRIMARY KEY CLUSTERED ([event_id] ASC, [user_id] ASC),
+    CONSTRAINT [FK_EventAssignedUsers_Event] FOREIGN KEY ([event_id]) REFERENCES [dbo].[Events] ([event_id]) ON DELETE CASCADE,
+    CONSTRAINT [FK_EventAssignedUsers_User] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+
+
+GO
+
+-- Table: dbo.Planning_Team_Members
+CREATE TABLE [dbo].[Planning_Team_Members] (
+    [team_id] INT NOT NULL,
+    [user_id] INT NOT NULL,
+    PRIMARY KEY CLUSTERED ([team_id] ASC, [user_id] ASC),
+    CONSTRAINT [FK_Planning_TeamMembers_Team] FOREIGN KEY ([team_id]) REFERENCES [dbo].[Planning_Teams] ([team_id]) ON DELETE CASCADE,
+    CONSTRAINT [FK_Planning_TeamMembers_User] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+
+
+GO
+
+-- Table: dbo.Conges
+CREATE TABLE [dbo].[Conges] (
+    [conge_id]            INT            IDENTITY (1, 1) NOT NULL,
+    [user_id]             INT            NOT NULL,
+    [date_debut]          DATE           NOT NULL,
+    [date_fin]            DATE           NOT NULL,
+    [type_conge]          VARCHAR (50)   NOT NULL,
+    [duree]               DECIMAL (5, 1) NOT NULL,
+    [commentaire]         TEXT           NULL,
+    [document]            VARCHAR (255)  NULL,
+    [status]              VARCHAR (20)   DEFAULT ('pending') NOT NULL,
+    [date_demande]        DATETIME       NOT NULL,
+    [date_reponse]        DATETIME       NULL,
+    [reponse_commentaire] TEXT           NULL,
+    PRIMARY KEY CLUSTERED ([conge_id] ASC),
+    CONSTRAINT [FK_Conges_Users] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [idx_status]
+    ON [dbo].[Conges]([status] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [idx_date_range]
+    ON [dbo].[Conges]([date_debut] ASC, [date_fin] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [idx_user_id]
+    ON [dbo].[Conges]([user_id] ASC);
+
+
+GO
+
+-- Table: dbo.Planning_Assignments
+CREATE TABLE [dbo].[Planning_Assignments] (
+    [assignment_id]    INT              IDENTITY (1, 1) NOT NULL,
+    [assigned_user_id] INT              NOT NULL,
+    [creator_user_id]  INT              NOT NULL,
+    [assignment_date]  DATE             NOT NULL,
+    [start_time]       TIME (7)         NULL,
+    [end_time]         TIME (7)         NULL,
+    [shift_type]       VARCHAR (50)     NULL,
+    [mission_text]     NVARCHAR (MAX)   NULL,
+    [color]            VARCHAR (7)      DEFAULT ('#007bff') NULL,
+    [date_creation]    DATETIME         DEFAULT (getdate()) NULL,
+    [location]         NVARCHAR (255)   NULL,
+    [is_validated]     BIT              DEFAULT ((0)) NOT NULL,
+    [mission_group_id] UNIQUEIDENTIFIER NULL,
+    [comments]         NVARCHAR (MAX)   NULL,
+    PRIMARY KEY CLUSTERED ([assignment_id] ASC),
+    CONSTRAINT [FK_Planning_Assignments_AssignedUser] FOREIGN KEY ([assigned_user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE,
+    CONSTRAINT [FK_Planning_Assignments_CreatorUser] FOREIGN KEY ([creator_user_id]) REFERENCES [dbo].[Users] ([user_id])
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Planning_Assignments_DateUser]
+    ON [dbo].[Planning_Assignments]([assignment_date] ASC, [assigned_user_id] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_Planning_Assignments_MissionGroupId]
+    ON [dbo].[Planning_Assignments]([mission_group_id] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Planning_Assignments_AssignedUser]
+    ON [dbo].[Planning_Assignments]([assigned_user_id] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Planning_Assignments_CreatorUser]
+    ON [dbo].[Planning_Assignments]([creator_user_id] ASC);
+
+
+GO
+
+-- Table: dbo.TimeSheet
+CREATE TABLE [dbo].[TimeSheet] (
+    [timesheet_id]           INT            IDENTITY (1, 1) NOT NULL,
+    [user_id]                INT            NOT NULL,
+    [entry_date]             DATE           NOT NULL,
+    [logon_time]             DATETIME       NULL,
+    [logoff_time]            DATETIME       NULL,
+    [break_minutes]          INT            NULL,
+    [logon_distance_meters]  INT            NULL,
+    [logoff_distance_meters] INT            NULL,
+    [logon_location_name]    NVARCHAR (255) NULL,
+    [logoff_location_name]   NVARCHAR (255) NULL,
+    PRIMARY KEY CLUSTERED ([timesheet_id] ASC),
+    CONSTRAINT [FK_Timesheet_Users] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_TimeSheet_EntryDate]
+    ON [dbo].[TimeSheet]([logon_time] ASC);
+
+
+GO
+
+-- Table: dbo.Bookings
+CREATE TABLE [dbo].[Bookings] (
+    [booking_id]       INT              IDENTITY (1, 1) NOT NULL,
+    [asset_id]         INT              NOT NULL,
+    [user_id]          INT              NULL,
+    [booking_date]     DATE             NOT NULL,
+    [mission]          NVARCHAR (500)   NULL,
+    [status]           VARCHAR (50)     DEFAULT ('booked') NOT NULL,
+    [created_at]       DATETIME         DEFAULT (getdate()) NULL,
+    [mission_group_id] UNIQUEIDENTIFIER NULL,
+    PRIMARY KEY CLUSTERED ([booking_id] ASC),
+    CONSTRAINT [FK_Bookings_Inventory] FOREIGN KEY ([asset_id]) REFERENCES [dbo].[Inventory] ([asset_id]) ON DELETE CASCADE,
+    CONSTRAINT [FK_Bookings_User] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_Bookings_MissionGroupId]
+    ON [dbo].[Bookings]([mission_group_id] ASC);
+
+
+GO
+
+CREATE UNIQUE NONCLUSTERED INDEX [IX_UQ_ActiveBooking_Asset_Date]
+    ON [dbo].[Bookings]([asset_id] ASC, [booking_date] ASC) WHERE ([status] IN ('booked', 'active'));
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_Bookings_Date]
+    ON [dbo].[Bookings]([booking_date] ASC);
+
+
+GO
+
+-- Table: dbo.Message_Recipients
+CREATE TABLE [dbo].[Message_Recipients] (
+    [message_id]        INT      NOT NULL,
+    [recipient_user_id] INT      NOT NULL,
+    [is_read]           BIT      DEFAULT ((0)) NOT NULL,
+    [read_at]           DATETIME NULL,
+    PRIMARY KEY CLUSTERED ([message_id] ASC, [recipient_user_id] ASC),
+    CONSTRAINT [FK_MessageRecipients_Message] FOREIGN KEY ([message_id]) REFERENCES [dbo].[Messages] ([message_id]) ON DELETE CASCADE,
+    CONSTRAINT [FK_MessageRecipients_User] FOREIGN KEY ([recipient_user_id]) REFERENCES [dbo].[Users] ([user_id])
+);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IDX_MessageRecipients_Recipient]
+    ON [dbo].[Message_Recipients]([recipient_user_id] ASC);
+
+
+GO
+
+-- Table: dbo.WorkLocations
+CREATE TABLE [dbo].[WorkLocations] (
+    [location_id]   INT            IDENTITY (1, 1) NOT NULL,
+    [location_name] NVARCHAR (255) NOT NULL,
+    [latitude]      DECIMAL (9, 6) NOT NULL,
+    [longitude]     DECIMAL (9, 6) NOT NULL,
+    [is_active]     BIT            DEFAULT ((1)) NOT NULL,
+    PRIMARY KEY CLUSTERED ([location_id] ASC)
+);
+
+
+GO
