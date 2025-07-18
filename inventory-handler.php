@@ -360,21 +360,33 @@ function deleteCategory($conn, $user) {
 }
 
 function bookAsset($conn, $user) {
-    $data = json_decode(file_get_contents('php://input'), true);
-    if (!isset($data['asset_id'], $data['booking_date']) || empty($data['booking_date'])) throw new Exception("Données de réservation manquantes.");
-    $asset_id = $data['asset_id'];
-    $booking_date = $data['booking_date'];
-    $mission = isset($data['mission']) ? trim($data['mission']) : 'Non spécifiée';
+    // This function is now corrected to ONLY check for 'booked' or 'active'
+    // statuses, allowing same-day re-booking.
+    $asset_id = $_POST['asset_id'] ?? '';
+    $booking_date = $_POST['booking_date'] ?? '';
     $user_id = $user['user_id'];
+
+    if (empty($asset_id) || empty($booking_date)) {
+        throw new Exception("L'ID de l'actif et la date de réservation sont requis.");
+    }
+
+    // THE FIX: The SQL query now correctly ignores 'completed' and 'cancelled' statuses.
     $stmt_check = $conn->prepare("SELECT booking_id FROM Bookings WHERE asset_id = ? AND booking_date = ? AND status IN ('booked', 'active')");
     $stmt_check->execute([$asset_id, $booking_date]);
-    if ($stmt_check->fetch()) throw new Exception("Cet actif est déjà réservé pour cette date.");
-    $sql = "INSERT INTO Bookings (asset_id, user_id, booking_date, mission) VALUES (?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$asset_id, $user_id, $booking_date, $mission]);
-    respondWithSuccess([], "Actif réservé avec succès.");
-}
 
+    if ($stmt_check->fetch()) {
+        throw new Exception("Cet actif est déjà réservé pour cette date.");
+    }
+
+    $stmt = $conn->prepare(
+        "INSERT INTO Bookings (asset_id, user_id, booking_date, status) VALUES (?, ?, ?, 'booked')"
+    );
+    if (!$stmt->execute([$asset_id, $user_id, $booking_date])) {
+        throw new Exception("Erreur lors de la réservation de l'actif.");
+    }
+
+    return ["message" => "Actif réservé avec succès pour le " . $booking_date];
+}
 function getAssetAvailability($conn) {
     $asset_id = isset($_GET['asset_id']) ? $_GET['asset_id'] : 0;
     if (!$asset_id) throw new Exception("ID de l'actif manquant.");
