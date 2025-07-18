@@ -41,7 +41,7 @@ try {
     error_log("Database Error in technician-handler: " . $e->getMessage());
     // Check for unique key violation (SQLSTATE 23000 is for integrity constraint violations)
     if ($e->getCode() == '23000') {
-        json_response('error', 'Conflit de réservation. Un autre utilisateur a réservé cet article en même temps. Veuillez réessayer.');
+        json_response('error', 'Erreur de base de données: ' . $e->getMessage());
     } else {
         json_response('error', 'Erreur de base de données: ' . $e->getMessage());
     }
