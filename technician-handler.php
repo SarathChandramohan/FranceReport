@@ -322,7 +322,7 @@ function returnItem($conn, $userId, $assetId) {
         // Step 3: Find the mission_group_id from the active booking.
         $today = date('Y-m-d');
         $stmt_find_mission = $conn->prepare(
-            "SELECT mission_group_id FROM Bookings WHERE asset_id = ? AND status = 'active' AND booking_date <= ? ORDER BY booking_date DESC LIMIT 1"
+            "SELECT TOP (1) mission_group_id FROM Bookings WHERE asset_id = ? AND status = 'active' AND booking_date <= ? ORDER BY booking_date DESC"
         );
         $stmt_find_mission->execute([$assetId, $today]);
         $mission_group_id = $stmt_find_mission->fetchColumn();
