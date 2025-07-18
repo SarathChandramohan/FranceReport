@@ -296,52 +296,36 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
 // technician-handler.php
 
 function returnItem($conn, $userId, $assetId) {
-    if (empty($assetId)) {
-        throw new Exception("Données de retour manquantes.");
-    }
-
+    // This function now completes past/current bookings and
+    // CANCELS future bookings for the returned item.
+    $today = date('Y-m-d');
     $conn->beginTransaction();
     try {
-        // First, check the item's current status and who it's assigned to.
-        $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
-        $checkStmt->execute([$assetId]);
-        $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$asset) {
-            throw new Exception("Article non trouvé.");
-        }
-        if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
-            throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
-        }
-
-        // Update the inventory status to 'pending_verification' but keep the user assignment for tracking.
-        $updateInvStmt = $conn->prepare(
-            "UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?"
-        );
-        $updateInvStmt->execute([$assetId]);
-
-        $today = date('Y-m-d');
-
-        // Mark only past bookings as 'completed'
+        // Mark past and current bookings as 'completed'
         $updatePastBookingsStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date < ?"
+            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date <= ?"
         );
         $updatePastBookingsStmt->execute([$assetId, $userId, $today]);
 
-        // Cancel today's and all future bookings
+        // Cancel all future bookings for this item by this user
         $cancelFutureBookingsStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date >= ?"
+            "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status = 'booked' AND booking_date > ?"
         );
         $cancelFutureBookingsStmt->execute([$assetId, $userId, $today]);
 
+        // Unassign the asset
+        $updateAssetStmt = $conn->prepare(
+            "UPDATE Assets SET assigned_to = NULL WHERE asset_id = ?"
+        );
+        $updateAssetStmt->execute([$assetId]);
+
         $conn->commit();
-        json_response('success', 'Article retourné. En attente de vérification.');
+        return ["message" => "Outil retourné et disponible pour une nouvelle réservation."];
     } catch (Exception $e) {
         $conn->rollBack();
-        throw $e; // Re-throw the exception to be caught by the main handler.
+        throw $e;
     }
 }
-
 /**
  * Helper function to standardize and send JSON responses, then terminate the script.
  */
