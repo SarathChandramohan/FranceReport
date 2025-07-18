@@ -290,10 +290,7 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
     }
 }
 
-/**
- * Returns an item, setting its status to 'pending_verification' and completing relevant bookings.
- */
-// technician-handler.php
+
 
 function returnItem($conn, $userId, $assetId) {
     if (empty($assetId)) {
@@ -302,7 +299,7 @@ function returnItem($conn, $userId, $assetId) {
 
     $conn->beginTransaction();
     try {
-        // First, check the item's current status and who it's assigned to.
+        // Step 1: Validate that the item is currently 'in-use'.
         $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
         $checkStmt->execute([$assetId]);
         $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -310,35 +307,47 @@ function returnItem($conn, $userId, $assetId) {
         if (!$asset) {
             throw new Exception("Article non trouvé.");
         }
-        if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
-            throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
+        // We check who it was assigned to for the fallback, but any team member can trigger the return.
+        if ($asset['status'] !== 'in-use') {
+            throw new Exception("Retour impossible. L'article n'est pas actuellement 'en cours d'utilisation'.");
         }
+        $assignedUserId = $asset['assigned_to_user_id'];
 
-        // Update the inventory status to 'pending_verification' but keep the user assignment for tracking.
+        // Step 2: Update the inventory. It's now free.
         $updateInvStmt = $conn->prepare(
-            "UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?"
+            "UPDATE Inventory SET status = 'pending_verification', assigned_to_user_id = NULL, last_modified = GETDATE() WHERE asset_id = ?"
         );
         $updateInvStmt->execute([$assetId]);
 
+        // Step 3: Find the mission_group_id from the active booking.
         $today = date('Y-m-d');
-
-        // Mark only past bookings as 'completed'
-        $updatePastBookingsStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date < ?"
+        $stmt_find_mission = $conn->prepare(
+            "SELECT mission_group_id FROM Bookings WHERE asset_id = ? AND status = 'active' AND booking_date <= ? ORDER BY booking_date DESC LIMIT 1"
         );
-        $updatePastBookingsStmt->execute([$assetId, $userId, $today]);
+        $stmt_find_mission->execute([$assetId, $today]);
+        $mission_group_id = $stmt_find_mission->fetchColumn();
 
-        // Cancel today's and all future bookings
-        $cancelFutureBookingsStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date >= ?"
-        );
-        $cancelFutureBookingsStmt->execute([$assetId, $userId, $today]);
+        // Step 4: Cancel bookings based on whether it was a mission or individual booking.
+        if ($mission_group_id) {
+            // MISSION RETURN: Cancel all present and future bookings for this mission group and asset.
+            $stmt_cancel_mission = $conn->prepare(
+                "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND mission_group_id = ? AND booking_date >= ?"
+            );
+            $stmt_cancel_mission->execute([$assetId, $mission_group_id, $today]);
+        } else {
+            // INDIVIDUAL RETURN (Fallback): Cancel bookings for the user who had the item.
+            $stmt_cancel_individual = $conn->prepare(
+                "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date >= ?"
+            );
+            // Use the ID of the user it was assigned to for accuracy.
+            $stmt_cancel_individual->execute([$assetId, $assignedUserId, $today]);
+        }
 
         $conn->commit();
-        json_response('success', 'Article retourné. En attente de vérification.');
+        json_response('success', 'Article retourné et disponible. En attente de vérification.');
     } catch (Exception $e) {
         $conn->rollBack();
-        throw $e; // Re-throw the exception to be caught by the main handler.
+        throw $e; // Re-throw the exception.
     }
 }
 
