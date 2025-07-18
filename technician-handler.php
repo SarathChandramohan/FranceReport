@@ -41,7 +41,7 @@ try {
     error_log("Database Error in technician-handler: " . $e->getMessage());
     // Check for unique key violation (SQLSTATE 23000 is for integrity constraint violations)
     if ($e->getCode() == '23000') {
-        json_response('error', 'Erreur de base de données: ' . $e->getMessage());
+        json_response('error', 'Conflit de réservation. Un autre utilisateur a réservé cet article en même temps. Veuillez réessayer.');
     } else {
         json_response('error', 'Erreur de base de données: ' . $e->getMessage());
     }
@@ -296,36 +296,52 @@ function checkoutItem($conn, $userId, $bookingId, $assetId) {
 // technician-handler.php
 
 function returnItem($conn, $userId, $assetId) {
-    // This function now completes past/current bookings and
-    // CANCELS future bookings for the returned item.
-    $today = date('Y-m-d');
+    if (empty($assetId)) {
+        throw new Exception("Données de retour manquantes.");
+    }
+
     $conn->beginTransaction();
     try {
-        // Mark past and current bookings as 'completed'
+        // First, check the item's current status and who it's assigned to.
+        $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+        $checkStmt->execute([$assetId]);
+        $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$asset) {
+            throw new Exception("Article non trouvé.");
+        }
+        if ($asset['status'] !== 'in-use' || $asset['assigned_to_user_id'] != $userId) {
+            throw new Exception("Retour impossible. L'article n'est pas sorti à votre nom.");
+        }
+
+        // Update the inventory status to 'pending_verification' but keep the user assignment for tracking.
+        $updateInvStmt = $conn->prepare(
+            "UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?"
+        );
+        $updateInvStmt->execute([$assetId]);
+
+        $today = date('Y-m-d');
+
+        // Mark only past bookings as 'completed'
         $updatePastBookingsStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date <= ?"
+            "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date < ?"
         );
         $updatePastBookingsStmt->execute([$assetId, $userId, $today]);
 
-        // Cancel all future bookings for this item by this user
+        // Cancel today's and all future bookings
         $cancelFutureBookingsStmt = $conn->prepare(
-            "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status = 'booked' AND booking_date > ?"
+            "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date >= ?"
         );
         $cancelFutureBookingsStmt->execute([$assetId, $userId, $today]);
 
-        // Unassign the asset
-        $updateAssetStmt = $conn->prepare(
-            "UPDATE Assets SET assigned_to = NULL WHERE asset_id = ?"
-        );
-        $updateAssetStmt->execute([$assetId]);
-
         $conn->commit();
-        return ["message" => "Outil retourné et disponible pour une nouvelle réservation."];
+        json_response('success', 'Article retourné. En attente de vérification.');
     } catch (Exception $e) {
         $conn->rollBack();
-        throw $e;
+        throw $e; // Re-throw the exception to be caught by the main handler.
     }
 }
+
 /**
  * Helper function to standardize and send JSON responses, then terminate the script.
  */
