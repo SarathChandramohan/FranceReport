@@ -54,7 +54,7 @@ function logoutUser() {
 }
 
 // Implement session timeout
-function checkSessionTimeout($maxIdleTime = 900) { // 900 seconds = 30 minutes
+function checkSessionTimeout($maxIdleTime = 5400) { // 5400 seconds = 30 minutes
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $maxIdleTime) {
         logoutUser();
     }
