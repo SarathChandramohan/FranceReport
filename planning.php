@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
             const isSelected = dateStr === state.selectedDate;
 
-            const plusButton = `<button class="btn ml-2" data-date="${dateStr}" style="background-color: #ffffff; color: #007bff; border: 1px solid #dee2e6; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;"><i class="fas fa-plus" style="font-size: 14px;"></i></button>`;
+            const plusButton = `<button class="btn ml-2 add-mission-btn" data-date="${dateStr}" style="background-color: #ffffff; color: #007bff; border: 1px solid #dee2e6; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;"><i class="fas fa-plus" style="font-size: 14px;"></i></button>`;
             const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span>${plusButton}</div>`);
 
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
