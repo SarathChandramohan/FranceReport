@@ -180,15 +180,20 @@ function getLeaveTypeName($typeKey) {
 function getWorkerStatusForDate($conn, $date) {
     if (!$date) respondWithError('Date not provided.');
 
-    // Get assigned users
-    $stmt_assigned = $conn->prepare("SELECT DISTINCT assigned_user_id FROM Planning_Assignments WHERE assignment_date = ? AND is_validated = 1 AND (shift_type IS NULL OR shift_type <> 'repos')");
+    // Get assigned users and their missions
+    $stmt_assigned = $conn->prepare("
+        SELECT assigned_user_id, STRING_AGG(mission_text, ', ') as missions
+        FROM Planning_Assignments
+        WHERE assignment_date = ? AND is_validated = 1 AND (shift_type IS NULL OR shift_type <> 'repos')
+        GROUP BY assigned_user_id
+    ");
     $stmt_assigned->execute([$date]);
-    $assigned_users = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN, 0);
+    $assigned_users_data = $stmt_assigned->fetchAll(PDO::FETCH_KEY_PAIR); // user_id => missions string
 
     // Get users on leave with leave type
     $stmt_on_leave = $conn->prepare("SELECT user_id, type_conge FROM Conges WHERE ? BETWEEN date_debut AND date_fin AND status = 'approved'");
     $stmt_on_leave->execute([$date]);
-    $on_leave_data = $stmt_on_leave->fetchAll(PDO::FETCH_KEY_PAIR); // Fetches into a user_id => type_conge map
+    $on_leave_data = $stmt_on_leave->fetchAll(PDO::FETCH_KEY_PAIR);
 
     // Get all active users
     $stmt_all_users = $conn->prepare("SELECT user_id FROM Users WHERE status = 'Active'");
@@ -199,26 +204,26 @@ function getWorkerStatusForDate($conn, $date) {
     foreach ($all_users as $user_id) {
         $status = 'available';
         $leave_type = null;
-        $is_sick_leave = false;
+        $missions = null;
 
         if (isset($on_leave_data[$user_id])) {
             $leave_type_key = $on_leave_data[$user_id];
             $leave_type = getLeaveTypeName($leave_type_key);
             if ($leave_type_key === 'maladie' || $leave_type_key === 'Arrêt maladie') {
                 $status = 'on_sick_leave';
-                $is_sick_leave = true;
             } else {
                 $status = 'on_leave';
             }
-        } elseif (in_array($user_id, $assigned_users)) {
+        } elseif (isset($assigned_users_data[$user_id])) {
             $status = 'assigned';
+            $missions = $assigned_users_data[$user_id];
         }
 
         $worker_statuses[] = [
             'user_id' => $user_id,
             'status' => $status,
             'leave_type' => $leave_type,
-            'is_sick_leave' => $is_sick_leave
+            'missions' => $missions,
         ];
     }
     respondWithSuccess('Worker statuses retrieved.', $worker_statuses);
