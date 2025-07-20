@@ -40,26 +40,30 @@ $default_color = $predefined_colors[0];
         .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:center; align-items:center; cursor: pointer; }
         .day-header.selected { background-color: var(--primary); color: white; }
         .add-mission-btn {
-    border-radius: 50%;
+    /* Shape and Sizing */
     width: 28px;
     height: 28px;
+    border-radius: 50%; /* This makes the button a perfect circle */
+
+    /* Color */
+    background-color: #ffffff; /* White background */
+    color: #007bff; /* Blue "+" icon color */
+    border: 1px solid #dee2e6; /* A light border for definition */
+
+    /* Centering the "+" icon inside the circle */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0;
-    font-size: 0.7rem;
-    line-height: 26px; /* Adjust for vertical alignment */
-    text-align: center;
-    background-color: #e9ecef;
-    color: #495057;
-    border: 1px solid #ced4da;
+    
+    /* Effects and Transitions */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
     transition: all 0.2s ease-in-out;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .add-mission-btn:hover {
-    background-color: #007bff;
-    color: #fff;
-    border-color: #007bff;
-    transform: scale(1.1) rotate(90deg);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: scale(1.1); /* Slightly enlarge on hover */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
 }
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.conflicting-assignment { border: 2px solid red !important; }
