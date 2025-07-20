@@ -295,7 +295,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateStr = getLocalDateString(dayDate);
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
             const isSelected = dateStr === state.selectedDate;
-            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span></div>`);
+
+            const plusButton = `<button class="btn btn-sm btn-outline-primary ml-2 add-mission-btn" data-date="${dateStr}" style="border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 22px;">+</button>`;
+            const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span>${plusButton}</div>`);
+
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
             const $dayContent = $(`<div class="day-content p-2" data-date="${dateStr}"></div>`).appendTo($dayColumn);
             $planningContainer.append($dayColumn);
@@ -330,7 +333,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return `<li class="${liClass}"><span ${nameStyle}>${name}</span> <i class="fas fa-times remove-worker-btn" data-worker-id="${workerId}"></i></li>`;
         }).join('');
 
-        // *** BUG FIX: Restored the logic to display assigned assets on the mission card ***
         const assetsHtml = mission.assigned_asset_names ? `<div class="mission-meta mt-2" style="font-size: 0.5rem;"><i class="fas fa-tools"></i> ${mission.assigned_asset_names}</div>` : '';
         
         const actionsHtml = `<div class="mission-actions">
@@ -365,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let customClass = '';
             let showStatus = false;
             if (worker.status === 'assigned') {
-                statusText = 'Assigné';
+                statusText = worker.missions; // MODIFIED: Show mission title(s)
                 customClass = 'unavailable'; 
                 showStatus = true;
             } else if (worker.status === 'on_leave' || worker.status === 'on_sick_leave') {
@@ -389,9 +391,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (statusInfo) {
                     worker.status = statusInfo.status;
                     worker.leave_type = statusInfo.leave_type;
+                    worker.missions = statusInfo.missions; // MODIFIED: Store missions
                 } else {
                     worker.status = 'available';
                     worker.leave_type = null;
+                    worker.missions = null; // MODIFIED: Clear missions
                 }
             });
             renderWorkerList();
@@ -489,6 +493,13 @@ document.addEventListener('DOMContentLoaded', function() {
         $('.day-header.selected').removeClass('selected');
         $(this).addClass('selected');
         refreshWorkerListForDate(date);
+    });
+    
+    // NEW: Event handler for the plus button in the day header
+    $planningContainer.on('click', '.add-mission-btn', function(e) {
+        e.stopPropagation(); // prevent day selection click from firing
+        const date = $(this).data('date');
+        openModalForCreate(date, false); // false means it's not from a drag-drop
     });
 
     $workerList.on('dragstart', '.worker-item', (e) => { state.draggedWorker = { id: $(e.currentTarget).data('worker-id'), name: $(e.currentTarget).data('worker-name') }; });
