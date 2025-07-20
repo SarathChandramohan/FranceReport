@@ -136,40 +136,35 @@ function connectDB() {
             }
         }
 
+        
         if(isset($_POST['login'])) {
-            $email = trim($_POST['email']);
-            $password = $_POST['password'];
+    $email = $_POST['email'];
+    $password = $_POST['password'];
 
-            if(empty($email) || empty($password)) {
-                $errorMsg = "L'email et le mot de passe sont obligatoires.";
-            } else {
-                $conn = connectDB();
-                if($conn === false) {
-                    $errorMsg = "Erreur de connexion à la base de données.";
-                } else {
-                    $user = authenticateUser($conn, $email, $password);
-                    if($user) {
-                        $_SESSION['user_id'] = $user['user_id'];
-                        $_SESSION['nom'] = $user['nom'];
-                        $_SESSION['prenom'] = $user['prenom'];
-                        $_SESSION['email'] = $email;
-                        $_SESSION['logged_in'] = true;
-                        $_SESSION['role'] = $user['role']; // Store the user's role in the session
+    // Include your database connection and new session manager
+    require_once 'db.php';
+    require_once 'session-management.php';
 
-                        // Redirect based on role
-                        if ($_SESSION['role'] === 'admin') {
-                            header("Location: dashboard.php");
-                        } else {
-                            header("Location: timesheet.php");
-                        }
-                        exit;
-                    } else {
-                        $errorMsg = "Email ou mot de passe incorrect.";
-                    }
-                    sqlsrv_close($conn);
-                }
-            }
+    // Authenticate the user against the database
+    $user = authenticateUser($conn, $email, $password);
+
+    if($user) {
+        // If authentication is successful, start a secure session
+        on_login_success($user);
+
+        // Redirect the user based on their role
+        if ($user['role'] === 'admin') {
+            header("Location: dashboard.php");
+        } else {
+            header("Location: timesheet.php");
         }
+        exit; // Important to prevent further script execution
+
+    } else {
+        // If authentication fails, show an error message
+        $error = "Invalid email or password";
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
