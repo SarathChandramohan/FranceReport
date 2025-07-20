@@ -62,13 +62,13 @@ function respondWithError($message, $code = 400) {
 }
 
 function getItemsForVerification($conn, $user) {
-    if ($user['role'] !== 'admin') respondWithError("Accès non autorisé.", 403);
+     if ($user['role'] !== 'admin') respondWithError("Accès non autorisé.", 403);
     $sql = "
         SELECT 
             i.asset_id, i.asset_name, i.barcode, i.last_modified,
             u.prenom AS returned_by_prenom, u.nom AS returned_by_nom
         FROM Inventory i
-        JOIN Users u ON i.assigned_to_user_id = u.user_id
+        LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
         WHERE i.status = 'pending_verification'
         ORDER BY i.last_modified ASC
     ";
