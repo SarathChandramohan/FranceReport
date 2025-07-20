@@ -1,5 +1,5 @@
 <?php
-// Step 1: Include the new secure session manager. It replaces the old session_start().
+// Step 1: Include the new secure session manager. This replaces session_start().
 require_once 'session-management.php';
 
 // Step 2: If user is already logged in, redirect them immediately.
@@ -13,7 +13,7 @@ if (isLoggedIn()) {
     exit;
 }
 
-// --- ALL YOUR EXISTING FUNCTIONS (NO CHANGES NEEDED HERE) ---
+// --- DATABASE AND USER AUTHENTICATION FUNCTIONS ---
 
 function connectDB() {
     $connectionInfo = array(
@@ -29,7 +29,10 @@ function connectDB() {
     if($conn === false) {
         $errors = sqlsrv_errors();
         $message = isset($errors[0]['message']) ? $errors[0]['message'] : 'Unknown SQL Server connection error.';
-        throw new Exception("SQL Server Connection Error: " . $message);
+        // In a real app, log this error instead of throwing an exception that reveals details.
+        error_log("SQL Server Connection Error: " . $message);
+        // For the user, a generic error is safer.
+        throw new Exception("Erreur de connexion à la base de données.");
     }
     return $conn;
 }
@@ -50,7 +53,10 @@ function userExists($conn, $email) {
     $sql = "SELECT COUNT(*) AS count FROM Users WHERE email = ?";
     $params = array($email);
     $stmt = sqlsrv_query($conn, $sql, $params);
-    if($stmt === false) { return false; }
+    if($stmt === false) {
+        error_log("userExists query failed: " . print_r(sqlsrv_errors(), true));
+        return false;
+    }
     $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
     sqlsrv_free_stmt($stmt);
     return ($row['count'] > 0);
@@ -62,7 +68,7 @@ function registerUser($conn, $nom, $prenom, $email, $password) {
     $params = array($nom, $prenom, $email, "User", "Active", $hashedPassword);
     $stmt = sqlsrv_query($conn, $sql, $params);
     if($stmt === false) {
-        error_log("Register error: " . print_r(sqlsrv_errors(), true));
+        error_log("Register user query failed: " . print_r(sqlsrv_errors(), true));
         return false;
     }
     sqlsrv_free_stmt($stmt);
@@ -73,20 +79,25 @@ function authenticateUser($conn, $email, $password) {
     $sql = "SELECT user_id, nom, prenom, role, password_hash FROM Users WHERE email = ?";
     $params = array($email);
     $stmt = sqlsrv_query($conn, $sql, $params);
-    if($stmt === false) { return false; }
+    if($stmt === false) {
+        error_log("authenticateUser query failed: " . print_r(sqlsrv_errors(), true));
+        return false;
+    }
     $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
     sqlsrv_free_stmt($stmt);
     if($row && verifyPassword($password, $row['password_hash'])) {
+        // Return the full user array, including email
         return array(
             'user_id' => $row['user_id'],
             'nom' => $row['nom'],
             'prenom' => $row['prenom'],
             'role' => $row['role'],
-            'email' => $email // Pass email back for the session
+            'email' => $email
         );
     }
     return false;
 }
+
 
 // --- FORM HANDLING LOGIC ---
 
@@ -94,20 +105,21 @@ $showLogin = true;
 $errorMsg = "";
 $successMsg = "";
 
+// Logic to toggle between login and registration forms
 if(isset($_POST['toggleForm'])) {
     $showLogin = ($_POST['toggleForm'] === 'register') ? false : true;
 }
 
 // --- REGISTRATION LOGIC ---
 if(isset($_POST['register'])) {
-    $showLogin = false; // Keep the registration form visible
+    $showLogin = false; // Ensure registration form stays visible on error
     $nom = trim($_POST['nom']);
     $prenom = trim($_POST['prenom']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
-    if(empty($nom) || empty($prenom) || empty($email) || empty($password)) {
+    if(empty($nom) || empty($prenom) || empty($email) || empty($password) || empty($confirm_password)) {
         $errorMsg = "Tous les champs sont obligatoires.";
     } elseif(!validateEmail($email)) {
         $errorMsg = "Format d'email invalide.";
@@ -123,15 +135,14 @@ if(isset($_POST['register'])) {
             } else {
                 if(registerUser($conn, $nom, $prenom, $email, $password)) {
                     $successMsg = "Compte créé avec succès. Vous pouvez maintenant vous connecter.";
-                    $showLogin = true; // Switch to login form on success
+                    $showLogin = true; // Switch to login form after successful registration
                 } else {
                     $errorMsg = "Erreur lors de l'inscription. Veuillez réessayer.";
                 }
             }
             sqlsrv_close($conn);
         } catch (Exception $e) {
-            $errorMsg = "Erreur de base de données. Veuillez réessayer.";
-            error_log($e->getMessage());
+            $errorMsg = $e->getMessage(); // Display the generic error from connectDB
         }
     }
 }
@@ -149,7 +160,7 @@ if(isset($_POST['login'])) {
             $user = authenticateUser($conn, $email, $password);
 
             if($user) {
-                // Step 3: Use the new function to securely start the session
+                // Step 3: Use the new secure function to initialize the session
                 on_login_success($user);
 
                 // Redirect based on role
@@ -158,14 +169,13 @@ if(isset($_POST['login'])) {
                 } else {
                     header("Location: timesheet.php");
                 }
-                exit;
+                exit; // Stop script execution after redirect
             } else {
                 $errorMsg = "Email ou mot de passe incorrect.";
             }
             sqlsrv_close($conn);
         } catch (Exception $e) {
-            $errorMsg = "Erreur de base de données. Veuillez réessayer.";
-            error_log($e->getMessage());
+            $errorMsg = $e->getMessage(); // Display the generic error from connectDB
         }
     }
 }
@@ -177,11 +187,8 @@ if(isset($_POST['login'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - Gestion des Ouvriers</title>
     <style>
-        /* Your existing CSS - no changes needed */
-        * {
-            margin: 0; padding: 0; box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
+        /* Your existing CSS - No changes needed */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body {
             background-image: url('Login.webp');
             background-size: auto;
@@ -190,10 +197,7 @@ if(isset($_POST['login'])) {
             background-attachment: fixed;
             background-color: #222122;
             color: #1d1d1f;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
         }
         .container { max-width: 420px; width: 100%; padding: 25px; }
         .logo-section { text-align: center; margin-bottom: 30px; }
@@ -213,9 +217,7 @@ if(isset($_POST['login'])) {
         .alert { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; font-size: 14px; }
         .alert-danger { background-color: #ffe5e5; border: 1px solid #ffcccc; color: #d63027; }
         .alert-success { background-color: #e5ffe8; border: 1px solid #ccffcc; color: #2ca048; }
-        <?php if(isset($_GET['logout_reason'])): ?>
         .alert-info { background-color: #e5f6ff; border: 1px solid #cceeff; color: #007aff; }
-        <?php endif; ?>
     </style>
 </head>
 <body>
@@ -230,10 +232,10 @@ if(isset($_POST['login'])) {
                 <div class="alert alert-info"><?php echo htmlspecialchars($_GET['logout_reason']); ?></div>
             <?php endif; ?>
             <?php if(!empty($errorMsg)): ?>
-                <div class="alert alert-danger"><?php echo $errorMsg; ?></div>
+                <div class="alert alert-danger"><?php echo htmlspecialchars($errorMsg); ?></div>
             <?php endif; ?>
             <?php if(!empty($successMsg)): ?>
-                <div class="alert alert-success"><?php echo $successMsg; ?></div>
+                <div class="alert alert-success"><?php echo htmlspecialchars($successMsg); ?></div>
             <?php endif; ?>
 
             <?php if($showLogin): ?>
@@ -259,9 +261,9 @@ if(isset($_POST['login'])) {
             <?php else: ?>
                 <h2>Créer un compte</h2>
                 <form method="post" action="index.php">
-                    <div class="form-group"><label for="nom">Nom</label><input type="text" id="nom" name="nom" class="form-control" required></div>
-                    <div class="form-group"><label for="prenom">Prénom</label><input type="text" id="prenom" name="prenom" class="form-control" required></div>
-                    <div class="form-group"><label for="email">Email</label><input type="email" id="email" name="email" class="form-control" required></div>
+                    <div class="form-group"><label for="nom">Nom</label><input type="text" id="nom" name="nom" class="form-control" required value="<?php echo isset($_POST['nom']) ? htmlspecialchars($_POST['nom']) : ''; ?>"></div>
+                    <div class="form-group"><label for="prenom">Prénom</label><input type="text" id="prenom" name="prenom" class="form-control" required value="<?php echo isset($_POST['prenom']) ? htmlspecialchars($_POST['prenom']) : ''; ?>"></div>
+                    <div class="form-group"><label for="email">Email</label><input type="email" id="email" name="email" class="form-control" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"></div>
                     <div class="form-group"><label for="password">Mot de passe</label><input type="password" id="password" name="password" class="form-control" required></div>
                     <div class="form-group"><label for="confirm_password">Confirmer le mot de passe</label><input type="password" id="confirm_password" name="confirm_password" class="form-control" required></div>
                     <button type="submit" name="register" class="btn-primary">Créer un compte</button>
