@@ -165,6 +165,7 @@ function connectDB() {
         $error = "Invalid email or password";
     }
 }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
