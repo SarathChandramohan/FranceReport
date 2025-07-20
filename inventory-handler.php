@@ -1,3 +1,4 @@
+
 <?php
 // inventory-handler.php
 
@@ -62,7 +63,7 @@ function respondWithError($message, $code = 400) {
 }
 
 function getItemsForVerification($conn, $user) {
-    if ($user['role'] !== 'admin') {
+     if ($user['role'] !== 'admin') {
         respondWithError("Accès non autorisé.", 403);
     }
 
@@ -75,7 +76,7 @@ function getItemsForVerification($conn, $user) {
             u.prenom AS returned_by_prenom, 
             u.nom AS returned_by_nom
         FROM Inventory i
-        LEFT JOIN (
+        JOIN (
             SELECT h.asset_id, h.user_id
             FROM History h
             INNER JOIN (
@@ -85,7 +86,7 @@ function getItemsForVerification($conn, $user) {
                 GROUP BY asset_id
             ) AS latest_return ON h.asset_id = latest_return.asset_id AND h.history_id = latest_return.max_history_id
         ) AS last_return_user ON i.asset_id = last_return_user.asset_id
-        LEFT JOIN Users u ON last_return_user.user_id = u.user_id
+        JOIN Users u ON last_return_user.user_id = u.user_id
         WHERE i.status = 'pending_verification'
         ORDER BY i.last_modified ASC
     ";
