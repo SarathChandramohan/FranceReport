@@ -62,20 +62,52 @@ function respondWithError($message, $code = 400) {
 }
 
 function getItemsForVerification($conn, $user) {
-     if ($user['role'] !== 'admin') respondWithError("Accès non autorisé.", 403);
+     if ($user['role'] !== 'admin') {
+        respondWithError("Accès non autorisé.", 403);
+    }
+
     $sql = "
         SELECT 
-            i.asset_id, i.asset_name, i.barcode, i.last_modified,
-            u.prenom AS returned_by_prenom, u.nom AS returned_by_nom
+            i.asset_id, 
+            i.asset_name, 
+            i.barcode, 
+            i.last_modified,
+            u.prenom AS returned_by_prenom, 
+            u.nom AS returned_by_nom
         FROM Inventory i
-        LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
+        JOIN (
+            SELECT h.asset_id, h.user_id
+            FROM History h
+            INNER JOIN (
+                SELECT asset_id, MAX(history_id) as max_history_id
+                FROM History
+                WHERE action = 'Retourné'
+                GROUP BY asset_id
+            ) AS latest_return ON h.asset_id = latest_return.asset_id AND h.history_id = latest_return.max_history_id
+        ) AS last_return_user ON i.asset_id = last_return_user.asset_id
+        JOIN Users u ON last_return_user.user_id = u.user_id
         WHERE i.status = 'pending_verification'
         ORDER BY i.last_modified ASC
     ";
+
     $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        respondWithError("Erreur de préparation de la requête: " . $conn->error, 500);
+    }
+
     $stmt->execute();
-    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    respondWithSuccess(['items_for_verification' => $items]);
+    $result = $stmt->get_result();
+    if (!$result) {
+        respondWithError("Erreur d'exécution de la requête: " . $stmt->error, 500);
+    }
+
+    $items = [];
+    while ($row = $result->fetch_assoc()) {
+        $items[] = $row;
+    }
+
+    $stmt->close();
+    echo json_encode($items);
 }
 
 function verifyItemReturn($conn, $user) {
