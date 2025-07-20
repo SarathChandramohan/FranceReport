@@ -63,7 +63,7 @@ function respondWithError($message, $code = 400) {
 }
 
 function getItemsForVerification($conn, $user) {
-     if ($user['role'] !== 'admin') {
+    if ($user['role'] !== 'admin') {
         respondWithError("Accès non autorisé.", 403);
     }
 
