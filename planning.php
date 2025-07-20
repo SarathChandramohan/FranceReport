@@ -39,32 +39,7 @@ $default_color = $predefined_colors[0];
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
         .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:center; align-items:center; cursor: pointer; }
         .day-header.selected { background-color: var(--primary); color: white; }
-        .add-mission-btn {
-    /* Shape and Sizing */
-    width: 28px;
-    height: 28px;
-    border-radius: 50%; /* This makes the button a perfect circle */
-
-    /* Color */
-    background-color: #ffffff; /* White background */
-    color: #007bff; /* Blue "+" icon color */
-    border: 1px solid #dee2e6; /* A light border for definition */
-
-    /* Centering the "+" icon inside the circle */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    
-    /* Effects and Transitions */
-    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
-    transition: all 0.2s ease-in-out;
-}
-
-.add-mission-btn:hover {
-    transform: scale(1.1); /* Slightly enlarge on hover */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
-}
+        
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .mission-card.conflicting-assignment { border: 2px solid red !important; }
         .mission-card.on-leave-assignment { border: 2px solid var(--dark-yellow) !important; }
@@ -322,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dayLabel = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
             const isSelected = dateStr === state.selectedDate;
 
-            const plusButton = `<button class="btn ml-2 add-mission-btn" data-date="${dateStr}"><i class="fas fa-plus"></i></button>`;
+            const plusButton = `<button class="btn ml-2" data-date="${dateStr}" style="background-color: #ffffff; color: #007bff; border: 1px solid #dee2e6; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;"><i class="fas fa-plus" style="font-size: 14px;"></i></button>`;
             const $dayHeader = $(`<div class="day-header ${isSelected ? 'selected' : ''}" data-date="${dateStr}"><span>${dayLabel}</span>${plusButton}</div>`);
 
             const $dayColumn = $(`<div class="day-column"></div>`).append($dayHeader);
