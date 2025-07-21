@@ -494,7 +494,7 @@ $user = getCurrentUser();
         };
         const levelData = fuelLevels[fuelLevel] || { percent: 0, text: 'N/A', low: false };
         const iconClass = levelData.low ? 'fuel-icon low' : 'fuel-icon';
-        const iconElement = 'fas fa-car-battery';
+        const iconElement = 'fas fa-gas-pump';
 
         return `
             <div class="fuel-indicator">
