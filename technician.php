@@ -96,6 +96,49 @@ $user = getCurrentUser();
         .overdue {
             background-color: #fff3cd; /* Yellow highlight for overdue items */
         }
+        .fuel-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 500;
+        }
+        .fuel-icon {
+            font-size: 1.2em;
+            position: relative;
+            color: #ccc; /* Empty color */
+        }
+        .fuel-icon .fuel-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: var(--fill-percent, 0%);
+            overflow: hidden;
+            color: #28a745; /* Full color */
+            transition: height 0.3s;
+        }
+        .fuel-icon.low .fuel-fill {
+            color: #dc3545; /* Low fuel color */
+        }
+        .fuel-level-options .btn {
+            flex: 1 1 100%;
+            margin: 5px;
+            font-weight: bold;
+        }
+        @media (min-width: 576px) {
+            .fuel-level-options .btn {
+                flex: 1 1 40%;
+            }
+        }
+        .fuel-level-options .btn.low-fuel {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .fuel-level-options .btn.low-fuel:hover {
+            background-color: #f1b0b7;
+            border-color: #ee9ca7;
+        }
     </style>
 </head>
 <body>
@@ -189,6 +232,27 @@ $user = getCurrentUser();
     </div>
 </div>
 
+<div class="modal fade" id="fuel-level-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Niveau de Carburant au Retour</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Veuillez indiquer le niveau de carburant actuel pour <strong><span id="fuel-modal-item-name"></span></strong>.</p>
+                <div class="d-flex flex-wrap justify-content-center fuel-level-options">
+                    <button type="button" class="btn btn-outline-secondary" data-fuel-level="full">Plein <i class="fas fa-gas-pump"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" data-fuel-level="three-quarter">3/4</button>
+                    <button type="button" class="btn btn-outline-secondary" data-fuel-level="half">Moitié</button>
+                    <button type="button" class="btn btn-outline-secondary low-fuel" data-fuel-level="quarter">1/4</button>
+                    <button type="button" class="btn btn-outline-secondary low-fuel" data-fuel-level="empty">Vide</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <div class="modal fade" id="info-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -217,6 +281,8 @@ $user = getCurrentUser();
 <script>
     // Global state variables
     let itemToProcess = null;
+    let selectedFuelLevel = null;
+    let actionAfterFuelModal = null;
     const codeReader = new ZXing.BrowserMultiFormatReader();
     let returnDatePicker = null;
     const currentUserId = <?php echo $user['user_id']; ?>;
@@ -226,18 +292,43 @@ $user = getCurrentUser();
         // Load the technician's equipment list on page start
         loadTechnicianEquipment();
 
-        // Event listener for "Take" or "Return" buttons on the equipment list
-        $('#equipment-list-section').on('click', '.action-btn', function() {
-            prepareAction($(this));
-            $('#scanner-title').text(`Pour ${itemToProcess.action === 'take' ? 'Prendre' : 'Retourner'}: Scannez "${itemToProcess.itemName}"`);
-            startScanner();
-        });
-
-        // Event listener for manual entry links under the return buttons
-        $('#equipment-list-section').on('click', '.manual-entry-link', function(e) {
+        // Combined event handler for "Take"/"Return" buttons and manual entry links
+        $('#equipment-list-section').on('click', '.action-btn, .manual-entry-link', function(e) {
             e.preventDefault();
             prepareAction($(this));
-            showManualEntryModal(`Pour retourner "${itemToProcess.itemName}", entrez son code-barres.`);
+            
+            const isManual = $(this).hasClass('manual-entry-link');
+
+            if (itemToProcess.action === 'return' && itemToProcess.itemType === 'vehicle') {
+                actionAfterFuelModal = isManual ? 'manual' : 'scan';
+                selectedFuelLevel = null; // Reset
+                $('#fuel-modal-item-name').text(itemToProcess.itemName);
+                $('#fuel-level-modal').modal('show');
+            } else if (itemToProcess.action === 'return') { // This is a tool return
+                if (isManual) {
+                    showManualEntryModal(`Pour retourner "${itemToProcess.itemName}", entrez son code-barres.`);
+                } else {
+                    $('#scanner-title').text(`Pour retourner: Scannez "${itemToProcess.itemName}"`);
+                    startScanner();
+                }
+            } else { // This is any 'take' action
+                $('#scanner-title').text(`Pour Prendre: Scannez "${itemToProcess.itemName}"`);
+                startScanner();
+            }
+        });
+        
+        // Event listener for fuel level selection in the modal
+        $('.fuel-level-options .btn').on('click', function() {
+            selectedFuelLevel = $(this).data('fuel-level');
+            $('#fuel-level-modal').modal('hide');
+
+            // Trigger the next action (scan or manual entry)
+            if (actionAfterFuelModal === 'manual') {
+                showManualEntryModal(`Pour retourner "${itemToProcess.itemName}", entrez son code-barres.`);
+            } else { // 'scan'
+                $('#scanner-title').text(`Pour retourner: Scannez "${itemToProcess.itemName}"`);
+                startScanner();
+            }
         });
 
         // Event listeners for the main "Pickup New Item" buttons
@@ -259,12 +350,18 @@ $user = getCurrentUser();
             $('#manual-entry-modal').modal('hide');
             processAction(enteredBarcode);
         });
-
-        // Reset scanner and state when modals are closed
-        $('#scanner-modal').on('hidden.bs.modal', () => codeReader.reset());
-        $('#manual-entry-modal, #scanner-modal, #range-booking-modal').on('hidden.bs.modal', () => {
-            $('#manual-entry-form')[0].reset();
-            itemToProcess = null; // Clear the state
+        
+        // Reset state only when all modals are fully closed
+        $('body').on('hidden.bs.modal', function () {
+            setTimeout(function() {
+                if (!$('.modal').is(':visible')) {
+                    if(codeReader) codeReader.reset();
+                    $('#manual-entry-form')[0].reset();
+                    itemToProcess = null;
+                    selectedFuelLevel = null;
+                    actionAfterFuelModal = null;
+                }
+            }, 500);
         });
     });
 
@@ -275,7 +372,8 @@ $user = getCurrentUser();
             assetId: button.data('asset-id'),
             bookingId: button.data('booking-id'),
             barcode: button.data('barcode'),
-            itemName: button.data('item-name')
+            itemName: button.data('item-name'),
+            itemType: button.data('item-type')
         };
     }
 
@@ -304,60 +402,55 @@ $user = getCurrentUser();
         if (!itemToProcess) return;
 
         if (itemToProcess.action === 'pickup') {
-            // This is for picking up a new item not on the list
             handleItemPickup(barcode);
         } else {
-            // This is for taking/returning an item already on the list
-            // Verify that the scanned barcode matches the expected one
             if (barcode.trim() !== String(itemToProcess.barcode)) {
                 showNotification(`Action annulée. Le code-barres ne correspond pas à "${itemToProcess.itemName}".`, 'danger');
                 return;
             }
             const backendAction = itemToProcess.action === 'take' ? 'checkout_item' : 'return_item';
             const postData = { asset_id: itemToProcess.assetId, booking_id: itemToProcess.bookingId };
+            
+            if (selectedFuelLevel && backendAction === 'return_item') {
+                postData.fuel_level = selectedFuelLevel;
+            }
+            
             performAjaxCall(backendAction, postData);
         }
     }
 
     // Handles the flow for picking up a new item
     function handleItemPickup(barcode) {
-        // First, ask the backend for the item's availability
         performAjaxCall('get_item_availability_for_pickup', { barcode: barcode }, (response) => {
             const asset = response.data.asset;
             const nextBookingDate = response.data.next_booking_date;
 
-            // Check if the item is already booked for today
             if (response.data.booked_today) {
                 showNotification(`Cet article (${asset.asset_name}) est déjà réservé pour aujourd'hui et ne peut pas être pris.`, 'danger');
                 return;
             }
 
-            // If available, show the booking modal
             $('#range-booking-item-name').text(asset.asset_name);
             $('#range-booking-modal').modal('show');
 
-            // Destroy any previous calendar instance to avoid conflicts
             if (returnDatePicker) {
                 returnDatePicker.destroy();
             }
 
-            // Configure the Flatpickr calendar
             let flatpickrConfig = {
                 locale: "fr",
-                minDate: "today", // Can't book in the past
+                minDate: "today",
                 dateFormat: "Y-m-d",
             };
 
-            // If there's a future booking, prevent selection of that date or any date after it
             if (nextBookingDate) {
                 let maxDate = new Date(nextBookingDate);
-                maxDate.setDate(maxDate.getDate() - 1); // Set max selectable date to the day *before* the next booking
+                maxDate.setDate(maxDate.getDate() - 1);
                 flatpickrConfig.maxDate = maxDate;
             }
 
             returnDatePicker = flatpickr("#return-date-calendar", flatpickrConfig);
 
-            // Set up the confirmation button inside the booking modal
             $('#confirm-range-booking-btn').off('click').on('click', function() {
                 const selectedReturnDate = returnDatePicker.selectedDates[0];
                 if (!selectedReturnDate) {
@@ -373,7 +466,6 @@ $user = getCurrentUser();
                 const returnDateStr = returnDatePicker.formatDate(selectedReturnDate, "Y-m-d");
 
                 $('#range-booking-modal').modal('hide');
-                // Call the backend to create the bookings and check out the item
                 performAjaxCall('book_and_pickup_range', {
                     asset_id: asset.asset_id,
                     return_date: returnDateStr,
@@ -387,6 +479,32 @@ $user = getCurrentUser();
     function loadTechnicianEquipment() {
         showLoading($('#equipment-list-section'));
         performAjaxCall('get_technician_equipment', {}, renderEquipmentList, 'GET');
+    }
+
+    // Generates graphical fuel level indicator
+    function generateFuelIndicatorHTML(fuelLevel) {
+        if (!fuelLevel) return 'N/A';
+
+        const fuelLevels = {
+            'full': { percent: 100, text: 'Plein', low: false },
+            'three-quarter': { percent: 75, text: '3/4', low: false },
+            'half': { percent: 50, text: 'Moitié', low: false },
+            'quarter': { percent: 25, text: '1/4', low: true },
+            'empty': { percent: 5, text: 'Vide', low: true }
+        };
+        const levelData = fuelLevels[fuelLevel] || { percent: 0, text: 'N/A', low: false };
+        const iconClass = levelData.low ? 'fuel-icon low' : 'fuel-icon';
+        const iconElement = 'fas fa-car-battery';
+
+        return `
+            <div class="fuel-indicator">
+                <span class="${iconClass}" style="--fill-percent: ${levelData.percent}%">
+                    <i class="${iconElement}"></i>
+                    <span class="fuel-fill"><i class="${iconElement}"></i></span>
+                </span>
+                <span>${levelData.text}</span>
+            </div>
+        `;
     }
 
     // Renders the equipment list HTML from the server response
@@ -404,28 +522,25 @@ $user = getCurrentUser();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Sort items: overdue items first, then by name
         items.sort((a, b) => {
             const a_return_date = a.return_date ? new Date(a.return_date) : null;
             const b_return_date = b.return_date ? new Date(b.return_date) : null;
-
             const a_is_overdue = a.status === 'in-use' && a_return_date && a_return_date < today;
             const b_is_overdue = b.status === 'in-use' && b_return_date && b_return_date < today;
-
             if (a_is_overdue && !b_is_overdue) return -1;
             if (!a_is_overdue && b_is_overdue) return 1;
-
             return a.asset_name.localeCompare(b.asset_name);
         });
 
 
         items.forEach(item => {
-            const iconClass = item.asset_type === 'vehicle' ? 'fa-car' : 'fa-tools';
+            const isVehicle = item.asset_type === 'vehicle';
+            const iconClass = isVehicle ? 'fa-car' : 'fa-tools';
             const isTakenByMe = item.status === 'in-use' && item.assigned_to_user_id == currentUserId;
 
             let actionButtonHtml = '';
-            const itemDataReturn = `data-action="return" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id || ''}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}"`;
-            const itemDataTake = `data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}"`;
+            const itemDataReturn = `data-action="return" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id || ''}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}" data-item-type="${item.asset_type}"`;
+            const itemDataTake = `data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}" data-item-type="${item.asset_type}"`;
 
             if (isTakenByMe) {
                 actionButtonHtml = `
@@ -441,9 +556,11 @@ $user = getCurrentUser();
                 const returnDate = new Date(item.return_date);
                 returnDateStr = returnDate.toLocaleDateString('fr-FR');
                 if (isTakenByMe && returnDate < today) {
-                    cardClass += ' overdue'; // Add yellow highlight for overdue items
+                    cardClass += ' overdue';
                 }
             }
+            
+            const fuelIndicatorHtml = isVehicle ? `<div><strong>Carburant:</strong> ${generateFuelIndicatorHTML(item.fuel_level)}</div>` : '';
 
             const itemCardHtml = `
                 <div class="${cardClass}">
@@ -454,6 +571,7 @@ $user = getCurrentUser();
                             <div><strong>Mission:</strong> ${item.mission || 'N/A'}</div>
                             <div><strong>Date de retour:</strong> ${returnDateStr}</div>
                             <div><strong>Code:</strong> ${item.serial_or_plate || 'N/A'} | <strong>Code-barres:</strong> ${item.barcode || 'N/A'}</div>
+                            ${fuelIndicatorHtml}
                         </div>
                     </div>
                     <div class="item-actions">${actionButtonHtml}</div>
@@ -464,7 +582,6 @@ $user = getCurrentUser();
 
     // Generic function for making AJAX calls to the backend
     function performAjaxCall(action, data, successCallback = null, method = 'POST') {
-        // If no specific success callback is provided, assume it's a simple action that requires a page reload
         if (!successCallback) {
             showLoading($('#equipment-list-section'));
         }
@@ -472,19 +589,19 @@ $user = getCurrentUser();
         $.ajax({
             url: 'technician-handler.php',
             type: method,
-            data: { action, ...data }, // Combine action with other data
+            data: { action, ...data },
             dataType: 'json',
             success: function(response) {
                 if (response.status === 'success') {
                     if (successCallback) {
-                        successCallback(response); // Execute custom success logic
+                        successCallback(response);
                     } else {
                         showNotification(response.message, 'success');
-                        loadTechnicianEquipment(); // Reload list on success
+                        loadTechnicianEquipment();
                     }
                 } else {
                     showNotification(response.message, 'danger');
-                    loadTechnicianEquipment(); // Also reload on error to get the latest state
+                    loadTechnicianEquipment();
                 }
             },
             error: function(xhr) {
@@ -512,7 +629,7 @@ $user = getCurrentUser();
             modalHeader.addClass('bg-success text-white');
             modalIcon.addClass('fa-check-circle');
             $('#info-modal-title').text('Succès');
-        } else { // 'danger' or 'error'
+        } else {
             modalHeader.addClass('bg-danger text-white');
             modalIcon.addClass('fa-exclamation-triangle');
             $('#info-modal-title').text('Erreur');
