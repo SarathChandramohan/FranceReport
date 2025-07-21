@@ -196,6 +196,7 @@ function getTechnicianEquipment($conn, $userId) {
         UNION ALL
 
         -- Part 2: Get items BOOKED for today but NOT yet taken.
+        -- CORRECTED QUERY LOGIC
         SELECT DISTINCT
             i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode, i.fuel_level,
             i.status, i.assigned_to_user_id,
@@ -205,20 +206,24 @@ function getTechnicianEquipment($conn, $userId) {
             pa.is_validated
         FROM Inventory i
         JOIN Bookings b ON i.asset_id = b.asset_id
-        LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
+        LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id
         WHERE b.booking_date = :today_b
           AND b.status = 'booked'
-          AND (b.user_id = :user_id_booked OR pa.assigned_user_id = :user_id_pa)
+          AND (
+               b.user_id = :user_id_booked 
+               OR 
+               (pa.assigned_user_id = :user_id_pa AND pa.assignment_date = :today_pa)
+              )
           AND (pa.is_validated = 1 OR pa.is_validated IS NULL)
     ";
 
     $stmt = $conn->prepare($sql);
     $stmt->execute([
         ':user_id_in_use' => $userId,
-        ':today_pa'       => $today,
         ':today_b'        => $today,
         ':user_id_booked' => $userId,
         ':user_id_pa'     => $userId,
+        ':today_pa'       => $today,
     ]);
     $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
