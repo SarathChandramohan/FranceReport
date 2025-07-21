@@ -184,7 +184,7 @@ function getTechnicianEquipment($conn, $userId) {
     $sql = "
         -- Part 1: Get items currently IN USE by the technician.
         SELECT
-            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
+            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode, i.fuel_level,
             i.status, i.assigned_to_user_id,
             (SELECT TOP 1 b.booking_id FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status = 'active') as booking_id,
             (SELECT TOP 1 b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.user_id = i.assigned_to_user_id AND b.status IN ('active', 'booked') ORDER BY b.booking_date) AS mission,
@@ -196,9 +196,8 @@ function getTechnicianEquipment($conn, $userId) {
         UNION ALL
 
         -- Part 2: Get items BOOKED for today but NOT yet taken.
-        -- BUG FIX: Added 'b.status = 'booked'' to prevent showing items that have been returned.
         SELECT DISTINCT
-            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode,
+            i.asset_id, i.asset_name, i.asset_type, i.serial_or_plate, i.barcode, i.fuel_level,
             i.status, i.assigned_to_user_id,
             b.booking_id,
             b.mission,
@@ -208,7 +207,7 @@ function getTechnicianEquipment($conn, $userId) {
         JOIN Bookings b ON i.asset_id = b.asset_id
         LEFT JOIN Planning_Assignments pa ON b.mission_group_id = pa.mission_group_id AND pa.assignment_date = :today_pa
         WHERE b.booking_date = :today_b
-          AND b.status = 'booked' -- <-- THE FIX IS HERE
+          AND b.status = 'booked'
           AND (b.user_id = :user_id_booked OR pa.assigned_user_id = :user_id_pa)
           AND (pa.is_validated = 1 OR pa.is_validated IS NULL)
     ";
@@ -231,21 +230,17 @@ function getTechnicianEquipment($conn, $userId) {
         $a_return_date = $a['return_date'] ? (new DateTime($a['return_date']))->setTime(0,0,0) : null;
         $b_return_date = $b['return_date'] ? (new DateTime($b['return_date']))->setTime(0,0,0) : null;
 
-        // Check for overdue status only for items 'in-use'.
         $is_a_overdue = ($a['status'] === 'in-use' && $a_return_date && $a_return_date < $today_dt);
         $is_b_overdue = ($b['status'] === 'in-use' && $b_return_date && $b_return_date < $today_dt);
 
-        // Priority 1: Overdue items first.
         if ($is_a_overdue && !$is_b_overdue) return -1;
         if (!$is_a_overdue && $is_b_overdue) return 1;
 
-        // Priority 2: Items to be taken today (status is not 'in-use').
         $a_is_for_today = ($a['status'] !== 'in-use');
         $b_is_for_today = ($b['status'] !== 'in-use');
         if ($a_is_for_today && !$b_is_for_today) return -1;
         if (!$a_is_for_today && $b_is_for_today) return 1;
-
-        // Default sort by asset name.
+        
         return strcmp($a['asset_name'], $b['asset_name']);
     });
 
@@ -296,30 +291,37 @@ function returnItem($conn, $userId, $assetId) {
     if (empty($assetId)) {
         throw new Exception("Données de retour manquantes.");
     }
+    
+    $fuelLevel = $_POST['fuel_level'] ?? null;
+    $validFuelLevels = ['full', 'three-quarter', 'half', 'quarter', 'empty'];
+    if ($fuelLevel !== null && !in_array($fuelLevel, $validFuelLevels)) {
+        throw new Exception("Niveau de carburant non valide.");
+    }
 
     $conn->beginTransaction();
     try {
-        // Step 1: Validate that the item is currently 'in-use'.
-        $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id FROM Inventory WHERE asset_id = ?");
+        $checkStmt = $conn->prepare("SELECT status, assigned_to_user_id, asset_type FROM Inventory WHERE asset_id = ?");
         $checkStmt->execute([$assetId]);
         $asset = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$asset) {
             throw new Exception("Article non trouvé.");
         }
-        // We check who it was assigned to for the fallback, but any team member can trigger the return.
         if ($asset['status'] !== 'in-use') {
             throw new Exception("Retour impossible. L'article n'est pas actuellement 'en cours d'utilisation'.");
         }
         $assignedUserId = $asset['assigned_to_user_id'];
-
-        // Step 2: Update the inventory. It's now free.
+        
+        if ($fuelLevel && $asset['asset_type'] === 'vehicle') {
+            $stmt_update_fuel = $conn->prepare("UPDATE Inventory SET fuel_level = ? WHERE asset_id = ?");
+            $stmt_update_fuel->execute([$fuelLevel, $assetId]);
+        }
+        
         $updateInvStmt = $conn->prepare(
             "UPDATE Inventory SET status = 'pending_verification', assigned_to_user_id = NULL, last_modified = GETDATE() WHERE asset_id = ?"
         );
         $updateInvStmt->execute([$assetId]);
-
-        // Step 3: Find the mission_group_id from the active booking.
+        
         $today = date('Y-m-d');
         $stmt_find_mission = $conn->prepare(
             "SELECT TOP (1) mission_group_id FROM Bookings WHERE asset_id = ? AND status = 'active' AND booking_date <= ? ORDER BY booking_date DESC"
@@ -327,19 +329,15 @@ function returnItem($conn, $userId, $assetId) {
         $stmt_find_mission->execute([$assetId, $today]);
         $mission_group_id = $stmt_find_mission->fetchColumn();
 
-        // Step 4: Cancel bookings based on whether it was a mission or individual booking.
         if ($mission_group_id) {
-            // MISSION RETURN: Cancel all present and future bookings for this mission group and asset.
             $stmt_cancel_mission = $conn->prepare(
                 "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND mission_group_id = ? AND booking_date >= ?"
             );
             $stmt_cancel_mission->execute([$assetId, $mission_group_id, $today]);
         } else {
-            // INDIVIDUAL RETURN (Fallback): Cancel bookings for the user who had the item.
             $stmt_cancel_individual = $conn->prepare(
                 "UPDATE Bookings SET status = 'cancelled' WHERE asset_id = ? AND user_id = ? AND status IN ('active', 'booked') AND booking_date >= ?"
             );
-            // Use the ID of the user it was assigned to for accuracy.
             $stmt_cancel_individual->execute([$assetId, $assignedUserId, $today]);
         }
 
@@ -347,7 +345,7 @@ function returnItem($conn, $userId, $assetId) {
         json_response('success', 'Article retourné et disponible. En attente de vérification.');
     } catch (Exception $e) {
         $conn->rollBack();
-        throw $e; // Re-throw the exception.
+        throw $e;
     }
 }
 
@@ -356,7 +354,6 @@ function returnItem($conn, $userId, $assetId) {
  */
 function json_response($status, $message, $data = []) {
     http_response_code($status === 'error' ? 400 : 200);
-    // Ensure that the script execution stops after sending the response.
     exit(json_encode(['status' => $status, 'message' => $message, 'data' => $data]));
 }
 ?>
