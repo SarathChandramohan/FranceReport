@@ -75,6 +75,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="verify_return"><i class="fas fa-user-check"></i> Vérifier Retour</div>
                 <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
+                <div class="tab" data-tab="reports"><i class="fas fa-flag"></i> Rapports</div>
             <?php endif; ?>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
             <?php if ($isAdmin): ?>
@@ -214,6 +215,28 @@ $isAdmin = ($currentUser['role'] === 'admin');
                         <tr><th>Actif</th><th>Code-barres</th><th>Sorti par</th><th>Date de réservation</th><th>Mission</th></tr>
                     </thead>
                     <tbody id="missing-items-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="reports" class="tab-content">
+        <div class="card">
+            <h3 class="mb-3"><i class="fas fa-flag mr-2"></i>Rapports sur le Matériel</h3>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Actif</th>
+                            <th>Signalé par</th>
+                            <th>Type</th>
+                            <th>Commentaires</th>
+                            <th>Statut</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reports-table-body"></tbody>
                 </table>
             </div>
         </div>
@@ -395,6 +418,7 @@ async function fetchAllData() {
         if (IS_ADMIN) {
             apiCalls.push(apiCall('get_missing_items', 'GET'));
             apiCalls.push(apiCall('get_items_for_verification', 'GET'));
+            apiCalls.push(apiCall('get_reports', 'GET'));
         }
 
         const results = await Promise.all(apiCalls);
@@ -409,6 +433,7 @@ async function fetchAllData() {
         if (IS_ADMIN) {
             missingItems = results[5].missing_items || [];
             itemsForVerification = results[6].items_for_verification || [];
+            reports = results[7].reports || [];
         }
 
         assetCategories.sort((a, b) => a.category_name.localeCompare(b.category_name));
@@ -418,6 +443,41 @@ async function fetchAllData() {
         showNotification("Impossible de charger toutes les données.", "error");
     }
 }
+function renderReportsTab() {
+    const tableBody = document.getElementById('reports-table-body');
+    tableBody.innerHTML = '';
+    if (reports.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center p-4">Aucun rapport.</td></tr>';
+        return;
+    }
+    reports.forEach(report => {
+        const row = tableBody.insertRow();
+        row.innerHTML = `
+            <td>${new Date(report.created_at).toLocaleDateString('fr-FR')}</td>
+            <td>${report.asset_name}</td>
+            <td>${report.prenom} ${report.nom}</td>
+            <td>${report.report_type}</td>
+            <td>${report.comments || 'N/A'}</td>
+            <td><span class="badge badge-pill badge-${report.status === 'pending' ? 'warning' : 'success'}">${report.status}</span></td>
+            <td>
+                ${report.status === 'pending' ? `<button class="btn btn-success btn-sm" onclick="updateReportStatus(${report.report_id}, 'resolved')">Résoudre</button>` : ''}
+            </td>
+        `;
+    });
+}
+async function updateReportStatus(reportId, newStatus) {
+    if (!confirm(`Voulez-vous vraiment marquer ce rapport comme "${newStatus}" ?`)) return;
+    loadingOverlay.style.display = 'flex';
+    try {
+        await apiCall('update_report_status', 'POST', { report_id: reportId, status: newStatus });
+        showNotification('Statut du rapport mis à jour.', 'success');
+        await fetchAllData();
+        renderReportsTab();
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
 
 function renderInventoryTab() {
     renderCategoryFilters();
@@ -606,7 +666,7 @@ function showTab(tabName) {
     
     if (tabName !== 'scanner' && codeReader) stopScanning();
 
-    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items', 'verify_return'].includes(tabName);
+    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items', 'verify_return', 'reports'].includes(tabName);
     
     if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
@@ -617,11 +677,13 @@ function showTab(tabName) {
                 if (tabName === 'manage_categories') renderCategoriesList();
                 else if (tabName === 'missing_items') renderMissingItemsTab();
                 else if (tabName === 'verify_return') renderVerifyReturnTab();
+                else if (tabName === 'reports') renderReportsTab();
             }
             loadingOverlay.style.display = 'none';
         });
     }
 }
+
 
 function renderCategoriesList() {
     const toolList = document.getElementById('toolCategoriesList');
