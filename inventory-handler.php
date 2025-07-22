@@ -38,6 +38,11 @@ try {
 
         // USER ACTION
         case 'get_users': getUsers($conn); break;
+
+        // REPORT ACTIONS
+        case 'report_item': reportItem($conn, $currentUser); break;
+        case 'get_reports': getReports($conn, $currentUser); break;
+        case 'update_report_status': updateReportStatus($conn, $currentUser); break;
             
         default:
             throw new Exception("Action non valide ou non spécifiée.");
@@ -49,6 +54,67 @@ try {
     error_log("General Error in inventory-handler.php: " . $e->getMessage());
     respondWithError($e->getMessage());
 }
+
+function reportItem($conn, $user) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $asset_id = $data['asset_id'] ?? 0;
+    $report_type = $data['report_type'] ?? '';
+    $comments = $data['comments'] ?? '';
+
+    if (!$asset_id || !$report_type) {
+        throw new Exception("Données de rapport manquantes.");
+    }
+
+    $sql = "INSERT INTO ToolReports (asset_id, user_id, report_type, comments) VALUES (?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id, $user['user_id'], $report_type, $comments]);
+
+    respondWithSuccess([], "Rapport envoyé avec succès.");
+}
+
+function getReports($conn, $user) {
+    if ($user['role'] !== 'admin') {
+        respondWithError("Accès non autorisé.", 403);
+    }
+
+    $sql = "
+        SELECT 
+            r.*,
+            i.asset_name,
+            u.prenom,
+            u.nom
+        FROM ToolReports r
+        JOIN Inventory i ON r.asset_id = i.asset_id
+        JOIN Users u ON r.user_id = u.user_id
+        ORDER BY r.created_at DESC
+    ";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    respondWithSuccess(['reports' => $reports]);
+}
+
+function updateReportStatus($conn, $user) {
+    if ($user['role'] !== 'admin') {
+        respondWithError("Accès non autorisé.", 403);
+    }
+
+    $data = json_decode(file_get_contents('php://input'), true);
+    $report_id = $data['report_id'] ?? 0;
+    $status = $data['status'] ?? '';
+
+    if (!$report_id || !$status) {
+        throw new Exception("Données de mise à jour de rapport manquantes.");
+    }
+
+    $sql = "UPDATE ToolReports SET status = ?, resolved_at = GETDATE() WHERE report_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$status, $report_id]);
+
+    respondWithSuccess([], "Statut du rapport mis à jour.");
+}
+
 
 function respondWithSuccess($data = [], $message = "Opération réussie.") {
     echo json_encode(['status' => 'success', 'message' => $message] + $data);
