@@ -184,7 +184,7 @@ function getWorkerStatusForDate($conn, $date) {
     $stmt_assigned = $conn->prepare("
         SELECT assigned_user_id, STRING_AGG(mission_text, ', ') as missions
         FROM Planning_Assignments
-        WHERE assignment_date = ? AND is_validated = 1 AND (shift_type IS NULL OR shift_type <> 'repos')
+        WHERE assignment_date = ? AND (shift_type IS NULL OR shift_type <> 'repos')
         GROUP BY assigned_user_id
     ");
     $stmt_assigned->execute([$date]);
@@ -228,7 +228,6 @@ function getWorkerStatusForDate($conn, $date) {
     }
     respondWithSuccess('Worker statuses retrieved.', $worker_statuses);
 }
-
 
 function saveMission($conn, $creator_id, $data) {
     $mission_id = $data['mission_id'] ?? null;
