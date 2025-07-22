@@ -253,6 +253,39 @@ $user = getCurrentUser();
     </div>
 </div>
 
+<div class="modal fade" id="report-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Signaler un problème</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="report-form">
+                    <input type="hidden" id="report-asset-id">
+                    <p>Vous signalez un problème pour : <strong><span id="report-item-name"></span></strong>.</p>
+                    <div class="form-group">
+                        <label for="report-type">Type de problème *</label>
+                        <select id="report-type" class="form-control" required>
+                            <option value="">Sélectionner...</option>
+                            <option value="missing">Outil manquant</option>
+                            <option value="repair">Outil à réparer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="report-comments">Commentaires</label>
+                        <textarea id="report-comments" class="form-control" rows="3" placeholder="Décrivez le problème..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="submit-report-btn">Envoyer le rapport</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <div class="modal fade" id="info-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -293,9 +326,16 @@ $user = getCurrentUser();
         loadTechnicianEquipment();
 
         // Combined event handler for "Take"/"Return" buttons and manual entry links
-        $('#equipment-list-section').on('click', '.action-btn, .manual-entry-link', function(e) {
+        $('#equipment-list-section').on('click', '.action-btn, .manual-entry-link, .report-btn', function(e) {
             e.preventDefault();
             prepareAction($(this));
+
+            if ($(this).hasClass('report-btn')) {
+                $('#report-asset-id').val(itemToProcess.assetId);
+                $('#report-item-name').text(itemToProcess.itemName);
+                $('#report-modal').modal('show');
+                return;
+            }
             
             const isManual = $(this).hasClass('manual-entry-link');
 
@@ -350,6 +390,25 @@ $user = getCurrentUser();
             $('#manual-entry-modal').modal('hide');
             processAction(enteredBarcode);
         });
+
+        // Handle the submission of the report form
+        $('#submit-report-btn').on('click', function() {
+            const assetId = $('#report-asset-id').val();
+            const reportType = $('#report-type').val();
+            const comments = $('#report-comments').val();
+
+            if (!reportType) {
+                showNotification("Veuillez sélectionner un type de problème.", "danger");
+                return;
+            }
+
+            performAjaxCall('report_item', {
+                asset_id: assetId,
+                report_type: reportType,
+                comments: comments
+            });
+            $('#report-modal').modal('hide');
+        });
         
         // Reset state only when all modals are fully closed
         $('body').on('hidden.bs.modal', function () {
@@ -357,6 +416,7 @@ $user = getCurrentUser();
                 if (!$('.modal').is(':visible')) {
                     if(codeReader) codeReader.reset();
                     $('#manual-entry-form')[0].reset();
+                    $('#report-form')[0].reset();
                     itemToProcess = null;
                     selectedFuelLevel = null;
                     actionAfterFuelModal = null;
@@ -541,11 +601,15 @@ $user = getCurrentUser();
             let actionButtonHtml = '';
             const itemDataReturn = `data-action="return" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id || ''}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}" data-item-type="${item.asset_type}"`;
             const itemDataTake = `data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}" data-item-type="${item.asset_type}"`;
+            const itemDataReport = `data-action="report" data-asset-id="${item.asset_id}" data-item-name="${item.asset_name}"`;
+
 
             if (isTakenByMe) {
                 actionButtonHtml = `
                     <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
-                    <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>`;
+                    <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
+                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+                    `;
             } else {
                  actionButtonHtml = `<button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>`;
             }
