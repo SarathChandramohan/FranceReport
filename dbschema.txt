@@ -368,3 +368,18 @@ CREATE TABLE [dbo].[WorkLocations] (
 
 
 GO
+
+CREATE TABLE [dbo].[ToolReports] (
+    [report_id]      INT            IDENTITY (1, 1) NOT NULL,
+    [asset_id]       INT            NOT NULL,
+    [user_id]        INT            NOT NULL,
+    [report_type]    VARCHAR(50)    NOT NULL, -- 'missing' or 'repair'
+    [comments]       NVARCHAR(MAX)  NULL,
+    [status]         VARCHAR(50)    DEFAULT ('pending') NOT NULL, -- 'pending', 'resolved'
+    [created_at]     DATETIME       DEFAULT (getdate()) NOT NULL,
+    [resolved_at]    DATETIME       NULL,
+    PRIMARY KEY CLUSTERED ([report_id] ASC),
+    CONSTRAINT [FK_ToolReports_Inventory] FOREIGN KEY ([asset_id]) REFERENCES [dbo].[Inventory] ([asset_id]) ON DELETE CASCADE,
+    CONSTRAINT [FK_ToolReports_Users] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
+);
+GO
