@@ -611,7 +611,10 @@ $user = getCurrentUser();
                     <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
                     `;
             } else {
-                 actionButtonHtml = `<button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>`;
+                 actionButtonHtml = `
+                    <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
+                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+                    `;
             }
 
             let returnDateStr = 'N/A';
@@ -651,7 +654,7 @@ $user = getCurrentUser();
         }
 
         $.ajax({
-            url: 'technician-handler.php',
+            url: action === 'report_item' ? 'inventory-handler.php' : 'technician-handler.php',
             type: method,
             data: { action, ...data },
             dataType: 'json',
