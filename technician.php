@@ -605,17 +605,16 @@ $user = getCurrentUser();
 
 
             if (isTakenByMe) {
-                actionButtonHtml = `
-                    <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
-                    <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
-                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
-                    `;
-            } else {
-                 actionButtonHtml = `
-                    <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
-                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
-                    `;
-            }
+    actionButtonHtml = `
+        <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
+        <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
+        `;
+} else {
+     actionButtonHtml = `
+        <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
+        <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+        `;
+}
 
             let returnDateStr = 'N/A';
             let cardClass = 'item-card';
