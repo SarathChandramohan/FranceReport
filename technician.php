@@ -603,12 +603,10 @@ $user = getCurrentUser();
             const itemDataTake = `data-action="take" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}" data-item-type="${item.asset_type}"`;
             const itemDataReport = `data-action="report" data-asset-id="${item.asset_id}" data-item-name="${item.asset_name}"`;
 
-
             if (isTakenByMe) {
                 actionButtonHtml = `
                     <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
                     <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
-                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
                     `;
             } else {
                  actionButtonHtml = `
