@@ -16,96 +16,213 @@ $user = getCurrentUser();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style>
+        :root {
+            --primary-color: #007aff;
+            --primary-hover: #0056b3;
+            --secondary-color: #6c757d;
+            --background-light: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-dark: #1d1d1f;
+            --text-medium: #495057;
+            --text-light: #6e6e73;
+            --border-color: #e5e5e5;
+            --shadow-light: rgba(0, 0, 0, 0.08);
+            --shadow-medium: rgba(0, 0, 0, 0.12);
+        }
+
         body {
-            background-color: #f5f5f7;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-light);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            color: var(--text-dark);
         }
         .main-card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-            border: none;
-            margin-top: 20px;
+            background-color: var(--card-bg);
+            border-radius: 16px; /* Slightly more rounded */
+            box-shadow: 0 8px 24px var(--shadow-medium); /* Deeper shadow */
+            border: 1px solid var(--border-color); /* Subtle border */
+            margin-top: 25px; /* Increased margin */
+            padding: 30px; /* More padding */
         }
         h2.card-title {
-            font-weight: 600;
-            color: #1d1d1f;
+            font-weight: 700; /* Bolder title */
+            color: var(--text-dark);
+            font-size: 1.8rem; /* Larger font size */
+            margin-bottom: 30px; /* More space below title */
         }
         .item-card {
             display: flex;
             align-items: center;
-            padding: 1rem 1.25rem;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-            background-color: #fff;
-            transition: box-shadow 0.2s ease-in-out;
+            padding: 1.2rem 1.5rem; /* Increased padding */
+            border: 1px solid var(--border-color);
+            border-radius: 12px; /* Consistent rounding */
+            margin-bottom: 15px; /* Consistent margin */
+            background-color: var(--card-bg);
+            transition: all 0.3s ease; /* Smoother transition */
+            box-shadow: 0 2px 8px var(--shadow-light); /* Subtle initial shadow */
         }
         .item-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 20px var(--shadow-medium); /* Enhanced hover shadow */
+            transform: translateY(-3px); /* Slight lift effect */
+        }
+        .item-card.overdue {
+            background-color: #fff4e5; /* Light orange for overdue */
+            border-left: 5px solid #ff9500; /* Orange border */
+            box-shadow: 0 2px 8px rgba(255, 149, 0, 0.2); /* Orange tint shadow */
         }
         .item-icon {
-            font-size: 2.2em;
-            color: #007bff;
-            margin-right: 1.5rem;
-            width: 50px;
+            font-size: 2.5em; /* Larger icons */
+            color: var(--primary-color);
+            margin-right: 1.8rem; /* More space */
+            width: 60px; /* Fixed width for alignment */
             text-align: center;
+            flex-shrink: 0; /* Prevent shrinking */
         }
         .item-details { flex-grow: 1; }
         .item-name {
-            font-weight: 600;
-            font-size: 1.15rem;
-            color: #343a40;
+            font-weight: 700; /* Bolder name */
+            font-size: 1.25rem; /* Larger font size */
+            color: var(--text-medium);
+            margin-bottom: 5px; /* Space below name */
         }
         .item-meta {
-            font-size: 0.9em;
-            color: #6c757d;
-            line-height: 1.6;
+            font-size: 0.95em; /* Slightly larger text */
+            color: var(--text-light);
+            line-height: 1.5;
         }
-        .item-meta strong { color: #495057; }
+        .item-meta strong { color: var(--text-dark); }
         .item-actions {
-            margin-left: 1rem;
+            margin-left: 1.5rem; /* More space */
             text-align: right;
-            min-width: 120px;
+            display: flex; /* Use flexbox for button alignment */
+            flex-direction: column; /* Stack buttons vertically */
+            gap: 8px; /* Space between buttons */
+            min-width: 130px; /* Ensure consistent width */
         }
+
+        /* Consistent Button Styling */
+        .btn {
+            padding: 10px 20px; /* Consistent padding */
+            border-radius: 8px; /* Rounded corners for all buttons */
+            font-weight: 600; /* Bolder font */
+            font-size: 0.95rem; /* Consistent font size */
+            transition: all 0.2s ease-in-out; /* Smooth transitions */
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
+            transform: translateY(-1px); /* Slight lift on hover */
+            box-shadow: 0 4px 10px rgba(0, 122, 255, 0.25);
+        }
+        .btn-info {
+            background-color: #34aadc; /* Blue info color */
+            border-color: #34aadc;
+            color: white;
+        }
+        .btn-info:hover {
+            background-color: #2795c6;
+            border-color: #2795c6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(52, 173, 220, 0.25);
+        }
+        .btn-success {
+            background-color: #34c759; /* Green success color */
+            border-color: #34c759;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #2ca048;
+            border-color: #2ca048;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(52, 199, 89, 0.25);
+        }
+        .btn-warning {
+            background-color: #ff9500; /* Orange warning color */
+            border-color: #ff9500;
+            color: white;
+        }
+        .btn-warning:hover {
+            background-color: #d97e00;
+            border-color: #d97e00;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(255, 149, 0, 0.25);
+        }
+        .btn-outline-secondary {
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+            background-color: transparent;
+        }
+        .btn-outline-secondary:hover {
+            background-color: var(--secondary-color);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(108, 117, 125, 0.25);
+        }
+        
         .manual-entry-link {
-            font-size: 0.8em;
-            color: #007bff;
+            font-size: 0.85em; /* Slightly larger link text */
+            color: var(--primary-color);
             cursor: pointer;
             display: block;
             margin-top: 5px;
+            text-align: center; /* Center the link */
         }
-        .manual-entry-link:hover { text-decoration: underline; }
+        .manual-entry-link:hover { text-decoration: underline; color: var(--primary-hover); }
+        
+        /* Scanner & Modal Improvements */
         #scanner-preview {
             width: 100%;
-            border-radius: 8px;
-            border: 1px solid #ddd;
+            height: 250px; /* Fixed height for consistent scanning area */
+            object-fit: cover; /* Ensure video covers area */
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background-color: #000; /* Black background for video */
+        }
+        .modal-content {
+            border-radius: 16px; /* Consistent modal rounding */
+            box-shadow: 0 10px 30px var(--shadow-medium); /* Deeper shadow for modals */
+        }
+        .modal-header {
+            border-bottom: none; /* Remove default border */
+            padding: 20px 25px;
+        }
+        .modal-title {
+            font-weight: 700;
+            color: var(--text-dark);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
         }
         .modal-header .fas {
-            font-size: 1.5rem;
-            margin-right: 10px;
+            font-size: 1.8rem; /* Larger icon in modal header */
+            margin-right: 12px;
+            color: var(--primary-color);
         }
-        .btn-primary {
-            background-color: #007bff;
-            border-color: #007bff;
+        .modal-body {
+            padding: 20px 25px;
         }
-        .btn-primary:hover {
-            background-color: #0069d9;
-            border-color: #0062cc;
+        .modal-footer {
+            border-top: none; /* Remove default border */
+            padding: 15px 25px 20px;
         }
-        .overdue {
-            background-color: #fff3cd; /* Yellow highlight for overdue items */
-        }
+
+        /* Fuel Indicator */
         .fuel-indicator {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            font-weight: 500;
+            gap: 8px; /* More space */
+            font-weight: 600; /* Bolder text */
+            color: var(--text-medium);
         }
         .fuel-icon {
-            font-size: 1.2em;
+            font-size: 1.5em; /* Larger icon */
             position: relative;
-            color: #ccc; /* Empty color */
+            color: #d2d2d7; /* Empty color */
         }
         .fuel-icon .fuel-fill {
             position: absolute;
@@ -114,30 +231,87 @@ $user = getCurrentUser();
             width: 100%;
             height: var(--fill-percent, 0%);
             overflow: hidden;
-            color: #28a745; /* Full color */
+            color: #34c759; /* Full color */
             transition: height 0.3s;
         }
         .fuel-icon.low .fuel-fill {
-            color: #dc3545; /* Low fuel color */
+            color: #ff3b30; /* Low fuel color */
         }
         .fuel-level-options .btn {
-            flex: 1 1 100%;
-            margin: 5px;
-            font-weight: bold;
+            flex: 1 1 auto; /* Allow buttons to grow evenly */
+            margin: 8px; /* More margin */
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            color: var(--text-dark);
+            background-color: var(--background-light);
         }
-        @media (min-width: 576px) {
-            .fuel-level-options .btn {
-                flex: 1 1 40%;
-            }
+        .fuel-level-options .btn:hover {
+            background-color: #e9ecef;
+            border-color: #ced4da;
+            transform: translateY(-1px);
         }
         .fuel-level-options .btn.low-fuel {
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-            color: #721c24;
+            background-color: #ffe5e5; /* Light red background */
+            border-color: #ffcccc; /* Red border */
+            color: #d63027; /* Dark red text */
         }
         .fuel-level-options .btn.low-fuel:hover {
-            background-color: #f1b0b7;
-            border-color: #ee9ca7;
+            background-color: #ffcccc;
+            border-color: #ffb3b3;
+        }
+
+        /* Placeholder styles */
+        #equipment-placeholder {
+            padding: 60px; /* More padding */
+            border: 2px dashed #ced4da; /* Dashed border */
+            border-radius: 12px;
+            background-color: #f8f9fa; /* Light background */
+        }
+        #equipment-placeholder .fas {
+            font-size: 3.5em; /* Larger icon */
+            color: #b0b0b0; /* Softer color */
+        }
+        #equipment-placeholder p {
+            font-size: 1.1rem; /* Larger text */
+            color: var(--text-light);
+            margin-top: 20px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .main-card {
+                margin-top: 15px;
+                padding: 20px;
+            }
+            h2.card-title {
+                font-size: 1.5rem;
+                margin-bottom: 20px;
+            }
+            .item-card {
+                flex-direction: column; /* Stack details and actions on small screens */
+                align-items: flex-start;
+                padding: 1rem;
+            }
+            .item-icon {
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+            .item-actions {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 15px;
+                flex-direction: row; /* Keep buttons inline or wrap if space is tight */
+                justify-content: center;
+            }
+            .item-actions .btn {
+                flex-grow: 1; /* Allow buttons to expand */
+            }
+            .manual-entry-link {
+                text-align: left; /* Align link to left when stacked */
+            }
+            .fuel-level-options .btn {
+                flex: 1 1 100%; /* Stack fuel options */
+            }
         }
     </style>
 </head>
@@ -175,7 +349,7 @@ $user = getCurrentUser();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="scanner-title">Scanner un Code-barres</h5>
+                <h5 class="modal-title" id="scanner-title"><i class="fas fa-barcode"></i>Scanner un Code-barres</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body text-center">
@@ -190,7 +364,7 @@ $user = getCurrentUser();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="manual-entry-title">Saisie Manuelle</h5>
+                <h5 class="modal-title" id="manual-entry-title"><i class="fas fa-keyboard"></i>Saisie Manuelle</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -210,7 +384,7 @@ $user = getCurrentUser();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Réserver un Article</h5>
+                <h5 class="modal-title"><i class="fas fa-calendar-check"></i>Réserver un Article</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -236,7 +410,7 @@ $user = getCurrentUser();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Niveau de Carburant au Retour</h5>
+                <h5 class="modal-title"><i class="fas fa-gas-pump"></i>Niveau de Carburant au Retour</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -257,7 +431,7 @@ $user = getCurrentUser();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Signaler un problème</h5>
+                <h5 class="modal-title"><i class="fas fa-flag"></i>Signaler un problème</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
