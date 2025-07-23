@@ -245,8 +245,8 @@ $user = getCurrentUser();
                     <button type="button" class="btn btn-outline-secondary" data-fuel-level="full">Plein <i class="fas fa-gas-pump"></i></button>
                     <button type="button" class="btn btn-outline-secondary" data-fuel-level="three-quarter">3/4</button>
                     <button type="button" class="btn btn-outline-secondary" data-fuel-level="half">Moitié</button>
-                    <button type="button" class="btn btn-outline-secondary low-fuel" data-fuel-level="quarter">1/4</button>
-                    <button type="button" class="btn btn-outline-secondary low-fuel" data-fuel-level="empty">Vide</button>
+                    <button type="button" class="btn btn-outline-secondary" data-fuel-level="quarter">1/4</button>
+                    <button type="button" class="btn btn-outline-secondary" data-fuel-level="empty">Vide</button>
                 </div>
             </div>
         </div>
@@ -406,7 +406,8 @@ $user = getCurrentUser();
                 asset_id: assetId,
                 report_type: reportType,
                 comments: comments
-            });
+            }, null, 'POST', true); // Pass true to indicate JSON data
+
             $('#report-modal').modal('hide');
         });
         
@@ -647,15 +648,14 @@ $user = getCurrentUser();
     }
 
     // Generic function for making AJAX calls to the backend
-    function performAjaxCall(action, data, successCallback = null, method = 'POST') {
+    function performAjaxCall(action, data, successCallback = null, method = 'POST', isJson = false) { // Added isJson parameter
         if (!successCallback) {
             showLoading($('#equipment-list-section'));
         }
 
-        $.ajax({
+        const ajaxOptions = {
             url: action === 'report_item' ? 'inventory-handler.php' : 'technician-handler.php',
             type: method,
-            data: { action, ...data },
             dataType: 'json',
             success: function(response) {
                 if (response.status === 'success') {
@@ -675,7 +675,17 @@ $user = getCurrentUser();
                 showNotification(errorMsg, 'danger');
                 loadTechnicianEquipment();
             }
-        });
+        };
+
+        if (isJson) {
+            ajaxOptions.contentType = 'application/json';
+            ajaxOptions.data = JSON.stringify({ action, ...data });
+            ajaxOptions.processData = false;
+        } else {
+            ajaxOptions.data = { action, ...data };
+        }
+
+        $.ajax(ajaxOptions);
     }
 
     // Shows a loading spinner in a given element
