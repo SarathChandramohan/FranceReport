@@ -7,7 +7,24 @@ require_once 'db-connection.php';
 
 header('Content-Type: application/json');
 $currentUser = getCurrentUser();
-$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : '';
+$action = '';
+// Check if the request content type is JSON
+$contentType = isset($_SERVER["CONTENT_TYPE"]) ? trim($_SERVER["CONTENT_TYPE"]) : '';
+if (strpos($contentType, 'application/json') !== false) {
+    // Attempt to read and decode JSON input
+    $jsonInput = file_get_contents('php://input');
+    $inputData = json_decode($jsonInput, true);
+
+    // If JSON is successfully decoded and contains 'action', use it
+    if (json_last_error() === JSON_ERROR_NONE && isset($inputData['action'])) {
+        $action = $inputData['action'];
+    }
+}
+
+// Fallback to $_REQUEST if action not found in JSON or if not a JSON request
+if (empty($action) && isset($_REQUEST['action'])) {
+    $action = $_REQUEST['action'];
+}
 
 try {
     switch ($action) {
