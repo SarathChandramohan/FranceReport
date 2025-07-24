@@ -39,6 +39,7 @@ $user = getCurrentUser();
             flex-grow: 1;
             display: flex;
             flex-direction: column;
+            box-sizing: border-box; /* Include padding in element's total width and height */
         }
 
         /* Date Navigator Styles (Top Calendar Header) */
@@ -53,7 +54,19 @@ $user = getCurrentUser();
             color: white; /* White text */
             position: relative;
             z-index: 2; /* Above the content card */
+            min-height: 180px; /* Give it more height to occupy space */
+            flex-direction: row; /* Ensure horizontal layout */
+            flex-wrap: wrap; /* Allow wrapping if needed */
         }
+        
+        .date-navigator .nav-buttons {
+            display: flex;
+            align-items: center;
+            width: 100%; /* Take full width for month/year and arrows */
+            justify-content: space-between;
+            margin-bottom: 10px; /* Space between top row and date */
+        }
+
         .date-navigator .btn {
             background-color: transparent;
             border: none;
@@ -68,7 +81,7 @@ $user = getCurrentUser();
             transform: scale(1.1);
         }
         .date-navigator h4 {
-            margin: 0;
+            margin: 0 auto; /* Center the date elements */
             font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
@@ -76,6 +89,8 @@ $user = getCurrentUser();
             display: flex;
             flex-direction: column; /* Stack year and month */
             align-items: center;
+            order: 2; /* Order it after buttons in the flex flow */
+            width: 100%; /* Take full width to center effectively */
         }
         .date-navigator h4 .year-display {
             font-size: 0.9rem; /* Smaller year font */
@@ -97,6 +112,8 @@ $user = getCurrentUser();
             font-size: 0.8rem;
             font-weight: 500;
             transition: background-color 0.2s ease;
+            order: 3; /* Order it after date elements */
+            margin-left: auto; /* Push to right */
         }
         .today-button:hover {
             background-color: rgba(255, 255, 255, 0.25);
@@ -289,6 +306,7 @@ $user = getCurrentUser();
             }
             .date-navigator {
                 padding: 15px 10px;
+                min-height: 150px; /* Adjust height for smaller screens */
             }
             .date-navigator h4 .month-display {
                 font-size: 1.5rem;
@@ -298,6 +316,7 @@ $user = getCurrentUser();
             }
             #content-card {
                 padding: 20px 15px;
+                margin-top: -15px; /* Adjust overlap for smaller screens */
             }
             .mission-card-header-inner, .mission-card-body {
                 padding: 12px 15px;
@@ -324,6 +343,14 @@ $user = getCurrentUser();
             .placeholder p {
                 font-size: 0.9rem;
             }
+            .today-button {
+                margin-left: 0; /* Align with others on small screens */
+                width: 100%; /* Take full width below other elements */
+                margin-top: 10px;
+            }
+            .date-navigator .nav-buttons {
+                flex-wrap: nowrap; /* Prevent buttons from wrapping */
+            }
         }
     </style>
 </head>
@@ -333,12 +360,14 @@ $user = getCurrentUser();
 
 <div class="planning-container">
     <div class="date-navigator">
-        <button class="btn" id="prevDayBtn"><i class="fas fa-chevron-left"></i></button>
-        <h4 id="currentDateDisplay">
+        <div class="nav-buttons">
+            <button class="btn" id="prevDayBtn"><i class="fas fa-chevron-left"></i></button>
+            <button class="btn" id="nextDayBtn"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <h4 id="datePickerTrigger">
             <span class="year-display"></span>
             <span class="month-display"></span>
         </h4>
-        <button class="btn" id="nextDayBtn"><i class="fas fa-chevron-right"></i></button>
         <button class="today-button" id="todayBtn">Aujourd'hui</button>
     </div>
     <input type="hidden" id="currentDateInput">
@@ -359,32 +388,43 @@ $user = getCurrentUser();
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // --- ELEMENT SELECTORS ---
-    const dateDisplay = document.getElementById('currentDateDisplay');
-    const yearDisplay = dateDisplay.querySelector('.year-display');
-    const monthDisplay = dateDisplay.querySelector('.month-display');
-    const selectedDayName = document.getElementById('selectedDayName'); // New element for "Monday, 28, October"
-    const dateInput = document.getElementById('currentDateInput');
+    const datePickerTrigger = document.getElementById('datePickerTrigger'); // Element to click to open picker
+    const yearDisplay = datePickerTrigger.querySelector('.year-display');
+    const monthDisplay = datePickerTrigger.querySelector('.month-display');
+    const selectedDayName = document.getElementById('selectedDayName');
+    const currentDateInput = document.getElementById('currentDateInput'); // Hidden input for internal date tracking
     const planningList = document.getElementById('planning-list');
     const prevDayBtn = document.getElementById('prevDayBtn');
     const nextDayBtn = document.getElementById('nextDayBtn');
-    const todayBtn = document.getElementById('todayBtn'); // New Today button
+    const todayBtn = document.getElementById('todayBtn');
 
     // --- INITIALIZE DATE PICKER ---
-    const fp = flatpickr(dateDisplay, {
+    // Initialize Flatpickr on the hidden input, but attach the trigger to the visible h4 element
+    const fp = flatpickr(currentDateInput, {
         locale: 'fr',
         dateFormat: "Y-m-d", // Internal format
         defaultDate: "today",
-        onChange: function(selectedDates) {
+        allowInput: false, // Prevent direct typing in the hidden input
+        onReady: function(selectedDates, dateStr, instance) {
+            // This ensures the initial display is correct when Flatpickr is ready
             updateCurrentDate(selectedDates[0]);
-            fetchPlanningForDate(getFormattedDate(selectedDates[0]));
         },
-        // To only show month and year in the picker, but still allow navigation
-        // This won't show a full calendar grid like in the image, but allows selecting month/year
-        // from the flatpickr interface.
-        // If a full grid is strictly needed, a library like FullCalendar would be required.
-        altInput: true, // Use a hidden input for the actual date, and display a formatted date
-        altFormat: "Y F", // Display format: e.g., "2025 July"
-        allowInput: true // Allow direct typing in the alt input if needed
+        onChange: function(selectedDates) {
+            if (selectedDates.length > 0) {
+                updateCurrentDate(selectedDates[0]);
+                fetchPlanningForDate(getFormattedDate(selectedDates[0]));
+            }
+        },
+        // Enable clicking the datePickerTrigger to open the calendar
+        clickOpens: true,
+        // Make the flatpickr instance accessible via the trigger element for manual opening
+        // This is a common pattern for custom triggers
+        appendTo: document.body // Append to body to avoid clipping issues with z-index
+    });
+
+    // Manually attach click listener to the visible h4 to open Flatpickr
+    datePickerTrigger.addEventListener('click', function() {
+        fp.open();
     });
 
     // --- DATE HELPER FUNCTIONS ---
@@ -396,7 +436,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateCurrentDate(date) {
-        fp.setDate(date, false); // Update flatpickr's internal date without triggering onChange
+        fp.setDate(date, false); // Update flatpickr's internal date without triggering onChange again
         
         // Update year and month display in header
         yearDisplay.textContent = date.getFullYear();
@@ -405,11 +445,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update the day name display (e.g., "Monday, 28, October")
         selectedDayName.textContent = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
-        dateInput.value = getFormattedDate(date);
+        currentDateInput.value = getFormattedDate(date);
     }
 
     function changeDay(offset) {
-        const currentDate = new Date(dateInput.value + 'T12:00:00'); // Use noon to avoid timezone shift issues
+        const currentDate = new Date(currentDateInput.value + 'T12:00:00'); // Use noon to avoid timezone shift issues
         currentDate.setDate(currentDate.getDate() + offset);
         updateCurrentDate(currentDate);
         fetchPlanningForDate(getFormattedDate(currentDate));
@@ -535,9 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- INITIAL LOAD ---
-    const today = new Date();
-    updateCurrentDate(today);
-    fetchPlanningForDate(getFormattedDate(today));
+    // The onReady function of flatpickr will handle the initial updateCurrentDate and fetchPlanningForDate calls.
 });
 </script>
 
