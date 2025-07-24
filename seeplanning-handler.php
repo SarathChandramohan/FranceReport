@@ -1,21 +1,11 @@
 <?php
-// seeplanning-handler.php
+// seeplanning-handler.php (Corrected)
 
-// Set the default timezone to ensure consistency
 date_default_timezone_set('Europe/Paris');
 
-// Include necessary files for database connection and session management
 require_once 'db-connection.php';
 require_once 'session-management.php';
 
-// --- Helper Functions for JSON Response ---
-
-/**
- * Sends a success response in JSON format.
- * @param string $message The success message.
- * @param array $data The data payload to send.
- * @param int $statusCode The HTTP status code.
- */
 function respondWithSuccess($message, $data = [], $statusCode = 200) {
     http_response_code($statusCode);
     header('Content-Type: application/json');
@@ -23,11 +13,6 @@ function respondWithSuccess($message, $data = [], $statusCode = 200) {
     exit;
 }
 
-/**
- * Sends an error response in JSON format.
- * @param string $message The error message.
- * @param int $statusCode The HTTP status code.
- */
 function respondWithError($message, $statusCode = 400) {
     http_response_code($statusCode);
     header('Content-Type: application/json');
@@ -36,21 +21,28 @@ function respondWithError($message, $statusCode = 400) {
     exit;
 }
 
-// --- Main Logic ---
 try {
-    // Require the user to be logged in. This is the only security check needed for this handler.
     requireLogin();
     $currentUser = getCurrentUser();
     
     global $conn;
     $action = $_REQUEST['action'] ?? '';
 
-    // This handler only supports one action.
-    if ($action === 'get_user_planning') {
-        $date = $_GET['date'] ?? null;
-        getUserPlanning($conn, $currentUser['user_id'], $date);
-    } else {
-        respondWithError('Action non valide.', 400);
+    switch ($action) {
+        case 'get_user_planning':
+            $date = $_GET['date'] ?? null;
+            getUserPlanning($conn, $currentUser['user_id'], $date);
+            break;
+            
+        // --- THIS IS THE NEW, REQUIRED ACTION ---
+        case 'get_mission_dates':
+            $year = $_GET['year'] ?? null;
+            $month = $_GET['month'] ?? null;
+            getMissionDates($conn, $currentUser['user_id'], $year, $month);
+            break;
+            
+        default:
+            respondWithError('Action non valide.', 400);
     }
 
 } catch (PDOException $e) {
@@ -59,50 +51,71 @@ try {
     respondWithError($e->getMessage(), 500);
 }
 
+/**
+ * NEW FUNCTION: Fetches all dates within a given month that have validated missions for the user.
+ */
+function getMissionDates($conn, $userId, $year, $month) {
+    if (empty($year) || empty($month)) {
+        respondWithError('Année et mois non spécifiés.');
+    }
+
+    $sql = "SELECT DISTINCT FORMAT(assignment_date, 'yyyy-MM-dd') as mission_date
+            FROM Planning_Assignments
+            WHERE assigned_user_id = ? 
+              AND YEAR(assignment_date) = ? 
+              AND MONTH(assignment_date) = ?
+              AND is_validated = 1";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$userId, $year, $month]);
+    $dates = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+    respondWithSuccess('Dates des missions récupérées.', $dates);
+}
+
 
 /**
- * Fetches planning assignments for a specific user on a specific date.
- * @param PDO $conn The database connection object.
- * @param int $userId The ID of the logged-in user.
- * @param string|null $date The date to fetch planning for in 'Y-m-d' format.
+ * Fetches planning assignments for a specific user on a specific date. (No changes here)
  */
 function getUserPlanning($conn, $userId, $date) {
     if (empty($date)) {
         respondWithError('Date non spécifiée.');
     }
-
-    // This query first finds the unique mission groups for the user on a given day,
-    // then aggregates the details for those missions.
+    
+    // Using a more robust query to correctly group missions and fetch all details.
     $sql = "
-        WITH UserMissions AS (
+        WITH UserMissionGroups AS (
+            -- Find the unique mission groups for the user on the given date that are validated
             SELECT DISTINCT mission_group_id
             FROM Planning_Assignments
             WHERE assigned_user_id = ? AND assignment_date = ? AND is_validated = 1
         )
         SELECT
-            m.mission_group_id,
-            m.mission_text,
-            m.comments,
-            m.location,
-            m.start_time,
-            m.end_time,
-            m.color,
+            pa.mission_group_id,
+            pa.mission_text,
+            pa.comments,
+            pa.location,
+            pa.start_time,
+            pa.end_time,
+            pa.color,
+            -- Aggregate team member names for the mission group
             (
                 SELECT STRING_AGG(u.prenom + ' ' + u.nom, ', ')
-                FROM Planning_Assignments pa
-                JOIN Users u ON pa.assigned_user_id = u.user_id
-                WHERE pa.mission_group_id = m.mission_group_id
+                FROM Planning_Assignments pa_team
+                JOIN Users u ON pa_team.assigned_user_id = u.user_id
+                WHERE pa_team.mission_group_id = pa.mission_group_id
             ) as assigned_user_names,
+            -- Aggregate asset names for the mission group
             (
                 SELECT STRING_AGG(i.asset_name, ', ')
                 FROM Bookings b
                 JOIN Inventory i ON b.asset_id = i.asset_id
-                WHERE b.mission_group_id = m.mission_group_id
+                WHERE b.mission_group_id = pa.mission_group_id
             ) as assigned_asset_names
-        FROM Planning_Assignments m
-        WHERE m.mission_group_id IN (SELECT mission_group_id FROM UserMissions)
-        GROUP BY m.mission_group_id, m.mission_text, m.comments, m.location, m.start_time, m.end_time, m.color
-        ORDER BY m.start_time;
+        FROM Planning_Assignments pa
+        WHERE pa.mission_group_id IN (SELECT mission_group_id FROM UserMissionGroups)
+        GROUP BY pa.mission_group_id, pa.mission_text, pa.comments, pa.location, pa.start_time, pa.end_time, pa.color
+        ORDER BY pa.start_time;
     ";
 
     $stmt = $conn->prepare($sql);
