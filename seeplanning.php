@@ -45,7 +45,7 @@ $user = getCurrentUser();
             border-radius: 5px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             overflow: hidden;
-            flex-grow: 1; /* Make it fill the content-wrapper */
+            flex-grow: 1;
         }
         .calendar-panel {
             background-color: var(--primary-bg);
@@ -85,14 +85,14 @@ $user = getCurrentUser();
         .timeline .duration { font-size: 0.75rem; color: #999; }
         .timeline-bar { width: 4px; height: 50px; margin: 5px 0; border-radius: 2px; }
         .item-details { padding-top: 2px; }
-        .item-details h6 { font-size: 1rem; font-weight: 600; margin: 0 0 5px 0; color: var(--secondary-text); }
-        .item-details p { font-size: 0.9rem; color: #666; margin: 0; }
-        .item-details i { margin-right: 8px; color: #aaa; width: 15px; text-align: center; }
+        .item-details h6 { font-size: 1rem; font-weight: 600; margin: 0 0 8px 0; color: var(--secondary-text); }
+        .item-details p { font-size: 0.9rem; color: #666; margin: 0 0 5px 0; display: flex; align-items: flex-start; }
+        .item-details i { margin-right: 8px; color: #aaa; width: 15px; text-align: center; padding-top: 3px; }
         .placeholder { text-align: center; padding: 50px 20px; }
         .placeholder i { font-size: 3rem; color: #ced4da; }
         .placeholder p { margin-top: 15px; font-size: 1.1rem; font-weight: 500; color: #888; }
         @media (min-width: 992px) {
-            .content-wrapper { height: calc(100vh - 78px); /* Adjust to match your navbar height */ }
+            .content-wrapper { height: calc(100vh - 78px); }
             .planning-container { flex-direction: row; }
             .calendar-panel { flex: 0 0 400px; border-right: 1px solid var(--border-color); }
             .details-panel { height: 100%; }
@@ -146,31 +146,25 @@ document.addEventListener('DOMContentLoaded', function() {
         weekdaysContainer.innerHTML = '';
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
-
         monthDisplay.innerHTML = `${currentDate.toLocaleDateString('fr-FR', { month: 'long' })} <span class="year-display">${year}</span>`;
-        
         const weekdays = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
         weekdays.forEach(day => {
             weekdaysContainer.innerHTML += `<div class="day-name">${day}</div>`;
         });
-
         const firstDayOfMonth = new Date(year, month, 1);
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const startDayIndex = firstDayOfMonth.getDay();
-
         fetchMissionIndicators(year, month + 1).then(() => {
-            daysContainer.innerHTML = ''; // Clear again to ensure order
+            daysContainer.innerHTML = '';
             for (let i = 0; i < startDayIndex; i++) {
                 daysContainer.innerHTML += `<div class="day-cell other-month"></div>`;
             }
-
             for (let day = 1; day <= daysInMonth; day++) {
                 const dayCell = document.createElement('div');
                 dayCell.className = 'day-cell';
                 dayCell.textContent = day;
                 const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 dayCell.dataset.date = dateString;
-
                 if (missionDates[dateString]) {
                     dayCell.classList.add('has-mission');
                 }
@@ -180,30 +174,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 daysContainer.appendChild(dayCell);
             }
-            
             updateSelectedDay(currentDate);
             fetchPlanningForDate(currentDate);
         }).catch(err => {
-            console.error("Failed to fetch mission indicators. Rendering calendar without them.", err);
-            // Fallback: render calendar without indicators if the call fails
-            daysContainer.innerHTML = ''; // Clear placeholder
-             for (let i = 0; i < startDayIndex; i++) { daysContainer.innerHTML += `<div class="day-cell other-month"></div>`; }
-             for (let day = 1; day <= daysInMonth; day++) {
-                const dayCell = document.createElement('div');
-                dayCell.className = 'day-cell';
-                dayCell.textContent = day;
-                dayCell.dataset.date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const today = new Date();
-                if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
-                    dayCell.classList.add('today');
-                }
-                daysContainer.appendChild(dayCell);
-             }
+            console.error("Could not fetch mission indicators:", err);
             updateSelectedDay(currentDate);
             fetchPlanningForDate(currentDate);
         });
     }
-    
+
     function updateSelectedDay(date) {
         document.querySelectorAll('.day-cell.selected').forEach(cell => cell.classList.remove('selected'));
         const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -237,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data: { action: 'get_user_planning', date: dateString },
             dataType: 'json',
             success: response => {
-                if (response.status === 'success') { renderPlanning(response.data); } 
+                if (response.status === 'success') { renderPlanning(response.data); }
                 else { showErrorState(response.message); }
             },
             error: () => showErrorState('Erreur de communication avec le serveur.')
@@ -264,6 +243,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const diffMins = Math.floor((diffMs % 3600000) / 60000);
                 if (diffHrs > 0 || diffMins > 0) duration = `${diffHrs}h ${diffMins > 0 ? `${diffMins}m` : ''}`.trim();
             }
+
+            // --- CORRECTED & COMPLETE HTML BLOCK ---
             li.innerHTML = `
                 <div class="timeline">
                     <span class="time">${startTime}</span>
@@ -272,9 +253,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="item-details">
                     <h6>${escapeHtml(mission.mission_text)}</h6>
-                    ${mission.location ? `<p><i class="fas fa-map-marker-alt"></i>${escapeHtml(mission.location)}</p>` : ''}
-                    ${mission.comments ? `<p><i class="fas fa-info-circle"></i>${escapeHtml(mission.comments)}</p>` : ''}
-                </div>`;
+                    ${mission.location ? `<p><i class="fas fa-map-marker-alt"></i><span>${escapeHtml(mission.location)}</span></p>` : ''}
+                    ${mission.assigned_user_names ? `<p><i class="fas fa-users"></i><span>${escapeHtml(mission.assigned_user_names)}</span></p>` : ''}
+                    ${mission.assigned_asset_names ? `<p><i class="fas fa-tools"></i><span>${escapeHtml(mission.assigned_asset_names)}</span></p>` : ''}
+                    ${mission.comments ? `<p><i class="far fa-comment-dots"></i><span>${escapeHtml(mission.comments)}</span></p>` : ''}
+                </div>
+            `;
             planningList.appendChild(li);
         });
     }
