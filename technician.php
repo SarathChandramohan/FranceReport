@@ -771,7 +771,7 @@ $user = getCurrentUser();
         items.forEach(item => {
             const isVehicle = item.asset_type === 'vehicle';
             const iconClass = isVehicle ? 'fa-car' : 'fa-tools';
-            const isTakenByMe = item.status === 'in-use' && item.assigned_to_user_id == currentUserId;
+            const  = item.status === 'in-use' && item.assigned_to_user_id == currentUserId;
 
             let actionButtonHtml = '';
             const itemDataReturn = `data-action="return" data-asset-id="${item.asset_id}" data-booking-id="${item.booking_id || ''}" data-barcode="${item.barcode}" data-item-name="${item.asset_name}" data-item-type="${item.asset_type}"`;
@@ -780,16 +780,20 @@ $user = getCurrentUser();
 
 
             if (isTakenByMe) {
-    actionButtonHtml = `
-        <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
-        <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
-        `;
-} else {
-     actionButtonHtml = `
-        <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
-        <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
-        `;
-}
+                // You have the item: Show Return, Report, and manual entry for return
+                actionButtonHtml = `
+                    <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
+                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+                    <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
+                    `;
+            } else {
+                // Item is available: Show Take, manual entry for take, and Report
+                 actionButtonHtml = `
+                    <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
+                    <a href="#" class="manual-entry-link" ${itemDataTake}>(saisie manuelle)</a>
+                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+                    `;
+            }
 
             let returnDateStr = 'N/A';
             let cardClass = 'item-card';
