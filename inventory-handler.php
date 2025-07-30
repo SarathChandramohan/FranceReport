@@ -72,6 +72,21 @@ try {
     respondWithError($e->getMessage());
 }
 
+function getAssetHistory($conn) {
+    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
+    if (!$asset_id) throw new Exception("ID de l'actif manquant.");
+
+    $sql = "SELECT b.booking_date, b.mission, b.status, u.prenom, u.nom, b.created_at as checkout_time,
+            (SELECT i.last_modified FROM Inventory i WHERE i.asset_id = b.asset_id) as checkin_time
+            FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
+            WHERE b.asset_id = ?
+            ORDER BY b.booking_date DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$asset_id]);
+    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    respondWithSuccess(['history' => $history]);
+}
+
 function reportItem($conn, $user) {
     $data = json_decode(file_get_contents('php://input'), true);
     $asset_id = $data['asset_id'] ?? 0;
@@ -379,16 +394,6 @@ function updateAsset($conn, $user) {
     $updatedAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
     if ($updatedAsset) respondWithSuccess(['asset' => $updatedAsset], "Actif mis à jour avec succès.");
     else throw new Exception("Échec de la mise à jour de l'actif.");
-}
-
-function getAssetHistory($conn) {
-    $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
-    if (!$asset_id) throw new Exception("ID de l'actif manquant.");
-    $sql = "SELECT b.booking_date, b.mission, b.status, u.prenom, u.nom FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id WHERE b.asset_id = ? AND b.status IN ('active', 'completed') ORDER BY b.booking_date DESC";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$asset_id]);
-    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    respondWithSuccess(['history' => $history]);
 }
 
 function getAssetCategories($conn) {
