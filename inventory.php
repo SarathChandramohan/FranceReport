@@ -33,8 +33,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .asset-card.in-use { border-left-color: #dc3545; background-color: #dc35461a; }
         .asset-card.pending_verification { border-left-color: #17a2b8; background-color: #17a2b81a; }
         .asset-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
-        .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; margin-right: 10px; cursor: pointer; transition: color 0.2s; }
-        .asset-title:hover { color: #0056b3; }
+        .asset-title { font-size: 1.2em; font-weight: 700; color: #343a40; margin-right: 10px; }
         .asset-status { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; white-space: nowrap; }
         .status-available { background: #d4edda; color: #155724; }
         .status-in-use { background: #f8d7da; color: #721c24; }
@@ -820,8 +819,11 @@ function createAssetCard(asset) {
     const details = asset.asset_type === 'tool' ? `<strong>N° série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Lieu:</strong> ${asset.position_or_info || 'N/A'}<br>` : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
     
     let buttons = '';
+    buttons += `<button class="btn btn-info btn-small" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-history"></i> Voir l'historique</button>`;
+    
     if (asset.status === 'available' || asset.status === 'pending_verification') {
-        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
+        // As requested, 'Réserver' button functionality is kept but commented out
+        // buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
         if (IS_ADMIN) {
              buttons += ` <button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
         }
@@ -833,7 +835,7 @@ function createAssetCard(asset) {
         buttons += ` <button class="btn btn-primary btn-small" onclick="openEditModal(${asset.asset_id})"><i class="fas fa-pencil-alt"></i></button> <button class="btn btn-danger btn-small" onclick="handleDeleteAsset(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-trash"></i></button>`;
     }
     
-    card.innerHTML = `<div><div class="asset-header"><span class="asset-title" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span><span class="asset-status status-${cardStatusClass}">${statusText}</span></div><div class="asset-details"><strong>Code-barres:</strong> ${asset.barcode}<br>${details}${assignedToText}</div>${bookingInfo}</div><div class="asset-actions mt-3">${buttons}</div>`;
+    card.innerHTML = `<div><div class="asset-header"><span class="asset-title"><i class="fas ${asset.asset_type === 'tool' ? 'fa-wrench' : 'fa-car'} mr-2"></i>${asset.asset_name}</span><span class="asset-status status-${cardStatusClass}">${statusText}</span></div><div class="asset-details"><strong>Code-barres:</strong> ${asset.barcode}<br>${details}${assignedToText}</div>${bookingInfo}</div><div class="asset-actions mt-3">${buttons}</div>`;
     return card;
 }
 
@@ -947,9 +949,18 @@ async function openHistoryModal(assetId, assetName) {
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
         if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
-        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
         data.history.forEach(rec => {
-            tableHtml += `<tr><td>${new Date(rec.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${rec.prenom} ${rec.nom}</td><td>${rec.mission || 'N/A'}</td><td><span class="badge badge-info">${rec.status}</span></td></tr>`;
+            const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
+            const checkinTime = (rec.status === 'completed' || rec.status === 'cancelled') && rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
+            
+            tableHtml += `<tr>
+                            <td>${checkoutTime}</td>
+                            <td>${checkinTime}</td>
+                            <td>${(rec.prenom || '')} ${(rec.nom || '')}</td>
+                            <td>${rec.mission || 'N/A'}</td>
+                            <td><span class="badge badge-info">${rec.status}</span></td>
+                          </tr>`;
         });
         tableHtml += '</tbody></table></div>';
         modalBody.html(tableHtml);
