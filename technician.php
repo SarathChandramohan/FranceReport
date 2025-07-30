@@ -526,8 +526,12 @@ $user = getCurrentUser();
                     startScanner();
                 }
             } else { // This is any 'take' action
-                $('#scanner-title').text(`Pour Prendre: Scannez "${itemToProcess.itemName}"`);
-                startScanner();
+                 if (isManual) {
+                    showManualEntryModal(`Pour prendre "${itemToProcess.itemName}", entrez son code-barres.`);
+                } else {
+                    $('#scanner-title').text(`Pour Prendre: Scannez "${itemToProcess.itemName}"`);
+                    startScanner();
+                }
             }
         });
         
@@ -779,17 +783,19 @@ $user = getCurrentUser();
             const itemDataReport = `data-action="report" data-asset-id="${item.asset_id}" data-item-name="${item.asset_name}"`;
 
 
-            if (isTakenByMe) {
-    actionButtonHtml = `
-        <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
-        <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
-        `;
-} else {
-     actionButtonHtml = `
-        <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
-        <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
-        `;
-}
+           if (isTakenByMe) {
+                actionButtonHtml = `
+                    <button class="btn btn-info action-btn" ${itemDataReturn}>Retourner</button>
+                    <a href="#" class="manual-entry-link" ${itemDataReturn}>(saisie manuelle)</a>
+                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+                    `;
+            } else {
+                actionButtonHtml = `
+                    <button class="btn btn-success action-btn" ${itemDataTake}>Prendre</button>
+                    <a href="#" class="manual-entry-link" ${itemDataTake}>(saisie manuelle)</a>
+                    <button class="btn btn-warning btn-sm mt-2 report-btn" ${itemDataReport}>Signaler</button>
+                    `;
+            }
 
             let returnDateStr = 'N/A';
             let cardClass = 'item-card';
