@@ -161,30 +161,53 @@ $user = getCurrentUser();
             updateButtonStates();
             return;
         }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                currentLatitude = position.coords.latitude;
-                currentLongitude = position.coords.longitude;
-                makeAjaxRequest('check_location_status', { latitude: currentLatitude, longitude: currentLongitude }, (error, response) => {
-                    if (error || response.status !== 'success') {
-                        locationInfo.textContent = "Erreur de vérification du lieu.";
-                        isInRange = false;
-                    } else {
-                        isInRange = response.data.in_range;
-                        locationInfo.textContent = response.data.message;
-                        locationInfo.className = isInRange ? 'in_range' : 'out_of_range';
-                    }
-                    updateButtonStates();
-                });
-            },
-            () => {
-                locationInfo.textContent = 'Impossible d\'obtenir la position.';
-                isInRange = false;
+
+        // Options for the geolocation request
+        const geoOptions = { 
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 0 
+        };
+
+        // Success callback
+        const geoSuccess = (position) => {
+            currentLatitude = position.coords.latitude;
+            currentLongitude = position.coords.longitude;
+            makeAjaxRequest('check_location_status', { latitude: currentLatitude, longitude: currentLongitude }, (error, response) => {
+                if (error || response.status !== 'success') {
+                    locationInfo.textContent = "Erreur de vérification du lieu.";
+                    isInRange = false;
+                } else {
+                    isInRange = response.data.in_range;
+                    // Keep the refresh button in the message
+                    locationInfo.innerHTML = response.data.message + ' <button id="refresh-location"><i class="fas fa-sync-alt"></i></button>';
+                    locationInfo.className = isInRange ? 'in_range' : 'out_of_range';
+                    // Re-add the event listener for the new button
+                    document.getElementById('refresh-location').addEventListener('click', checkLocationAndSetButtons);
+                }
                 updateButtonStates();
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
+            });
+        };
+
+        // Error callback - THIS IS THE MODIFIED PART
+        const geoError = (error) => {
+            let message = 'Impossible d\'obtenir la position.';
+            if (error.code === error.PERMISSION_DENIED) {
+                message = 'Permission de géolocalisation refusée. Veuillez l\'activer dans les paramètres de votre navigateur.';
+            }
+            // Add the refresh button back to the message
+            locationInfo.innerHTML = message + ' <button id="refresh-location"><i class="fas fa-sync-alt"></i></button>';
+            locationInfo.className = 'out_of_range';
+            isInRange = false;
+            // Re-add the event listener for the new button
+            document.getElementById('refresh-location').addEventListener('click', checkLocationAndSetButtons);
+            updateButtonStates();
+        };
+
+        // Make the call
+        navigator.geolocation.getCurrentPosition(geoSuccess, geoError, geoOptions);
     }
+
 
     function enregistrerPointage(action) {
         const missionSelect = document.getElementById('mission-select');
@@ -310,12 +333,10 @@ $user = getCurrentUser();
     document.addEventListener('DOMContentLoaded', function() {
         loadTimesheetHistory();
         loadUserMissions();
-        setInterval(checkLocationAndSetButtons, 30000);
+        // The initial event listener is added here. It gets re-added inside checkLocationAndSetButtons
+        // because we rewrite the innerHTML of the location-info div.
+        document.getElementById('refresh-location').addEventListener('click', checkLocationAndSetButtons);
 
-        document.getElementById('refresh-location').addEventListener('click', function() {
-            checkLocationAndSetButtons();
-        });
-        
         document.getElementById('mission-select').addEventListener('change', function() {
             const commentBox = document.getElementById('mission-comment');
             if (this.value === 'without') {
