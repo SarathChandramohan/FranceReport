@@ -33,8 +33,24 @@ switch($action) {
     case 'check_location_status':
         checkLocationStatus();
         break;
+    case 'get_user_assignments':
+        getUserAssignments($user_id);
+        break;
     default:
         respondWithError('Invalid action specified');
+}
+
+function getUserAssignments($user_id) {
+    global $conn;
+    $today = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('Y-m-d');
+    try {
+        $stmt = $conn->prepare("SELECT assignment_id, mission_text FROM Planning_Assignments WHERE assigned_user_id = ? AND assignment_date = ?");
+        $stmt->execute([$user_id, $today]);
+        $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        respondWithSuccess('Assignments retrieved', $assignments);
+    } catch (PDOException $e) {
+        respondWithError('Database error: ' . $e->getMessage());
+    }
 }
 
 function calculateDistance($lat1, $lon1, $lat2, $lon2) {
@@ -114,6 +130,8 @@ function recordTimeEntry($user_id, $type) {
     
     $distance_meters = $nearest['distance'];
     $location_name = $nearest['name'];
+    $assignment_id = isset($_POST['assignment_id']) ? intval($_POST['assignment_id']) : null;
+    $logon_comment = isset($_POST['logon_comment']) ? trim($_POST['logon_comment']) : null;
 
     try {
         $conn->beginTransaction();
@@ -127,8 +145,8 @@ function recordTimeEntry($user_id, $type) {
                 respondWithError("Une entrée a déjà été enregistrée pour aujourd'hui.");
                 return;
             }
-            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters, logon_location_name) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters, $location_name]);
+            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters, logon_location_name, assignment_id, logon_comment) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters, $location_name, $assignment_id, $logon_comment]);
             $message = "Entrée enregistrée avec succès.";
         } else if ($type === 'logoff') {
             if (!$existing_entry || $existing_entry['logon_time'] === null) {
