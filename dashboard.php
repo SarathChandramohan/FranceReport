@@ -109,219 +109,73 @@ $initial_employee_list = getInitialEmployeeList($conn);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tableau de bord - Gestion des Ouvriers</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
-        /* --- NEW VIOLET THEME & FONT --- */
-        :root {
-            --theme-color-violet: #6A0DAD;       /* Main violet color */
-            --theme-color-violet-dark: #5A0B93;  /* Darker violet for hover */
-            --theme-color-violet-light: #F4ECF7; /* Light violet for backgrounds */
-            --theme-color-violet-super-light: #f9f5fc;
-            --text-color-primary: #1f2937;
-            --text-color-secondary: #4b5563;
-            --border-color: #e5e7eb;
-            --background-color: #f9fafb;
-        }
-
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-            font-family: 'Inter', sans-serif; /* Applied new font */
-        }
-
-        body { 
-            background-color: var(--background-color); 
-            color: var(--text-color-primary); 
-            -webkit-font-smoothing: antialiased; 
-            -moz-osx-font-smoothing: grayscale; 
-            padding-bottom: 30px; 
-        }
-
-        .container-fluid { /* Changed from .container to match navbar */
-            width: 100%; 
-            margin: 0 auto; 
-            padding: 25px;
-            max-width: 1600px; /* Optional: adds a max-width for very large screens */
-        }
-
-        h1, h2, h3, h5 { 
-            color: var(--text-color-primary); 
-            font-weight: 700; /* Bolder headings */
-        }
-        h1 { font-size: 2rem; margin-bottom: 25px; }
-        h2 { font-size: 1.5rem; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
-        h3 { font-size: 1.25rem; margin-bottom: 20px; }
-
-        .shortcut-buttons-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
-            gap: 20px; 
-            margin-bottom: 30px; 
-        }
-
-        .shortcut-btn { 
-            background-color: #ffffff; 
-            border: 1px solid var(--border-color); 
-            color: var(--text-color-secondary); 
-            padding: 20px; 
-            text-align: center; 
-            border-radius: 12px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06); 
-            transition: all 0.2s ease; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            text-decoration: none; 
-            font-size: 0.9rem; 
-            font-weight: 600; 
-            min-height: 120px; 
-            cursor: pointer; 
-        }
-
-        .shortcut-btn i { 
-            color: var(--theme-color-violet); /* Icon color to violet */
-            margin-bottom: 12px; 
-            font-size: 2.2em;
-            transition: all 0.2s ease;
-        }
-
-        .shortcut-btn:hover { 
-            transform: translateY(-4px); 
-            box-shadow: 0 6px 15px rgba(0,0,0,0.1); 
-            color: var(--theme-color-violet); 
-            border-color: var(--theme-color-violet);
-        }
-
-        .content-card { 
-            background-color: #ffffff; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07); 
-            padding: 25px; 
-            border: 1px solid var(--border-color); 
-            margin-bottom: 30px; 
-        }
-
-        .stats-container { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); 
-            gap: 20px; 
-            margin-bottom: 30px; 
-        }
-        
-        /* Themed Stat Cards */
-        .stat-card { 
-            background-color: var(--theme-color-violet-super-light);
-            border-radius: 10px; 
-            padding: 20px; 
-            text-align: center; 
-            border-left: 5px solid var(--theme-color-violet);
-            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            cursor: pointer;
-        }
-
-        .stat-card:hover { 
-            transform: translateY(-5px); 
-            box-shadow: 0 6px 15px rgba(106, 13, 173, 0.15); /* Violet shadow */
-        }
-        
-        .stat-value { 
-            font-size: 2.5rem; 
-            font-weight: 700; 
-            margin-bottom: 8px; 
-            line-height: 1.1; 
-            color: var(--theme-color-violet); /* Violet for stat value */
-        }
-        
-        .stat-label { 
-            font-size: 0.95rem; 
-            color: var(--text-color-secondary); 
-            font-weight: 500; 
-        }
-
-        .stat-icon { 
-            font-size: 1.8rem; 
-            margin-bottom: 10px; 
-            opacity: 0.8;
-            color: var(--theme-color-violet);
-        }
-        
-        /* Specific stat card colors can be removed or simplified as they all follow the main theme now */
-        .stat-card.total-employees { border-left-color: #6A0DAD; }
-        .stat-card.assigned-today { border-left-color: #8A2BE2; }
-        .stat-card.active-today { border-left-color: #9932CC; }
-        .stat-card.on-generic-leave-today { border-left-color: #BA55D3; }
-        .stat-card.on-sick-leave-today { border-left-color: #C71585; }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
+        body { background-color: #f5f5f7; color: #1d1d1f; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; padding-bottom: 30px; }
+        .container { width: 100%; margin: 0; padding: 25px; }
+        h1 { color: #1d1d1f; font-size: 28px; font-weight: 600; margin-bottom: 25px; }
+        .shortcut-buttons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .shortcut-btn { background-color: #ffffff; border: 1px solid #e0e0e0; color: #333; padding: 20px; text-align: center; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.07); transition: all 0.3s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; font-size: 0.9rem; font-weight: 500; min-height: 120px; cursor: pointer; }
+        .shortcut-btn:hover { background-color: #f0f2f5; transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); color: #007bff; }
+        .shortcut-btn i { color: #007bff; margin-bottom: 10px; font-size: 2.2em; }
+        .shortcut-btn:hover i { color: #0056b3; }
+        .content-card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); padding: 25px; border: 1px solid #e5e5e5; margin-bottom: 30px; }
+        h2 { margin-bottom: 20px; color: #1d1d1f; font-size: 22px; font-weight: 600; }
+        h3 { color: #1d1d1f; font-weight: 600; margin-bottom: 20px; font-size: 20px; }
+        .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background-color: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); padding: 20px; text-align: center; border-left: 5px solid #007aff; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; cursor: default; }
+        .stat-card.clickable:hover { transform: translateY(-5px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); cursor: pointer; }
+        .stat-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 8px; line-height: 1.1; color: #333; }
+        .stat-label { font-size: 0.95rem; color: #555; font-weight: 500; }
+        .stat-icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.7; }
+        .stat-card.total-employees { border-left-color: #007bff; } .stat-card.total-employees .stat-icon { color: #007bff; }
+        .stat-card.assigned-today { border-left-color: #ff9500; } .stat-card.assigned-today .stat-icon { color: #ff9500; }
+        .stat-card.active-today { border-left-color: #34c759; } .stat-card.active-today .stat-icon { color: #34c759; }
+        .stat-card.on-generic-leave-today { border-left-color: #5856d6; } .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
+        .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
         #employeeListCardHeader { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         #employeeListCardHeader h3 { margin-bottom: 0.5rem; }
         #backToListButton { display: none; margin-bottom: 0.5rem; }
-
-        /* Themed tables */
-        .table-container { 
-            overflow-x: auto; 
-            border: 1px solid var(--border-color);
-            border-radius: 8px; 
-            margin-top: 15px; 
-        }
+        .filter-controls { margin-bottom: 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
+        .filter-item { display: flex; align-items: center; gap: 8px; }
+        .filter-controls label { font-weight: 500; color: #1d1d1f; font-size: 14px; white-space: nowrap; }
+        .filter-controls .form-control-sm { padding: 0.3rem 0.6rem; font-size: 14px; border-radius: 8px; border: 1px solid #d2d2d7; background-color: #f5f5f7; height: auto; line-height: 1.5; }
+        .filter-item select.form-control-sm { min-width: 200px; flex-grow: 1; }
+        .filter-item input[type="month"].form-control-sm, .filter-item input[type="date"].form-control-sm { min-width: 150px; }
+        .filter-item.export-button-group { margin-left: auto; }
+        .export-button { padding: 8px 15px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out; background-color: #34c759; color: white; }
+        .export-button:hover { background-color: #2ca048; }
+        .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; }
         table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        table th, table td { 
-            padding: 14px 16px; /* Increased padding */
-            text-align: left; 
-            border-bottom: 1px solid var(--border-color); 
-            font-size: 14px; 
-            color: var(--text-color-primary); 
-            vertical-align: middle; 
-        }
-        table td { color: var(--text-color-secondary); }
-        table th { 
-            background-color: var(--theme-color-violet-super-light);
-            font-weight: 600; 
-            color: var(--text-color-primary); 
-            border-bottom-width: 2px; 
-            border-color: var(--border-color);
-        }
+        table th, table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e5e5e5; font-size: 14px; color: #1d1d1f; vertical-align: middle; }
+        table td { color: #555; }
+        table th { background-color: #f9f9f9; font-weight: 600; color: #333; border-bottom-width: 2px; }
         table tr:last-child td { border-bottom: none; }
-        table tr:hover { background-color: var(--theme-color-violet-light); }
-
-        /* Themed buttons and controls */
-        .btn-primary { background-color: var(--theme-color-violet) !important; border-color: var(--theme-color-violet) !important; }
-        .btn-primary:hover { background-color: var(--theme-color-violet-dark) !important; border-color: var(--theme-color-violet-dark) !important; }
-        .btn-outline-secondary { color: var(--text-color-secondary); border-color: #ced4da; }
-        .btn-outline-secondary:hover { color: var(--text-color-primary); background-color: #e9ecef; border-color: #ced4da; }
-        .action-button { background-color: var(--theme-color-violet); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; }
-        .action-button:hover { background-color: var(--theme-color-violet-dark); }
-        .export-button { background-color: #10B981; color: white; padding: 8px 15px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s; } /* Keep green for export for visual distinction */
-        .export-button:hover { background-color: #059669; }
-        .action-button.btn-info { background-color: #0ea5e9; } /* Example of complementary color for 'Details' */
-        .action-button.btn-info:hover { background-color: #0284c7; }
-
-        /* Status Tags */
-        .status-tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; color: white; }
-        .status-tag.status-pending { background-color: #f59e0b; } 
-        .status-tag.status-approved { background-color: #10b981; } 
-        .status-tag.status-rejected { background-color: #ef4444; } 
-        .status-tag.status-cancelled { background-color: #6b7280; }
-
-        /* Modals */
-        .modal-content { border: none; border-radius: 14px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15); }
-        .modal-header .close { padding: 1rem; margin: -1rem -1rem -1rem auto; }
-        .modal-header { border-bottom: 1px solid var(--border-color); }
-        .modal-footer { border-top: 1px solid var(--border-color); }
-        .nav-tabs .nav-link { color: var(--theme-color-violet); }
-        .nav-tabs .nav-link.active { color: var(--text-color-primary); border-color: var(--border-color) var(--border-color) #fff; font-weight: bold; }
-
-        /* Placeholders */
-        .loading-placeholder, .error-placeholder, .info-placeholder { text-align: center; padding: 40px 20px; color: var(--text-color-secondary); font-size: 1.1rem; }
+        table tr:hover { background-color: #f0f0f0; }
+        .action-button { padding: 5px 10px; border-radius: 6px; border: none; background-color: #007aff; color: white; font-size: 13px; cursor: pointer; transition: background-color 0.2s; margin-right: 5px; margin-bottom: 3px; display: inline-block; }
+        .action-button:hover { background-color: #0056b3; }
+        .btn-sm { padding: .25rem .5rem; font-size: .875rem; line-height: 1.5; border-radius: .2rem; }
+        .status-tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; color: white; }
+        .status-tag.status-pending { background-color: #ff9500; } .status-tag.status-approved { background-color: #34c759; } .status-tag.status-rejected { background-color: #ff3b30; } .status-tag.status-cancelled { background-color: #8e8e93; }
+        .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #ffffff; margin: 5% auto; padding: 25px; border: none; width: 90%; border-radius: 14px; position: relative; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15); }
+        .modal-lg { max-width: 800px; } .modal-xl { max-width: 1140px; }
+        .modal-header .close { padding: 1rem 1rem; margin: -1rem -1rem -1rem auto; }
+        .modal-alert { display: none; margin-bottom: 15px; }
+        #congesAdminModal .nav-tabs .nav-link { border-radius: 0.25rem 0.25rem 0 0; color: #007bff; }
+        #congesAdminModal .nav-tabs .nav-link.active { color: #495057; background-color: #fff; border-color: #dee2e6 #dee2e6 #fff; font-weight: bold; }
+        #congesAdminModal .tab-content { border: 1px solid #dee2e6; border-top: none; padding: 15px; border-radius: 0 0 0.25rem 0.25rem; }
+        #leaveDetailsModal .modal-body p { font-size: 1rem; margin-bottom: 0.8rem; }
+        #leaveDetailsModal .modal-body strong { font-weight: 600; color: #333; }
+        #leaveDetailsModal .document-link-modal { display: inline-block; margin-top: 5px; padding: 5px 10px; background-color: #f0f2f5; border-radius: 5px; color: #007bff; text-decoration: none; }
+        #leaveDetailsModal .document-link-modal:hover { background-color: #e9ecef; }
+        #leaveDetailsModal .status-tag-modal { padding: 0.25em 0.6em; font-size: 0.9em; }
+        .loading-placeholder, .error-placeholder, .info-placeholder { text-align: center; padding: 40px 20px; color: #6c757d; font-size: 1.1rem; }
         .error-placeholder { color: #dc3545; }
-
-        /* Media Queries - Unchanged */
+        .alert-custom { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: .35rem; }
+        .alert-danger-custom { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
+        .alert-info-custom { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
         @media (max-width: 768px) {
             h1 { font-size: 24px; } .content-card { padding: 20px; } h2 { font-size: 20px; } h3 { font-size: 18px; }
             table th, table td { padding: 10px 12px; font-size: 13px; }
@@ -353,7 +207,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
         </div>
 
         <div class="content-card" id="integrated-employes-section">
-            <?php if (isset($GLOBALS['initial_employee_list_error'])) echo '<div class="alert alert-danger-custom text-center">' . htmlspecialchars($GLOBALS['initial_employee_list_error']) . '</div>'; ?>
+             <?php if (isset($GLOBALS['initial_employee_list_error'])) echo '<div class="alert alert-danger-custom text-center">' . htmlspecialchars($GLOBALS['initial_employee_list_error']) . '</div>'; ?>
             <div class="card" style="border: none; box-shadow: none; padding: 0;"> <h3>Statistiques du Jour</h3>
                 <div class="stats-container" id="employee-stats-container">
                     <div class="loading-placeholder"><div class="spinner-border spinner-border-sm" role="status"></div> Chargement des statistiques...</div>
@@ -365,8 +219,8 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     <button id="backToListButton" class="btn btn-sm btn-outline-secondary" onclick="showInitialEmployeeList()"><i class="fas fa-arrow-left"></i> Retour à la liste générale</button>
                 </div>
                 <div class="table-container">
-                    <table id="employees-table" class="table table-hover">
-                        <thead id="employees-table-head"></thead>
+                    <table id="employees-table" class="table table-striped table-hover">
+                        <thead class="thead-light" id="employees-table-head"></thead>
                         <tbody id="employees-table-body"></tbody>
                     </table>
                 </div>
@@ -375,11 +229,11 @@ $initial_employee_list = getInitialEmployeeList($conn);
         <div class="content-card">
             <h2>Dernières activités</h2>
             <div class="table-container">
-                <table id="activities-table" class="table table-hover">
+                <table id="activities-table">
                     <thead><tr><th>Employé</th><th>Action</th><th>Date</th><th>Heure</th></tr></thead>
                     <tbody id="activities-table-body">
                         <?php if (empty($activities)): ?>
-                            <tr><td colspan="4" class="info-placeholder">Aucune activité récente</td></tr>
+                            <tr><td colspan="4" style="text-align: center;">Aucune activité récente</td></tr>
                         <?php else: ?>
                             <?php foreach ($activities as $activity): ?>
                                 <tr>
@@ -427,7 +281,8 @@ $initial_employee_list = getInitialEmployeeList($conn);
         </div>
     </div>
     <div class="modal fade" id="leaveDetailsModal" tabindex="-1" aria-labelledby="leaveDetailsModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="leaveDetailsModalLabel">Détails de la Demande</h5><button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span></button></div><div class="modal-body" id="leaveDetailsModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button></div></div></div></div>
-    <div class="modal fade" id="eventCreationModal" tabindex="-1" aria-labelledby="eventCreationModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="eventCreationModalLabel">Créer un Nouvel Événement</h5><button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span></button></div><form id="eventCreationForm"><div class="modal-body"><div id="eventCreationAlert" class="alert modal-alert" style="display:none;"></div><div class="form-group"><label for="eventTitleModal">Titre <span class="text-danger">*</span></label><input type="text" class="form-control form-control-sm" id="eventTitleModal" name="title" required></div><div class="form-group"><label for="eventDescriptionModal">Description</label><textarea class="form-control form-control-sm" id="eventDescriptionModal" name="description" rows="3"></textarea></div><div class="row"><div class="col-md-6 form-group"><label for="eventStartModal">Début <span class="text-danger">*</span></label><input type="datetime-local" class="form-control form-control-sm" id="eventStartModal" name="start_datetime" required></div><div class="col-md-6 form-group"><label for="eventEndModal">Fin <span class="text-danger">*</span></label><input type="datetime-local" class="form-control form-control-sm" id="eventEndModal" name="end_datetime" required></div></div><div class="form-group"><label for="eventAssignedUsersModal">Assigner à <span class="text-danger">*</span></label><select class="form-control form-control-sm" id="eventAssignedUsersModal" name="assigned_users[]" multiple required><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select><small class="form-text text-muted">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small></div><div class="form-group"><label for="eventColorModal">Couleur</label><input type="color" class="form-control form-control-sm" id="eventColorModal" name="color" value="#6A0DAD"></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary btn-sm">Enregistrer</button></div></form></div></div></div>
+    <div class="modal fade" id="eventCreationModal" tabindex="-1" aria-labelledby="eventCreationModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="eventCreationModalLabel">Créer un Nouvel Événement</h5><button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span></button></div><form id="eventCreationForm"><div class="modal-body"><div id="eventCreationAlert" class="alert modal-alert" style="display:none;"></div><div class="form-group"><label for="eventTitleModal">Titre <span class="text-danger">*</span></label><input type="text" class="form-control form-control-sm" id="eventTitleModal" name="title" required></div><div class="form-group"><label for="eventDescriptionModal">Description</label><textarea class="form-control form-control-sm" id="eventDescriptionModal" name="description" rows="3"></textarea></div><div class="row"><div class="col-md-6 form-group"><label for="eventStartModal">Début <span class="text-danger">*</span></label><input type="datetime-local" class="form-control form-control-sm" id="eventStartModal" name="start_datetime" required></div><div class="col-md-6 form-group"><label for="eventEndModal">Fin <span class="text-danger">*</span></label><input type="datetime-local" class="form-control form-control-sm" id="eventEndModal" name="end_datetime" required></div></div><div class="form-group"><label for="eventAssignedUsersModal">Assigner à <span class="text-danger">*</span></label><select class="form-control form-control-sm" id="eventAssignedUsersModal" name="assigned_users[]" multiple required><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select><small class="form-text text-muted">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small></div><div class="form-group"><label for="eventColorModal">Couleur</label><input type="color" class="form-control form-control-sm" id="eventColorModal" name="color" value="#007bff"></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary btn-sm">Enregistrer</button></div></form></div></div></div>
+
     <div class="modal fade" id="feuilleDeTempsModal" tabindex="-1" aria-labelledby="feuilleDeTempsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
@@ -462,7 +317,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+   <script>
     // This script block contains all your original functions, with targeted fixes.
     const currentUserRole = '<?= $user['role']; ?>';
 
@@ -517,9 +372,9 @@ $initial_employee_list = getInitialEmployeeList($conn);
         activities.forEach(activity => {
             const row = document.createElement('tr');
             row.innerHTML = `<td>${escapeHtml(activity.employee_name)}</td>
-                                <td>${escapeHtml(activity.action)}</td>
-                                <td>${escapeHtml(activity.date)}</td>
-                                <td>${escapeHtml(activity.hour)}</td>`;
+                             <td>${escapeHtml(activity.action)}</td>
+                             <td>${escapeHtml(activity.date)}</td>
+                             <td>${escapeHtml(activity.hour)}</td>`;
             tbody.appendChild(row);
         });
     }
@@ -607,7 +462,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
                 if (response.status === 'success' && response.data && response.data.length > 0) {
                     response.data.forEach(function(req) {
                         let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>` : 'Aucun';
-                        tbody.append(`<tr><td>${escapeHtml(req.employee_name)}</td><td>${escapeHtml(req.date_debut)} - ${escapeHtml(req.date_fin)}</td><td>${escapeHtml(getLeaveTypeName(req.type_conge))}</td><td>${escapeHtml(req.duree)}j</td><td>${docLink}</td><td>${escapeHtml(req.date_demande)}</td><td><button class="action-button btn-success btn-sm" onclick="approveLeaveFromModal(${req.id})">Approuver</button><button class="action-button btn-danger btn-sm ml-1" onclick="rejectLeaveFromModal(${req.id})">Refuser</button><button class="action-button btn-info btn-sm ml-1" onclick="showLeaveDetailsModal(${req.id})">Détails</button></td></tr>`);
+                        tbody.append(`<tr><td>${escapeHtml(req.employee_name)}</td><td>${escapeHtml(req.date_debut)} - ${escapeHtml(req.date_fin)}</td><td>${escapeHtml(getLeaveTypeName(req.type_conge))}</td><td>${escapeHtml(req.duree)}j</td><td>${docLink}</td><td>${escapeHtml(req.date_demande)}</td><td><button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(${req.id})">Approuver</button><button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(${req.id})">Refuser</button><button class="btn btn-info btn-sm ml-1 py-0 px-1 action-button" onclick="showLeaveDetailsModal(${req.id})">Détails</button></td></tr>`);
                     });
                 } else {
                     tbody.html('<tr><td colspan="7" class="info-placeholder">Aucune demande en attente.</td></tr>');
@@ -801,7 +656,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     }
-</script>
+</script> 
     
 </body>
 </html>
