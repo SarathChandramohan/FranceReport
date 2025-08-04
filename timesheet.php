@@ -201,6 +201,7 @@ $user = getCurrentUser();
             updateButtonStates();
             return;
         }
+        locationInfo.textContent = 'Activation de la géolocalisation...';
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 currentLatitude = position.coords.latitude;
@@ -314,6 +315,7 @@ $user = getCurrentUser();
     
     document.getElementById('toggle-location').addEventListener('change', function() {
         const statusText = document.getElementById('location-status-text');
+        const locationInfo = document.getElementById('location-info');
         if (this.checked) {
             statusText.textContent = "Activée";
             statusText.style.color = "#2ecc71";
@@ -321,8 +323,9 @@ $user = getCurrentUser();
         } else {
             statusText.textContent = "Désactivée";
             statusText.style.color = "#e74c3c";
-            document.getElementById('location-info').textContent = "Localisation désactivée";
-            isInRange = true; // Allow clocking in without location
+            locationInfo.textContent = "La localisation doit être activée pour pointer.";
+            locationInfo.className = 'out_of_range';
+            isInRange = false;
             updateButtonStates();
         }
     });
