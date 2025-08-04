@@ -13,9 +13,16 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-    /* * CSS for the new site header.
+    /*
+     * CSS for the new site header.
      * All rules are prefixed with '.site-header' to prevent conflicts with other page styles.
-    */
+     */
+    
+    /* Define violet theme color */
+    :root {
+        --theme-color-violet: #6A0DAD; /* Premium Violet */
+    }
+
     body {
         /* Apply font to the whole page for consistency */
         font-family: 'Inter', sans-serif;
@@ -28,16 +35,16 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid #e5e7eb;
-        border-top: 3px solid #374151; /* Dark grey top border from the image */
+        border-top: 3px solid #374151; /* Dark grey top border */
         width: 100%;
         position: sticky;
         top: 0;
-        z-index: 1020; /* Ensure it's above most content */
+        z-index: 1020;
     }
 
     /* Left Side: Logo */
     .site-header .header-left .company-logo {
-        height: 32px; /* Adjusted height for a sleeker look */
+        height: 32px;
         width: auto;
         display: block;
     }
@@ -46,20 +53,20 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     .site-header .header-center {
         display: flex;
         align-items: center;
-        gap: 2rem; /* Space between links */
+        gap: 2rem;
     }
 
     .site-header .header-center a {
         font-family: 'Inter', sans-serif;
         text-decoration: none;
-        color: #4b5563; /* Dark gray for text */
+        color: #4b5563;
         font-weight: 500;
         font-size: 0.95rem;
         padding: 0.5rem 0;
         transition: color 0.2s ease-in-out;
         position: relative;
     }
-    
+
     .site-header .header-center a:after {
         content: '';
         position: absolute;
@@ -67,14 +74,14 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         height: 2px;
         bottom: 0;
         left: 50%;
-        background-color: #007bff;
+        background-color: var(--theme-color-violet); /* Violet underline */
         transition: all 0.3s ease-in-out;
         transform: translateX(-50%);
     }
 
     .site-header .header-center a:hover,
     .site-header .header-center a.active {
-        color: #007bff; /* Primary blue for hover and active states */
+        color: var(--theme-color-violet); /* Violet for hover and active states */
     }
 
     .site-header .header-center a.active:after {
@@ -85,19 +92,25 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     .site-header .header-right {
         display: flex;
         align-items: center;
-        gap: 1.5rem; /* Space between user info and logout button */
+        gap: 1.5rem;
+    }
+    
+    /* NEW: Container for the user menu hover effect */
+    .site-header .user-menu-container {
+        position: relative; /* Needed for positioning the logout button */
     }
 
     .site-header .user-info {
         display: flex;
         align-items: center;
-        gap: 0.75rem; /* Space between name and avatar */
+        gap: 0.75rem;
         color: #374151;
         font-weight: 500;
+        cursor: pointer; /* Indicates it's interactive */
     }
 
     .site-header .user-avatar {
-        background-color: #007bff;
+        background-color: var(--theme-color-violet); /* Violet avatar background */
         color: white;
         border-radius: 50%;
         width: 36px;
@@ -108,22 +121,34 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         font-weight: 600;
         font-size: 0.9rem;
     }
-    
-    .site-header .my-account-button {
+
+    .site-header .logout-button {
+        display: none; /* Hide logout button by default */
+        position: absolute;
+        top: 110%; /* Position below the user info */
+        right: 0;
         background-color: #ffffff;
-        color: #374151;
-        border: 2px solid #d1d5db; /* Gray border like the image */
-        padding: 0.5rem 1.25rem;
+        border: 1px solid #e5e7eb;
+        padding: 0.75rem 1.5rem;
         border-radius: 8px;
         text-decoration: none;
         font-weight: 600;
         font-size: 0.9rem;
+        color: #374151;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        white-space: nowrap; /* Prevent "Déconnexion" from wrapping */
         transition: all 0.2s ease-in-out;
     }
-
-    .site-header .my-account-button:hover {
+    
+    .site-header .logout-button:hover {
         border-color: #374151;
         color: #111827;
+        background-color: #f9fafb;
+    }
+    
+    /* NEW: Show logout button on hover of the container */
+    .site-header .user-menu-container:hover .logout-button {
+        display: block;
     }
 
     /* Mobile Hamburger Toggler */
@@ -139,7 +164,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     .mobile-nav-panel {
         position: fixed;
         top: 0;
-        left: -300px; /* Start off-screen to the left */
+        left: -300px;
         width: 280px;
         height: 100%;
         background-color: #ffffff;
@@ -152,7 +177,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     }
 
     .mobile-nav-panel.show {
-        left: 0; /* Slide in */
+        left: 0;
     }
     
     .mobile-nav-panel .close-btn {
@@ -185,8 +210,8 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     
     .mobile-nav-panel .mobile-nav-links a:hover,
     .mobile-nav-panel .mobile-nav-links a.active {
-        background-color: #f3f4f6; /* Light gray background */
-        color: #007bff;
+        background-color: #f3f4f6;
+        color: var(--theme-color-violet); /* Violet for mobile active state */
     }
     
     /* Overlay for when mobile menu is open */
@@ -205,10 +230,10 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         display: block;
     }
 
-    /* Hide elements on different screen sizes using Bootstrap's d-classes */
+    /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
         .site-header .header-center,
-        .site-header .user-info {
+        .site-header .user-menu-container { /* Hide the new container on mobile */
             display: none;
         }
     }
@@ -245,13 +270,16 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     </div>
 
     <div class="header-right">
-        <div class="user-info">
-            <span class="user-name"><?php echo isset($user) ? htmlspecialchars($user['prenom'] . ' ' . $user['nom']) : ''; ?></span>
-            <div class="user-avatar">
-                <?php echo isset($user) ? htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1))) : '??'; ?>
+        <div class="user-menu-container">
+            <div class="user-info">
+                <span class="user-name"><?php echo isset($user) ? htmlspecialchars($user['prenom'] . ' ' . $user['nom']) : ''; ?></span>
+                <div class="user-avatar">
+                    <?php echo isset($user) ? htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1))) : '??'; ?>
+                </div>
             </div>
+            <a href="logout.php" class="logout-button">Déconnexion</a>
         </div>
-        <a href="logout.php" class="my-account-button">Déconnexion</a>
+        
         <button class="navbar-toggler" type="button" aria-label="Toggle navigation">
             <i class="fas fa-bars"></i>
         </button>
@@ -275,7 +303,8 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">Technicien</a>
         <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
         <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
-    </div>
+        <hr>
+        <a href="logout.php">Déconnexion</a> </div>
 </div>
 
 <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
@@ -288,13 +317,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const overlay = document.getElementById('mobileNavOverlay');
 
     function openMobileNav() {
-        mobileNav.classList.add('show');
-        overlay.classList.add('show');
+        if (mobileNav && overlay) {
+            mobileNav.classList.add('show');
+            overlay.classList.add('show');
+        }
     }
 
     function closeMobileNav() {
-        mobileNav.classList.remove('show');
-        overlay.classList.remove('show');
+        if (mobileNav && overlay) {
+            mobileNav.classList.remove('show');
+            overlay.classList.remove('show');
+        }
     }
 
     if (toggler) {
