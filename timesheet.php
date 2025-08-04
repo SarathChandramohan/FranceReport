@@ -9,6 +9,7 @@ $user = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pointage - Gestion des Ouvriers</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <style>
         @media (max-width: 991px) { .navbar-toggler { margin-right: 0; z-index: 1035; } }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
@@ -45,6 +46,7 @@ $user = getCurrentUser();
         .alert { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid transparent; font-size: 14px; text-align: center; }
         .alert-success { background-color: rgba(52, 199, 89, 0.1); border-color: rgba(52, 199, 89, 0.3); color: #2ca048; }
         .alert-error { background-color: rgba(255, 59, 48, 0.1); border-color: rgba(255, 59, 48, 0.3); color: #d63027; }
+        #refresh-location { margin-left: 10px; }
     </style>
 </head>
 <body class="timesheet-page">
@@ -58,9 +60,10 @@ $user = getCurrentUser();
                     <div class="clock-display" id="current-time">--:--:--</div>
                     <div id="location-info">
                         Activation de la géolocalisation...
+                        <button id="refresh-location" class="btn btn-sm btn-secondary">Rafraîchir</button>
                     </div>
                     <div class="clock-buttons">
-                        <button class="btn-success" id="btn-entree" onclick="enregistrerPointage('record_entry')">Enregistrer Entrée</button>
+                        <button class="btn-success" id="btn-entree">Enregistrer Entrée</button>
                         <div class="dropdown" id="break-dropdown">
                             <button class="btn-warning" id="btn-break">Ajouter Pause</button>
                             <div class="dropdown-content">
@@ -95,8 +98,39 @@ $user = getCurrentUser();
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="missionModal" tabindex="-1" role="dialog" aria-labelledby="missionModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="missionModalLabel">Sélectionner une mission</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+                <label for="assignment_id">Mission</label>
+                <select class="form-control" id="assignment_id">
+                    <option value="">-- Sans mission --</option>
+                </select>
+            </div>
+            <div class="form-group" id="comment-group">
+                <label for="logon_comment">Commentaire (si pas de mission)</label>
+                <textarea class="form-control" id="logon_comment" rows="3"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+            <button type="button" class="btn btn-primary" id="confirm-entry">Confirmer l'entrée</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <?php include('footer.php'); ?>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let currentLatitude = null;
     let currentLongitude = null;
@@ -139,7 +173,7 @@ $user = getCurrentUser();
         };
         xhr.send(formData);
     }
-    
+
     function checkLocationAndSetButtons() {
         const locationInfo = document.getElementById('location-info');
         if (!navigator.geolocation) {
@@ -173,12 +207,18 @@ $user = getCurrentUser();
         );
     }
 
-    function enregistrerPointage(action) {
+    function enregistrerPointage(action, assignment_id = null, logon_comment = null) {
         if (!isInRange) {
             showStatusMessage("Vous devez être à proximité d'un site autorisé pour pointer.", "error");
             return;
         }
         const data = { latitude: currentLatitude, longitude: currentLongitude };
+        if (assignment_id) {
+            data.assignment_id = assignment_id;
+        }
+        if (logon_comment) {
+            data.logon_comment = logon_comment;
+        }
         showStatusMessage("Envoi en cours...", "info");
         makeAjaxRequest(action, data, (error, response) => {
             if (error || response.status !== 'success') {
@@ -228,7 +268,7 @@ $user = getCurrentUser();
             fetchLatestEntryStatus();
         });
     }
-    
+
     function fetchLatestEntryStatus() {
         makeAjaxRequest('get_latest_entry_status', {}, (error, response) => {
             if (!error && response.status === 'success' && response.data) {
@@ -252,6 +292,35 @@ $user = getCurrentUser();
         btnSortie.disabled = !isInRange || !hasEntry || hasExit;
         btnBreak.disabled = !hasEntry || hasExit;
     }
+
+    document.getElementById('refresh-location').addEventListener('click', function() {
+        checkLocationAndSetButtons();
+    });
+    
+    document.getElementById('btn-entree').addEventListener('click', function() {
+        makeAjaxRequest('get_user_assignments', {}, (error, response) => {
+            if (error || response.status !== 'success') {
+                showStatusMessage("Erreur lors de la récupération des missions.", "error");
+                return;
+            }
+            const select = document.getElementById('assignment_id');
+            select.innerHTML = '<option value="">-- Sans mission --</option>';
+            response.data.forEach(assignment => {
+                const option = document.createElement('option');
+                option.value = assignment.assignment_id;
+                option.textContent = assignment.mission_text;
+                select.appendChild(option);
+            });
+            $('#missionModal').modal('show');
+        });
+    });
+
+    document.getElementById('confirm-entry').addEventListener('click', function() {
+        const assignment_id = document.getElementById('assignment_id').value;
+        const logon_comment = document.getElementById('logon_comment').value;
+        enregistrerPointage('record_entry', assignment_id, logon_comment);
+        $('#missionModal').modal('hide');
+    });
 
     document.addEventListener('DOMContentLoaded', function() {
         loadTimesheetHistory();
