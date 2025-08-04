@@ -1,4 +1,8 @@
 <?php
+// Enable error reporting for debugging. Should be turned off in production.
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once 'session-management.php';
 requireLogin();
 
@@ -6,42 +10,36 @@ header('Content-Type: application/json');
 
 // --- Database Connection ---
 function getDbConnection() {
-    // IMPORTANT: Replace with your actual database credentials
-    $host = 'localhost';
-    $dbname = 'your_database_name';
-    $user = 'your_username';
-    $password = 'your_password';
+    // IMPORTANT: Replace with your actual MS SQL Server credentials
+    $host = 'tcp:francerecord.database.windows.net,1433'; // e.g., 'localhost' or 'server.database.windows.net'
+    $dbname = 'Francerecord';
+    $user = 'francerecordloki';
+    $password = 'Hesoyam@2025';
     
     try {
-        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $password);
+        // Use the sqlsrv driver for Microsoft SQL Server
+        $pdo = new PDO("sqlsrv:server=$host;database=$dbname", $user, $password);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         return $pdo;
     } catch (PDOException $e) {
-        // In a real application, you would log this error, not just expose it.
-        echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
-        exit;
+        // Log the error and send a generic failure message
+        error_log('Database Connection Error: ' . $e->getMessage());
+        sendJsonResponse('error', 'Erreur de connexion à la base de données.');
     }
 }
 
 // --- Helper Functions ---
 
-/**
- * Sends a JSON response and terminates the script.
- */
 function sendJsonResponse($status, $message, $data = null) {
     $response = ['status' => $status, 'message' => $message];
     if ($data !== null) {
         $response['data'] = $data;
     }
-    echo json_encode($response);
-    exit;
+    die(json_encode($response));
 }
 
-/**
- * Calculates the distance between two geographical points (Haversine formula).
- * Returns distance in meters.
- */
 function calculateDistance($lat1, $lon1, $lat2, $lon2) {
+    if ($lat1 == null || $lon1 == null || $lat2 == null || $lon2 == null) return PHP_INT_MAX;
     $earthRadius = 6371000; // meters
     $dLat = deg2rad($lat2 - $lat1);
     $dLon = deg2rad($lon2 - $lon1);
@@ -60,127 +58,137 @@ $pdo = getDbConnection();
 try {
     switch ($action) {
         case 'get_user_missions_for_today':
-            // Fetches missions assigned to the user for the current day
+            // SQL Server uses CAST(GETDATE() AS DATE) to get the current date
             $stmt = $pdo->prepare("
                 SELECT a.assignment_id, m.name AS mission_text
                 FROM mission_assignments a
                 JOIN missions m ON a.mission_id = m.mission_id
-                WHERE a.user_id = ? AND a.assignment_date = CURDATE()
+                WHERE a.user_id = ? AND a.assignment_date = CAST(GETDATE() AS DATE)
             ");
             $stmt->execute([$userId]);
             $missions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            sendJsonResponse('success', 'Missions loaded.', $missions);
+            sendJsonResponse('success', 'Missions chargées.', $missions);
             break;
 
         case 'check_location_status':
-            // Checks if user is within range of any authorized site
-            $latitude = $_POST['latitude'] ?? 0;
-            $longitude = $_POST['longitude'] ?? 0;
+            $latitude = filter_input(INPUT_POST, 'latitude', FILTER_VALIDATE_FLOAT);
+            $longitude = filter_input(INPUT_POST, 'longitude', FILTER_VALIDATE_FLOAT);
             
-            $stmt = $pdo->query("SELECT site_name, latitude, longitude, radius FROM authorized_sites");
+            $stmt = $pdo->query("SELECT site_name, latitude, longitude, radius FROM authorized_sites WHERE is_active = 1");
             $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             $inRange = false;
-            $message = "Vous êtes hors de portée de tout site autorisé.";
+            $message = "Hors de portée de tout site autorisé.";
 
             foreach ($sites as $site) {
                 $distance = calculateDistance($latitude, $longitude, $site['latitude'], $site['longitude']);
                 if ($distance <= $site['radius']) {
                     $inRange = true;
-                    $message = "Vous êtes à proximité de : " . htmlspecialchars($site['site_name']);
+                    $message = "À proximité de : " . htmlspecialchars($site['site_name']) . " (" . round($distance) . "m)";
                     break;
                 }
             }
-            sendJsonResponse('success', 'Location status checked.', ['in_range' => $inRange, 'message' => $message]);
+            sendJsonResponse('success', 'Statut du lieu vérifié.', ['in_range' => $inRange, 'message' => $message]);
             break;
             
         case 'record_entry':
-            // Records a clock-in entry
-            $missionId = isset($_POST['mission_id']) && $_POST['mission_id'] !== 'null' ? $_POST['mission_id'] : null;
-            $comment = $_POST['comment'] ?? null;
-            $latitude = $_POST['latitude'];
-            $longitude = $_POST['longitude'];
+            $missionId = filter_input(INPUT_POST, 'mission_id', FILTER_VALIDATE_INT) ?: null;
+            $comment = filter_input(INPUT_POST, 'comment', FILTER_SANITIZE_STRING);
+            $latitude = filter_input(INPUT_POST, 'latitude', FILTER_VALIDATE_FLOAT);
+            $longitude = filter_input(INPUT_POST, 'longitude', FILTER_VALIDATE_FLOAT);
 
+            if ($missionId === null && $_POST['mission_id'] !== 'null') $missionId = false; // Handle invalid int
+
+            // SQL Server uses GETDATE() for the current timestamp
             $stmt = $pdo->prepare("
-                INSERT INTO timesheet (user_id, logon_time, logon_latitude, logon_longitude, assignment_id, logon_comment)
-                VALUES (?, NOW(), ?, ?, ?, ?)
+                INSERT INTO timesheet (user_id, timesheet_date, logon_time, logon_latitude, logon_longitude, assignment_id, logon_comment)
+                VALUES (?, CAST(GETDATE() AS DATE), GETDATE(), ?, ?, ?, ?)
             ");
             $stmt->execute([$userId, $latitude, $longitude, $missionId, $comment]);
             sendJsonResponse('success', 'Entrée enregistrée avec succès.');
             break;
 
         case 'record_exit':
-             // Records a clock-out entry
-            $latitude = $_POST['latitude'];
-            $longitude = $_POST['longitude'];
+            $latitude = filter_input(INPUT_POST, 'latitude', FILTER_VALIDATE_FLOAT);
+            $longitude = filter_input(INPUT_POST, 'longitude', FILTER_VALIDATE_FLOAT);
 
             $stmt = $pdo->prepare("
-                UPDATE timesheet SET logoff_time = NOW(), logoff_latitude = ?, logoff_longitude = ?
-                WHERE user_id = ? AND timesheet_date = CURDATE() AND logoff_time IS NULL
+                UPDATE timesheet SET logoff_time = GETDATE(), logoff_latitude = ?, logoff_longitude = ?
+                WHERE user_id = ? AND timesheet_date = CAST(GETDATE() AS DATE) AND logoff_time IS NULL
             ");
             $stmt->execute([$latitude, $longitude, $userId]);
             sendJsonResponse('success', 'Sortie enregistrée avec succès.');
             break;
             
         case 'add_break':
-            // Adds a break to the current day's timesheet
-            $breakMinutes = $_POST['break_minutes'] ?? 0;
+            $breakMinutes = filter_input(INPUT_POST, 'break_minutes', FILTER_VALIDATE_INT);
+            if (!$breakMinutes || $breakMinutes <= 0) sendJsonResponse('error', 'Durée de pause invalide.');
+
             $stmt = $pdo->prepare("
-                UPDATE timesheet SET break_minutes = break_minutes + ?
-                WHERE user_id = ? AND timesheet_date = CURDATE() AND logoff_time IS NULL
+                UPDATE timesheet SET break_minutes = ISNULL(break_minutes, 0) + ?
+                WHERE user_id = ? AND timesheet_date = CAST(GETDATE() AS DATE) AND logoff_time IS NULL
             ");
             $stmt->execute([$breakMinutes, $userId]);
             sendJsonResponse('success', 'Pause ajoutée.');
             break;
 
         case 'get_history':
-            // Fetches the user's timesheet history
+            // SQL Server uses DATEDIFF for time difference and CONVERT for formatting
             $stmt = $pdo->prepare("
-                SELECT 
-                    DATE_FORMAT(timesheet_date, '%d/%m/%Y') AS date,
-                    TIME_FORMAT(logon_time, '%H:%i') AS logon_time,
-                    logon_location_name,
-                    TIME_FORMAT(logoff_time, '%H:%i') AS logoff_time,
-                    logoff_location_name,
-                    break_minutes,
-                    TIMESTAMPDIFF(MINUTE, logon_time, logoff_time) - COALESCE(break_minutes, 0) as total_minutes
+                SELECT TOP 15
+                    CONVERT(varchar, timesheet_date, 103) AS date,
+                    CONVERT(varchar, logon_time, 108) AS logon_time,
+                    CONVERT(varchar, logoff_time, 108) AS logoff_time,
+                    ISNULL(break_minutes, 0) as break_minutes,
+                    DATEDIFF(minute, logon_time, logoff_time) as total_minutes
                 FROM timesheet 
                 WHERE user_id = ? 
                 ORDER BY timesheet_date DESC, logon_time DESC
-                LIMIT 30
             ");
             $stmt->execute([$userId]);
-            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $history_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach ($history as &$row) {
-                 if ($row['total_minutes'] !== null) {
-                    $hours = floor($row['total_minutes'] / 60);
-                    $mins = $row['total_minutes'] % 60;
-                    $row['duration'] = sprintf('%dh %02dmin', $hours, $mins);
-                } else {
-                    $row['duration'] = '--';
+            $history = [];
+            foreach ($history_raw as $row) {
+                $duration = '--';
+                if ($row['total_minutes'] !== null) {
+                    $effective_minutes = $row['total_minutes'] - $row['break_minutes'];
+                    if ($effective_minutes < 0) $effective_minutes = 0;
+                    $hours = floor($effective_minutes / 60);
+                    $mins = $effective_minutes % 60;
+                    $duration = sprintf('%dh %02dmin', $hours, $mins);
                 }
+                $history[] = [
+                    'date' => $row['date'],
+                    'logon_time' => substr($row['logon_time'], 0, 5),
+                    'logoff_time' => $row['logoff_time'] ? substr($row['logoff_time'], 0, 5) : '--',
+                    'break_minutes' => $row['break_minutes'] > 0 ? $row['break_minutes'] . ' min' : '--',
+                    'duration' => $duration
+                ];
             }
-            sendJsonResponse('success', 'History loaded.', $history);
+            sendJsonResponse('success', 'Historique chargé.', $history);
             break;
             
         case 'get_latest_entry_status':
-             // Checks if the user has clocked in or out for the day
             $stmt = $pdo->prepare("
-                SELECT 
-                    (logon_time IS NOT NULL) as has_entry,
-                    (logoff_time IS NOT NULL) as has_exit
+                SELECT TOP 1
+                    (CASE WHEN logon_time IS NOT NULL THEN 1 ELSE 0 END) as has_entry,
+                    (CASE WHEN logoff_time IS NOT NULL THEN 1 ELSE 0 END) as has_exit
                 FROM timesheet
-                WHERE user_id = ? AND timesheet_date = CURDATE()
-                ORDER BY timesheet_id DESC LIMIT 1
+                WHERE user_id = ? AND timesheet_date = CAST(GETDATE() AS DATE)
+                ORDER BY timesheet_id DESC
             ");
             $stmt->execute([$userId]);
             $status = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$status) {
                 $status = ['has_entry' => false, 'has_exit' => false];
+            } else {
+                // Convert boolean-like integers to actual booleans for JavaScript
+                $status['has_entry'] = (bool)$status['has_entry'];
+                $status['has_exit'] = (bool)$status['has_exit'];
             }
-            sendJsonResponse('success', 'Status fetched.', $status);
+            sendJsonResponse('success', 'Statut récupéré.', $status);
             break;
             
         default:
@@ -188,7 +196,6 @@ try {
             break;
     }
 } catch (Exception $e) {
-    // Log the error and send a generic error message
     error_log('Timesheet Handler Error: ' . $e->getMessage());
-    sendJsonResponse('error', 'Une erreur inattendue est survenue.');
+    sendJsonResponse('error', 'Une erreur de serveur est survenue. Veuillez contacter l\'administrateur.');
 }
