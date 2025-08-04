@@ -1,6 +1,9 @@
 server name francerecord
 francerecordloki
 Hesoyam@2025
+
+
+
 ---------------------------
 CREATE TABLE Users (
     user_id INT IDENTITY(1,1) PRIMARY KEY,
@@ -12,6 +15,7 @@ CREATE TABLE Users (
     password_hash NVARCHAR(255) NOT NULL, 
     date_creation DATETIME DEFAULT GETDATE() 
 );
+
 
 
 sarath
@@ -36,6 +40,10 @@ CREATE TABLE Timesheet (
     REFERENCES Users (user_id)
     ON DELETE CASCADE -- Optional: Define behavior on user deletion (e.g., CASCADE, NO ACTION)
 );
+ALTER TABLE timesheet
+ADD
+    assignment_id INT NULL,
+    logon_comment TEXT NULL;
 
 
 ------------------------------------------------------
@@ -319,3 +327,4 @@ ALTER TABLE [dbo].[Bookings] DROP CONSTRAINT [UQ_Booking_Asset_Date];
 CREATE UNIQUE NONCLUSTERED INDEX [IX_UQ_ActiveBooking_Asset_Date]
 ON [dbo].[Bookings] ([asset_id], [booking_date])
 WHERE [status] IN ('booked', 'active');
+
