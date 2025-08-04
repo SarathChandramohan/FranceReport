@@ -383,3 +383,9 @@ CREATE TABLE [dbo].[ToolReports] (
     CONSTRAINT [FK_ToolReports_Users] FOREIGN KEY ([user_id]) REFERENCES [dbo].[Users] ([user_id]) ON DELETE CASCADE
 );
 GO
+
+
+ALTER TABLE timesheet
+ADD
+    assignment_id INT NULL,
+    logon_comment TEXT NULL;
