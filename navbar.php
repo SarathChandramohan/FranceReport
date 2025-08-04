@@ -2,228 +2,309 @@
 require_once 'session-management.php';
 requireLogin();
 $user = getCurrentUser();
-
-// Get current page filename to set active state
 $current_page = basename($_SERVER['PHP_SELF']);
+$home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.php' : 'timesheet.php';
 ?>
 
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
+    /* * CSS for the new site header.
+     * All rules are prefixed with '.site-header' to prevent conflicts with other page styles.
+    */
     body {
-        font-family: 'Poppins', sans-serif;
+        /* Apply font to the whole page for consistency */
+        font-family: 'Inter', sans-serif;
     }
 
-    .company-logo {
-        height: 50px;
+    .site-header {
+        background-color: #ffffff;
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e5e7eb;
+        border-top: 3px solid #374151; /* Dark grey top border from the image */
+        width: 100%;
+        position: sticky;
+        top: 0;
+        z-index: 1020; /* Ensure it's above most content */
     }
 
-    .navbar{
-        background-color: #333333;
+    /* Left Side: Logo */
+    .site-header .header-left .company-logo {
+        height: 32px; /* Adjusted height for a sleeker look */
+        width: auto;
+        display: block;
     }
 
-    .nav-links a {
-    color: white;
-    text-decoration: none;
-    padding: 8px 15px;
-    /* Remove border-radius to make it rectangular */
-    border-radius: 0;
-    margin: 0 5px;
-    font-weight: 500;
-    transition: background-color 0.3s;
-}
-
-.nav-links a.active,
-.nav-links a:hover {
-    background-color: #007bff;
-    color: white;
-    /* Remove transform to eliminate the lift effect */
-    transform: none;
-}
-
-    .user-info-nav {
-        color: white;
+    /* Center: Navigation Links */
+    .site-header .header-center {
         display: flex;
         align-items: center;
-        margin-left: 30px;
+        gap: 2rem; /* Space between links */
     }
 
-    .user-avatar {
+    .site-header .header-center a {
+        font-family: 'Inter', sans-serif;
+        text-decoration: none;
+        color: #4b5563; /* Dark gray for text */
+        font-weight: 500;
+        font-size: 0.95rem;
+        padding: 0.5rem 0;
+        transition: color 0.2s ease-in-out;
+        position: relative;
+    }
+    
+    .site-header .header-center a:after {
+        content: '';
+        position: absolute;
+        width: 0;
+        height: 2px;
+        bottom: 0;
+        left: 50%;
+        background-color: #007bff;
+        transition: all 0.3s ease-in-out;
+        transform: translateX(-50%);
+    }
+
+    .site-header .header-center a:hover,
+    .site-header .header-center a.active {
+        color: #007bff; /* Primary blue for hover and active states */
+    }
+
+    .site-header .header-center a.active:after {
+        width: 100%;
+    }
+
+    /* Right Side: User Info & Actions */
+    .site-header .header-right {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem; /* Space between user info and logout button */
+    }
+
+    .site-header .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem; /* Space between name and avatar */
+        color: #374151;
+        font-weight: 500;
+    }
+
+    .site-header .user-avatar {
         background-color: #007bff;
         color: white;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         display: flex;
         justify-content: center;
         align-items: center;
-        font-weight: bold;
-        margin-left: 15px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .site-header .my-account-button {
+        background-color: #ffffff;
+        color: #374151;
+        border: 2px solid #d1d5db; /* Gray border like the image */
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s ease-in-out;
     }
 
-    .user-info-nav span {
-        font-size: 16px;
-    }
- 
-
-    .navbar-toggler {
-        /*border-color: rgba(255,255,255,0.5);
-        background-color: rgba(0,0,0,0.5);  Added background to make it visible */
-        text-align:left;
+    .site-header .my-account-button:hover {
+        border-color: #374151;
+        color: #111827;
     }
 
-    /* Making the navbar collapse from left side */
-    @media (max-width: 991px) {
-        /* Mobile navbar layout adjustments */
-        .navbar {
-            padding: 10px 15px;
-            justify-content: space-between;
-        }
-        
-        .navbar-brand {
-            margin: 0;
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        
-        /* User avatar on right side */
-        .user-info-nav {
-            order: 3;
-            margin-left: 0;
-            margin-right: 0;
-        }
-        
-        .user-info-nav span {
+    /* Mobile Hamburger Toggler */
+    .site-header .navbar-toggler {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    /* Mobile Navigation Panel */
+    .mobile-nav-panel {
+        position: fixed;
+        top: 0;
+        left: -300px; /* Start off-screen to the left */
+        width: 280px;
+        height: 100%;
+        background-color: #ffffff;
+        z-index: 1030;
+        transition: left 0.3s ease-in-out;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem;
+    }
+
+    .mobile-nav-panel.show {
+        left: 0; /* Slide in */
+    }
+    
+    .mobile-nav-panel .close-btn {
+        background: none;
+        border: none;
+        font-size: 1.8rem;
+        color: #6b7280;
+        position: absolute;
+        top: 1rem;
+        right: 1.5rem;
+        cursor: pointer;
+    }
+
+    .mobile-nav-panel .mobile-nav-links {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 3rem;
+    }
+
+    .mobile-nav-panel .mobile-nav-links a {
+        text-decoration: none;
+        color: #374151;
+        font-weight: 500;
+        font-size: 1.1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+    }
+    
+    .mobile-nav-panel .mobile-nav-links a:hover,
+    .mobile-nav-panel .mobile-nav-links a.active {
+        background-color: #f3f4f6; /* Light gray background */
+        color: #007bff;
+    }
+    
+    /* Overlay for when mobile menu is open */
+    .mobile-nav-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        z-index: 1025;
+        display: none;
+    }
+    
+    .mobile-nav-overlay.show {
+        display: block;
+    }
+
+    /* Hide elements on different screen sizes using Bootstrap's d-classes */
+    @media (max-width: 991.98px) {
+        .site-header .header-center,
+        .site-header .user-info {
             display: none;
         }
-        
-        /* Hamburger menu sliding from left */
-        #navbarNav {
-            position: fixed;
-            top: 0;
-            left: -300px; /* Changed from right to left */
-            height: 100vh;
-            width: 250px;
-            background-color: #333;
-            z-index: 1031;
-            transition: left 0.3s ease; /* Changed from right to left */
-            padding-top: 70px;
-            box-shadow: 5px 0 15px rgba(0,0,0,0.2); /* Adjusted shadow direction */
-            overflow-y: auto;
-        }
-        
-        #navbarNav.show {
-            left: 0; /* Changed from right to left */
-        }
-        
-        .navbar-collapse.collapsing {
-            height: 100vh !important;
-            transition: left 0.3s ease; /* Changed from right to left */
-            left: -300px; /* Changed from right to left */
-        }
-        
-        .navbar-nav {
-            padding-left: 15px;
-        }
-        
-        .close-menu {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            z-index: 1032;
-        }
-        
-        /* User name at top of sidebar */
-        .user-name-mobile {
-            position: absolute;
-            top: 15px;
-            left: 0;
-            width: 100%;
-            padding: 10px 15px;
-            font-size: 16px;
-            color: white;
-            font-weight: 500;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    @media (min-width: 992px) {
+        .site-header .navbar-toggler {
+            display: none;
         }
     }
 </style>
 
-<nav class="navbar navbar-expand-lg px-3 py-3 sticky-top">
-    <button class="navbar-toggler d-lg-none" type="button" data-toggle="collapse" data-target="#navbarNav"
-        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span style="font-size: 24px; color: white;">☰</span>
-    </button>
-    
-    <a class="navbar-brand mx-auto mx-lg-0" href="#">
-        <img src="Logo.png" alt="Company Logo" class="company-logo">
-    </a>
-
-    <div class="collapse navbar-collapse" id="navbarNav">
-        <div class="user-name-mobile d-lg-none">
-            <?php echo isset($user) ? htmlspecialchars($user['prenom'] . ' ' . $user['nom']) : ''; ?>
-        </div>
-        
-        <span class="close-menu d-lg-none">&times;</span>
-        <ul class="navbar-nav ml-auto nav-links">
-            <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
-                <li class="nav-item"><a href="dashboard.php" class="nav-link <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Administrateur</a></li>
-            <?php endif; ?>
-            <li class="nav-item"><a href="timesheet.php" class="nav-link <?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a></li>
-            <li class="nav-item"><a href="conges.php" class="nav-link <?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a></li>
-            <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
-            <li class="nav-item"><a href="planning.php" class="nav-link <?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a></li>
-            <li class="nav-item"><a href="inventory.php" class="nav-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventory</a></li>
-            <?php else: ?>
-            <li class="nav-item"><a href="seeplanning.php" class="nav-link <?php echo ($current_page == 'seeplanning.php') ? 'active' : ''; ?>">Mission aujourd'hui</a></li>
-            <?php endif; ?>
-            <li class="nav-item"><a href="technician.php" class="nav-link <?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">Technician</a></li>
-            <li class="nav-item"><a href="messages.php" class="nav-link <?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages RH/Direction</a></li>
-            <li class="nav-item"><a href="events.php" class="nav-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>">Événements</a></li>
-            <li class="nav-item"><a href="logout.php" class="nav-link <?php echo $current_page == 'logout.php' ? 'active' : ''; ?>">Déconnexion</a></li>
-        </ul>
+<nav class="site-header">
+    <div class="header-left">
+        <a href="<?php echo $home_page; ?>">
+            <img src="Logo.png" alt="Company Logo" class="company-logo">
+        </a>
     </div>
-    
-    <div class="user-info-nav d-flex">
-        <span class="d-none d-lg-block">
-            <?php echo isset($user) ? htmlspecialchars($user['prenom'] . ' ' . $user['nom']) : ''; ?>
-        </span>
-        <div class="user-avatar">
-            <?php
-            if (isset($user)) {
-                echo htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1)));
-            } else {
-                echo "??";
-            }
-            ?>
+
+    <div class="header-center">
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
+            <a href="dashboard.php" class="<?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Administrateur</a>
+        <?php endif; ?>
+        <a href="timesheet.php" class="<?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a>
+        <a href="conges.php" class="<?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a>
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
+            <a href="planning.php" class="<?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a>
+            <a href="inventory.php" class="<?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventaire</a>
+        <?php else: ?>
+            <a href="seeplanning.php" class="<?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
+        <?php endif; ?>
+        <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">Technicien</a>
+        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
+        <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
+    </div>
+
+    <div class="header-right">
+        <div class="user-info">
+            <span class="user-name"><?php echo isset($user) ? htmlspecialchars($user['prenom'] . ' ' . $user['nom']) : ''; ?></span>
+            <div class="user-avatar">
+                <?php echo isset($user) ? htmlspecialchars(strtoupper(substr($user['prenom'], 0, 1) . substr($user['nom'], 0, 1))) : '??'; ?>
+            </div>
         </div>
+        <a href="logout.php" class="my-account-button">Déconnexion</a>
+        <button class="navbar-toggler" type="button" aria-label="Toggle navigation">
+            <i class="fas fa-bars"></i>
+        </button>
     </div>
 </nav>
 
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<div class="mobile-nav-panel" id="mobileNavPanel">
+    <button class="close-btn" aria-label="Close navigation">&times;</button>
+    <div class="mobile-nav-links">
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
+            <a href="dashboard.php" class="<?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Administrateur</a>
+        <?php endif; ?>
+        <a href="timesheet.php" class="<?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a>
+        <a href="conges.php" class="<?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a>
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
+            <a href="planning.php" class="<?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a>
+            <a href="inventory.php" class="<?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventaire</a>
+        <?php else: ?>
+            <a href="seeplanning.php" class="<?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
+        <?php endif; ?>
+        <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">Technicien</a>
+        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
+        <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
+    </div>
+</div>
+
+<div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
 
 <script>
-$(document).ready(function() {
-    // Close menu when close button is clicked
-    $('.close-menu').click(function() {
-        $('#navbarNav').collapse('hide');
-    });
-    
-    // Close menu when clicking outside
-    $(document).click(function(event) {
-        var clickover = $(event.target);
-        var $navbar = $("#navbarNav");
-        var _opened = $navbar.hasClass("show");
-        
-        if (_opened && !clickover.hasClass("navbar-toggler") && !clickover.closest("#navbarNav").length) {
-            $navbar.collapse('hide');
-        }
-    });
+document.addEventListener('DOMContentLoaded', function () {
+    const toggler = document.querySelector('.site-header .navbar-toggler');
+    const mobileNav = document.getElementById('mobileNavPanel');
+    const closeBtn = document.querySelector('.mobile-nav-panel .close-btn');
+    const overlay = document.getElementById('mobileNavOverlay');
+
+    function openMobileNav() {
+        mobileNav.classList.add('show');
+        overlay.classList.add('show');
+    }
+
+    function closeMobileNav() {
+        mobileNav.classList.remove('show');
+        overlay.classList.remove('show');
+    }
+
+    if (toggler) {
+        toggler.addEventListener('click', openMobileNav);
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeMobileNav);
+    }
+    if (overlay) {
+        overlay.addEventListener('click', closeMobileNav);
+    }
 });
 </script>
