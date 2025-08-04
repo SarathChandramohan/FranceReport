@@ -1,241 +1,194 @@
 <?php
-// timesheet-handler.php - Handles all AJAX requests for timesheet operations
-
-require_once 'db-connection.php';
 require_once 'session-management.php';
-
 requireLogin();
 
-$user = getCurrentUser();
-$user_id = $user['user_id'];
+header('Content-Type: application/json');
 
-define('APP_TIMEZONE', 'Europe/Paris');
-define('MAX_DISTANCE_METERS', 100);
-
-$action = isset($_POST['action']) ? $_POST['action'] : '';
-
-switch($action) {
-    case 'record_entry':
-        recordTimeEntry($user_id, 'logon');
-        break;
-    case 'record_exit':
-        recordTimeEntry($user_id, 'logoff');
-        break;
-    case 'add_break':
-        addBreak($user_id);
-        break;
-    case 'get_history':
-        getTimesheetHistory($user_id);
-        break;
-    case 'get_latest_entry_status':
-        getLatestEntryStatus($user_id);
-        break;
-    case 'check_location_status':
-        checkLocationStatus();
-        break;
-    default:
-        respondWithError('Invalid action specified');
+// --- Database Connection ---
+function getDbConnection() {
+    // IMPORTANT: Replace with your actual database credentials
+    $host = 'localhost';
+    $dbname = 'your_database_name';
+    $user = 'your_username';
+    $password = 'your_password';
+    
+    try {
+        $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $pdo;
+    } catch (PDOException $e) {
+        // In a real application, you would log this error, not just expose it.
+        echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
+        exit;
+    }
 }
 
+// --- Helper Functions ---
+
+/**
+ * Sends a JSON response and terminates the script.
+ */
+function sendJsonResponse($status, $message, $data = null) {
+    $response = ['status' => $status, 'message' => $message];
+    if ($data !== null) {
+        $response['data'] = $data;
+    }
+    echo json_encode($response);
+    exit;
+}
+
+/**
+ * Calculates the distance between two geographical points (Haversine formula).
+ * Returns distance in meters.
+ */
 function calculateDistance($lat1, $lon1, $lat2, $lon2) {
-    $earth_radius = 6371000;
+    $earthRadius = 6371000; // meters
     $dLat = deg2rad($lat2 - $lat1);
     $dLon = deg2rad($lon2 - $lon1);
     $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
     $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-    return $earth_radius * $c;
+    return $earthRadius * $c;
 }
 
-function findNearestWorkLocation($user_lat, $user_lon) {
-    global $conn;
-    $stmt = $conn->prepare("SELECT latitude, longitude, location_name FROM WorkLocations WHERE is_active = 1");
-    $stmt->execute();
-    $work_locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    if (empty($work_locations)) return null;
+// --- Main Action Handler ---
 
-    $min_distance = PHP_INT_MAX;
-    $nearest_location_name = '';
-    foreach ($work_locations as $location) {
-        $distance = calculateDistance($user_lat, $user_lon, $location['latitude'], $location['longitude']);
-        if ($distance < $min_distance) {
-            $min_distance = $distance;
-            $nearest_location_name = $location['location_name'];
-        }
-    }
-    return ['distance' => round($min_distance), 'name' => $nearest_location_name];
-}
+$action = $_POST['action'] ?? '';
+$user = getCurrentUser();
+$userId = $user['user_id'];
+$pdo = getDbConnection();
 
-function checkLocationStatus() {
-    $user_lat = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
-    $user_lon = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
-    if ($user_lat === null || $user_lon === null) {
-        respondWithError('Coordonnées utilisateur non fournies.');
-        return;
-    }
+try {
+    switch ($action) {
+        case 'get_user_missions_for_today':
+            // Fetches missions assigned to the user for the current day
+            $stmt = $pdo->prepare("
+                SELECT a.assignment_id, m.name AS mission_text
+                FROM mission_assignments a
+                JOIN missions m ON a.mission_id = m.mission_id
+                WHERE a.user_id = ? AND a.assignment_date = CURDATE()
+            ");
+            $stmt->execute([$userId]);
+            $missions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            sendJsonResponse('success', 'Missions loaded.', $missions);
+            break;
 
-    $nearest = findNearestWorkLocation($user_lat, $user_lon);
-    if ($nearest === null) {
-        respondWithSuccess('Aucun site de travail trouvé.', ['in_range' => false, 'message' => 'Aucun site de travail n\'est configuré.']);
-        return;
-    }
+        case 'check_location_status':
+            // Checks if user is within range of any authorized site
+            $latitude = $_POST['latitude'] ?? 0;
+            $longitude = $_POST['longitude'] ?? 0;
+            
+            $stmt = $pdo->query("SELECT site_name, latitude, longitude, radius FROM authorized_sites");
+            $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $is_in_range = $nearest['distance'] <= MAX_DISTANCE_METERS;
-    $message = $is_in_range
-        ? "Vous êtes à portée ({$nearest['distance']}m de: {$nearest['name']})."
-        : "Vous êtes trop loin ({$nearest['distance']}m). Le pointage est désactivé.";
+            $inRange = false;
+            $message = "Vous êtes hors de portée de tout site autorisé.";
 
-    respondWithSuccess('Statut de localisation vérifié.', ['in_range' => $is_in_range, 'message' => $message]);
-}
-
-function recordTimeEntry($user_id, $type) {
-    global $conn;
-
-    $paris_tz = new DateTimeZone(APP_TIMEZONE);
-    $current_time_for_sql = (new DateTime('now', $paris_tz))->format('Y-m-d H:i:s');
-    $current_date_for_sql = (new DateTime('now', $paris_tz))->format('Y-m-d');
-
-    $latitude = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
-    $longitude = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
-
-    if ($latitude === null || $longitude === null) {
-        respondWithError("Les coordonnées GPS sont requises pour pointer.");
-        return;
-    }
-
-    $nearest = findNearestWorkLocation($latitude, $longitude);
-    if ($nearest === null) {
-        respondWithError("Aucun site de travail configuré. Impossible de pointer.");
-        return;
-    }
-    if ($nearest['distance'] > MAX_DISTANCE_METERS) {
-        respondWithError("Pointage refusé. Vous n'êtes pas sur un site de travail autorisé (à {$nearest['distance']}m).");
-        return;
-    }
-    
-    $distance_meters = $nearest['distance'];
-    $location_name = $nearest['name'];
-
-    try {
-        $conn->beginTransaction();
-        $stmt = $conn->prepare("SELECT timesheet_id, logon_time, logoff_time FROM Timesheet WHERE user_id = ? AND entry_date = ?");
-        $stmt->execute([$user_id, $current_date_for_sql]);
-        $existing_entry = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($type === 'logon') {
-            if ($existing_entry && $existing_entry['logon_time'] !== null) {
-                $conn->rollBack();
-                respondWithError("Une entrée a déjà été enregistrée pour aujourd'hui.");
-                return;
+            foreach ($sites as $site) {
+                $distance = calculateDistance($latitude, $longitude, $site['latitude'], $site['longitude']);
+                if ($distance <= $site['radius']) {
+                    $inRange = true;
+                    $message = "Vous êtes à proximité de : " . htmlspecialchars($site['site_name']);
+                    break;
+                }
             }
-            $stmt = $conn->prepare("INSERT INTO Timesheet (user_id, entry_date, logon_time, logon_distance_meters, logon_location_name) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$user_id, $current_date_for_sql, $current_time_for_sql, $distance_meters, $location_name]);
-            $message = "Entrée enregistrée avec succès.";
-        } else if ($type === 'logoff') {
-            if (!$existing_entry || $existing_entry['logon_time'] === null) {
-                $conn->rollBack();
-                respondWithError("Impossible d'enregistrer la sortie sans une entrée préalable.");
-                return;
+            sendJsonResponse('success', 'Location status checked.', ['in_range' => $inRange, 'message' => $message]);
+            break;
+            
+        case 'record_entry':
+            // Records a clock-in entry
+            $missionId = isset($_POST['mission_id']) && $_POST['mission_id'] !== 'null' ? $_POST['mission_id'] : null;
+            $comment = $_POST['comment'] ?? null;
+            $latitude = $_POST['latitude'];
+            $longitude = $_POST['longitude'];
+
+            $stmt = $pdo->prepare("
+                INSERT INTO timesheet (user_id, logon_time, logon_latitude, logon_longitude, assignment_id, logon_comment)
+                VALUES (?, NOW(), ?, ?, ?, ?)
+            ");
+            $stmt->execute([$userId, $latitude, $longitude, $missionId, $comment]);
+            sendJsonResponse('success', 'Entrée enregistrée avec succès.');
+            break;
+
+        case 'record_exit':
+             // Records a clock-out entry
+            $latitude = $_POST['latitude'];
+            $longitude = $_POST['longitude'];
+
+            $stmt = $pdo->prepare("
+                UPDATE timesheet SET logoff_time = NOW(), logoff_latitude = ?, logoff_longitude = ?
+                WHERE user_id = ? AND timesheet_date = CURDATE() AND logoff_time IS NULL
+            ");
+            $stmt->execute([$latitude, $longitude, $userId]);
+            sendJsonResponse('success', 'Sortie enregistrée avec succès.');
+            break;
+            
+        case 'add_break':
+            // Adds a break to the current day's timesheet
+            $breakMinutes = $_POST['break_minutes'] ?? 0;
+            $stmt = $pdo->prepare("
+                UPDATE timesheet SET break_minutes = break_minutes + ?
+                WHERE user_id = ? AND timesheet_date = CURDATE() AND logoff_time IS NULL
+            ");
+            $stmt->execute([$breakMinutes, $userId]);
+            sendJsonResponse('success', 'Pause ajoutée.');
+            break;
+
+        case 'get_history':
+            // Fetches the user's timesheet history
+            $stmt = $pdo->prepare("
+                SELECT 
+                    DATE_FORMAT(timesheet_date, '%d/%m/%Y') AS date,
+                    TIME_FORMAT(logon_time, '%H:%i') AS logon_time,
+                    logon_location_name,
+                    TIME_FORMAT(logoff_time, '%H:%i') AS logoff_time,
+                    logoff_location_name,
+                    break_minutes,
+                    TIMESTAMPDIFF(MINUTE, logon_time, logoff_time) - COALESCE(break_minutes, 0) as total_minutes
+                FROM timesheet 
+                WHERE user_id = ? 
+                ORDER BY timesheet_date DESC, logon_time DESC
+                LIMIT 30
+            ");
+            $stmt->execute([$userId]);
+            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($history as &$row) {
+                 if ($row['total_minutes'] !== null) {
+                    $hours = floor($row['total_minutes'] / 60);
+                    $mins = $row['total_minutes'] % 60;
+                    $row['duration'] = sprintf('%dh %02dmin', $hours, $mins);
+                } else {
+                    $row['duration'] = '--';
+                }
             }
-            if ($existing_entry['logoff_time'] !== null) {
-                $conn->rollBack();
-                respondWithError("Une sortie a déjà été enregistrée pour aujourd'hui.");
-                return;
+            sendJsonResponse('success', 'History loaded.', $history);
+            break;
+            
+        case 'get_latest_entry_status':
+             // Checks if the user has clocked in or out for the day
+            $stmt = $pdo->prepare("
+                SELECT 
+                    (logon_time IS NOT NULL) as has_entry,
+                    (logoff_time IS NOT NULL) as has_exit
+                FROM timesheet
+                WHERE user_id = ? AND timesheet_date = CURDATE()
+                ORDER BY timesheet_id DESC LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            $status = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$status) {
+                $status = ['has_entry' => false, 'has_exit' => false];
             }
-            $stmt = $conn->prepare("UPDATE Timesheet SET logoff_time = ?, logoff_distance_meters = ?, logoff_location_name = ? WHERE timesheet_id = ?");
-            $stmt->execute([$current_time_for_sql, $distance_meters, $location_name, $existing_entry['timesheet_id']]);
-            $message = "Sortie enregistrée avec succès.";
-        }
-        $conn->commit();
-        respondWithSuccess($message);
-    } catch (PDOException $e) {
-        if ($conn->inTransaction()) $conn->rollBack();
-        respondWithError('Database error: ' . $e->getMessage());
+            sendJsonResponse('success', 'Status fetched.', $status);
+            break;
+            
+        default:
+            sendJsonResponse('error', 'Action non valide.');
+            break;
     }
+} catch (Exception $e) {
+    // Log the error and send a generic error message
+    error_log('Timesheet Handler Error: ' . $e->getMessage());
+    sendJsonResponse('error', 'Une erreur inattendue est survenue.');
 }
-
-function getTimesheetHistory($user_id) {
-    global $conn;
-    try {
-        $stmt = $conn->prepare("SELECT
-                                    timesheet_id, entry_date, logon_time, logon_location_name,
-                                    logoff_time, logoff_location_name, break_minutes
-                                FROM Timesheet WHERE user_id = ? ORDER BY entry_date DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
-        $stmt->execute([$user_id]);
-        $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $formatted_history = [];
-        foreach ($history as $entry) {
-            $duration = '';
-            if ($entry['logon_time'] && $entry['logoff_time']) {
-                $logon_dt = new DateTime($entry['logon_time']);
-                $logoff_dt = new DateTime($entry['logoff_time']);
-                $interval = $logon_dt->diff($logoff_dt);
-                $total_minutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
-                $effective_minutes = $total_minutes - ($entry['break_minutes'] ?? 0);
-                if ($effective_minutes < 0) $effective_minutes = 0;
-                $hours = floor($effective_minutes / 60);
-                $minutes = $effective_minutes % 60;
-                $duration = sprintf('%dh%02d', $hours, $minutes);
-            }
-
-            $formatted_history[] = [
-                'date' => (new DateTime($entry['entry_date']))->format('d/m/Y'),
-                'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time']))->format('H:i') : '--:--',
-                'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
-                'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time']))->format('H:i') : '--:--',
-                'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
-                'break_minutes' => $entry['break_minutes'] ?? 0,
-                'duration' => $duration
-            ];
-        }
-        respondWithSuccess('History retrieved successfully', $formatted_history);
-    } catch (Exception $e) {
-        respondWithError('Processing error: ' . $e->getMessage());
-    }
-}
-
-function addBreak($user_id) {
-    global $conn;
-    $current_date_for_sql = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('Y-m-d');
-    $break_minutes = isset($_POST['break_minutes']) ? intval($_POST['break_minutes']) : 0;
-    if (!in_array($break_minutes, [30, 60])) { respondWithError('Invalid break duration specified.'); return; }
-    try {
-        $conn->beginTransaction();
-        $stmt = $conn->prepare("SELECT timesheet_id FROM Timesheet WHERE user_id = ? AND entry_date = ? AND logon_time IS NOT NULL AND logoff_time IS NULL");
-        $stmt->execute([$user_id, $current_date_for_sql]);
-        $existing_entry = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$existing_entry) { $conn->rollBack(); respondWithError("Impossible d'ajouter une pause. Aucun pointage d'entrée actif trouvé."); return; }
-        $stmt = $conn->prepare("UPDATE Timesheet SET break_minutes = ? WHERE timesheet_id = ?");
-        $stmt->execute([$break_minutes, $existing_entry['timesheet_id']]);
-        $conn->commit();
-        respondWithSuccess("Pause de {$break_minutes} minutes ajoutée avec succès.");
-    } catch(PDOException $e) {
-        if ($conn->inTransaction()) $conn->rollBack();
-        respondWithError('Database error: ' . $e->getMessage());
-    }
-}
-
-function getLatestEntryStatus($user_id) {
-    global $conn;
-    $current_date_for_sql = (new DateTime('now', new DateTimeZone(APP_TIMEZONE)))->format('Y-m-d');
-    try {
-        $stmt = $conn->prepare("SELECT logon_time, logoff_time FROM Timesheet WHERE user_id = ? AND entry_date = ?");
-        $stmt->execute([$user_id, $current_date_for_sql]);
-        $latest_entry = $stmt->fetch(PDO::FETCH_ASSOC);
-        $status = [
-            'has_entry' => $latest_entry && $latest_entry['logon_time'] !== null,
-            'has_exit' => $latest_entry && $latest_entry['logoff_time'] !== null
-        ];
-        respondWithSuccess('Latest entry status retrieved successfully', $status);
-    } catch(PDOException $e) {
-        respondWithError('Database error: ' . $e->getMessage());
-    }
-}
-
-function respondWithSuccess($message, $data = []) {
-    header('Content-Type: application/json'); echo json_encode(['status' => 'success', 'message' => $message, 'data' => $data]); exit;
-}
-function respondWithError($message) {
-    header('Content-Type: application/json'); echo json_encode(['status' => 'error', 'message' => $message]); exit;
-}
-?>
