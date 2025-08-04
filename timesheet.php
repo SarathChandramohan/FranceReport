@@ -8,108 +8,281 @@ $user = getCurrentUser();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pointage - Gestion des Ouvriers</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <title>Pointage - <?php echo htmlspecialchars($user['full_name'] ?? 'Employé'); ?></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @media (max-width: 991px) { .navbar-toggler { margin-right: 0; z-index: 1035; } }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
-        body { background-color: #f5f5f7; color: #1d1d1f; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; padding-top: 0 !important; margin-top: 0 !important; overflow-x: hidden; }
-        .container-fluid { margin-top: 0 !important; padding-top: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 25px; }
-        .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); padding: 25px; margin-bottom: 25px; border: 1px solid #e5e5e5; }
-        h2 { margin-bottom: 25px; color: #1d1d1f; font-size: 28px; font-weight: 600; }
-        h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: #1d1d1f; }
-        .clock-section { display: flex; justify-content: center; margin-bottom: 30px; }
-        .clock-card { text-align: center; width: 100%; max-width: 450px; }
-        .clock-display { font-size: 56px; font-weight: 300; margin-bottom: 25px; color: #1d1d1f; letter-spacing: 1px; }
-        .clock-buttons { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
-        button, .btn-primary, .btn-success, .btn-danger, .btn-warning { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 15px; transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out; line-height: 1.2; flex-grow: 1; flex-basis: 0; text-align: center; min-width: 120px; }
-        .btn-success { background-color: #34c759; color: white; } .btn-success:hover { background-color: #2ca048; }
-        .btn-danger { background-color: #ff3b30; color: white; } .btn-danger:hover { background-color: #d63027; }
-        .btn-warning { background-color: #333333; color: white; } .btn-warning:hover { background-color: #555555; }
-        button:disabled, button[disabled] { background-color: #ccc !important; color: #666 !important; opacity: 0.7; cursor: not-allowed; }
-        .clock-buttons button { margin-bottom: 10px; }
-        .dropdown { position: relative; display: inline-block; width: 100%; }
-        .dropdown .btn-warning { width: 100%; margin-bottom: 0; }
-        .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 100%; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1; border-radius: 8px; overflow: hidden; top: 100%; left: 0; }
-        .dropdown-content a { color: black; padding: 12px 16px; text-decoration: none; display: block; font-size: 14px; }
-        .dropdown-content a:hover { background-color: #f1f1f1; }
-        .dropdown.show .dropdown-content { display: block; }
-        .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; }
-        table { width: 100%; border-collapse: collapse; min-width: 650px; }
-        table th, table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #e5e5e5; font-size: 14px; color: #1d1d1f; }
-        table td { color: #555; }
-        table th { background-color: #f9f9f9; font-weight: 600; color: #333; border-bottom-width: 2px; }
-        #location-info { background-color: #f0f0f0; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0; text-align: center; color: #6e6e73; font-size: 14px; font-weight: 600; }
-        #location-info.in_range { color: #2ca048; border-color: #a3e9b4; background-color: #eaf9ed; }
-        #location-info.out_of_range { color: #d63027; border-color: #f5b9b5; background-color: #fdedec; }
-        .alert { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid transparent; font-size: 14px; text-align: center; }
-        .alert-success { background-color: rgba(52, 199, 89, 0.1); border-color: rgba(52, 199, 89, 0.3); color: #2ca048; }
-        .alert-error { background-color: rgba(255, 59, 48, 0.1); border-color: rgba(255, 59, 48, 0.3); color: #d63027; }
-        #refresh-location { border: none; background: none; cursor: pointer; }
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --text-color: #212529;
+            --text-muted: #6c757d;
+            --bg-color: #eef2f5;
+            --card-bg: #ffffff;
+            --border-color: #dee2e6;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+            --border-radius: 12px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        .container-fluid {
+            padding: 20px 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h2, h3 {
+            color: var(--dark-color);
+            font-weight: 600;
+        }
+        h2 { font-size: 1.75rem; margin-bottom: 20px; }
+        h3 { font-size: 1.25rem; margin-bottom: 15px; }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        /* Clock-in Section */
+        .clock-section {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .clock-card {
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+
+        .clock-display {
+            font-size: 3.5rem;
+            font-weight: 300;
+            color: var(--dark-color);
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        /* Location Info */
+        #location-info {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        #location-info.in_range { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; }
+        #location-info.out_of_range { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        #location-info.pending { color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; }
+        #refresh-location {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 1rem;
+            padding: 5px;
+        }
+        #refresh-location:hover { color: var(--primary-color); }
+
+        /* Mission Selection */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--light-color);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+        }
+        #mission-comment {
+            resize: vertical;
+        }
+
+        /* Buttons */
+        .clock-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .btn {
+            padding: 15px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: var(--text-muted) !important;
+        }
+        .btn-entree { background-color: var(--success-color); color: white; grid-column: 1 / -1; }
+        .btn-entree:hover:not(:disabled) { background-color: #218838; }
+        .btn-pause { background-color: var(--warning-color); color: var(--dark-color); }
+        .btn-pause:hover:not(:disabled) { background-color: #e0a800; }
+        .btn-sortie { background-color: var(--danger-color); color: white; }
+        .btn-sortie:hover:not(:disabled) { background-color: #c82333; }
+        
+        /* History Table */
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            background-color: var(--light-color);
+            font-weight: 600;
+        }
+        tbody tr:hover {
+            background-color: #f1f5f8;
+        }
+        .total-duration {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 576px) {
+            .clock-display { font-size: 2.5rem; }
+            .btn { font-size: 0.9rem; padding: 12px; }
+            h2 { font-size: 1.5rem; }
+            .card { padding: 20px; }
+        }
+
+        /* Status Message */
+        #status-message {
+            display: none;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        #status-message.alert-success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; }
+        #status-message.alert-error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        #status-message.alert-info { color: #0c5460; background-color: #d1ecf1; border: 1px solid #bee5eb; }
+
     </style>
 </head>
-<body class="timesheet-page">
+<body>
     <?php include 'navbar.php'; ?>
     <div class="container-fluid">
-        <div id="pointage">
-            <h2>Pointage</h2>
-            <div id="status-message" style="display: none;"></div>
-            <div class="clock-section">
+        <h2>Pointage</h2>
+        <div id="status-message"></div>
+
+        <div class="row">
+            <div class="col-lg-5">
                 <div class="card clock-card">
                     <div class="clock-display" id="current-time">--:--:--</div>
-                    <div class="mission-selection" style="margin-bottom: 15px;">
-                        <label for="mission-select">Mission:</label>
-                        <select id="mission-select" class="form-control" style="margin-bottom: 10px;">
+                    
+                    <div id="location-info" class="pending">
+                        <i class="fas fa-spinner fa-spin"></i> Vérification du lieu...
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mission-select"><i class="fas fa-tasks"></i> Mission du jour</label>
+                        <select id="mission-select" class="form-control">
                             <option value="">-- Choisissez une mission --</option>
                             <option value="without">Sans mission</option>
                         </select>
-                        <textarea id="mission-comment" class="form-control" style="display: none; margin-top: 10px;" placeholder="Commentaire..."></textarea>
                     </div>
-                    <div id="location-info">
-                        Activation de la géolocalisation...
-                        <button id="refresh-location">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
+
+                    <div class="form-group" id="comment-group" style="display: none;">
+                        <label for="mission-comment"><i class="fas fa-comment"></i> Commentaire</label>
+                        <textarea id="mission-comment" class="form-control" placeholder="Raison du pointage sans mission..."></textarea>
                     </div>
+
                     <div class="clock-buttons">
-                        <button class="btn-success" id="btn-entree" onclick="enregistrerPointage('record_entry')">Enregistrer Entrée</button>
-                        <div class="dropdown" id="break-dropdown">
-                            <button class="btn-warning" id="btn-break">Ajouter Pause</button>
-                            <div class="dropdown-content">
-                                <a href="#" onclick="addBreak(30)">30 min</a>
-                                <a href="#" onclick="addBreak(60)">1 heure</a>
-                            </div>
-                        </div>
-                        <button class="btn-danger" id="btn-sortie" onclick="enregistrerPointage('record_exit')">Enregistrer Sortie</button>
+                        <button class="btn btn-entree" id="btn-entree" onclick="enregistrerPointage('record_entry')">
+                            <i class="fas fa-sign-in-alt"></i> Enregistrer l'Entrée
+                        </button>
+                        <button class="btn btn-pause" id="btn-pause">
+                            <i class="fas fa-coffee"></i> Ajouter Pause
+                        </button>
+                        <button class="btn btn-sortie" id="btn-sortie" onclick="enregistrerPointage('record_exit')">
+                            <i class="fas fa-sign-out-alt"></i> Enregistrer la Sortie
+                        </button>
                     </div>
                 </div>
             </div>
-            <div class="card">
-                <h3>Historique des pointages</h3>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Entrée</th>
-                                <th>Lieu (Entrée)</th>
-                                <th>Sortie</th>
-                                <th>Lieu (Sortie)</th>
-                                <th>Pause</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="timesheet-history">
-                            <tr><td colspan="7" style="text-align: center;">Chargement...</td></tr>
-                        </tbody>
-                    </table>
+            <div class="col-lg-7">
+                <div class="card">
+                    <h3><i class="fas fa-history"></i> Historique des Pointages</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Entrée</th>
+                                    <th>Sortie</th>
+                                    <th>Pause</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="timesheet-history">
+                                <!-- History rows will be inserted here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
     <?php include('footer.php'); ?>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    
 <script>
     let currentLatitude = null;
     let currentLongitude = null;
@@ -117,16 +290,13 @@ $user = getCurrentUser();
     let timeSheetStatus = { has_entry: false, has_exit: false };
 
     function updateClock() {
-        const timeElement = document.getElementById('current-time');
-        if (timeElement) timeElement.textContent = new Date().toLocaleTimeString('fr-FR');
+        document.getElementById('current-time').textContent = new Date().toLocaleTimeString('fr-FR');
     }
-    setInterval(updateClock, 1000);
-    updateClock();
 
     function showStatusMessage(message, type = 'info') {
         const statusDiv = document.getElementById('status-message');
-        statusDiv.innerHTML = message;
-        statusDiv.className = `alert alert-${type}`;
+        statusDiv.textContent = message;
+        statusDiv.className = `alert-${type}`;
         statusDiv.style.display = 'block';
         setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
     }
@@ -134,80 +304,72 @@ $user = getCurrentUser();
     function makeAjaxRequest(action, data, callback) {
         const formData = new FormData();
         formData.append('action', action);
-        for (const key in data) formData.append(key, data[key]);
+        for (const key in data) {
+            formData.append(key, data[key]);
+        }
+        
         const xhr = new XMLHttpRequest();
         xhr.open('POST', 'timesheet-handler.php', true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    try {
-                        callback(null, JSON.parse(xhr.responseText));
-                    } catch (e) {
-                        callback('Erreur de parsing JSON: ' + xhr.responseText);
-                    }
-                } else {
-                    callback('Erreur réseau: ' + xhr.status);
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    callback(null, JSON.parse(xhr.responseText));
+                } catch (e) {
+                    callback('Erreur de parsing JSON: ' + xhr.responseText);
                 }
+            } else {
+                callback('Erreur serveur: ' + xhr.statusText);
             }
+        };
+        xhr.onerror = function() {
+            callback('Erreur réseau. Vérifiez votre connexion.');
         };
         xhr.send(formData);
     }
-    
-    function checkLocationAndSetButtons() {
+
+    function updateLocationInfo(className, icon, text) {
         const locationInfo = document.getElementById('location-info');
+        locationInfo.className = className;
+        locationInfo.innerHTML = `<i class="fas ${icon}"></i> ${text} <button id="refresh-location" onclick="checkLocationAndSetButtons()"><i class="fas fa-sync-alt"></i></button>`;
+    }
+
+    function checkLocationAndSetButtons() {
+        updateLocationInfo('pending', 'fa-spinner fa-spin', 'Vérification du lieu...');
         if (!navigator.geolocation) {
-            locationInfo.textContent = 'Géolocalisation non supportée.';
+            updateLocationInfo('out_of_range', 'fa-map-marker-slash', 'Géolocalisation non supportée.');
             isInRange = false;
             updateButtonStates();
             return;
         }
 
-        // Options for the geolocation request
-        const geoOptions = { 
-            enableHighAccuracy: true, 
-            timeout: 10000, 
-            maximumAge: 0 
-        };
-
-        // Success callback
-        const geoSuccess = (position) => {
-            currentLatitude = position.coords.latitude;
-            currentLongitude = position.coords.longitude;
-            makeAjaxRequest('check_location_status', { latitude: currentLatitude, longitude: currentLongitude }, (error, response) => {
-                if (error || response.status !== 'success') {
-                    locationInfo.textContent = "Erreur de vérification du lieu.";
-                    isInRange = false;
-                } else {
-                    isInRange = response.data.in_range;
-                    // Keep the refresh button in the message
-                    locationInfo.innerHTML = response.data.message + ' <button id="refresh-location"><i class="fas fa-sync-alt"></i></button>';
-                    locationInfo.className = isInRange ? 'in_range' : 'out_of_range';
-                    // Re-add the event listener for the new button
-                    document.getElementById('refresh-location').addEventListener('click', checkLocationAndSetButtons);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                currentLatitude = position.coords.latitude;
+                currentLongitude = position.coords.longitude;
+                makeAjaxRequest('check_location_status', { latitude: currentLatitude, longitude: currentLongitude }, (error, response) => {
+                    if (error || response.status !== 'success') {
+                        updateLocationInfo('out_of_range', 'fa-exclamation-circle', 'Erreur de vérification du lieu.');
+                        isInRange = false;
+                    } else {
+                        isInRange = response.data.in_range;
+                        const icon = isInRange ? 'fa-check-circle' : 'fa-times-circle';
+                        updateLocationInfo(isInRange ? 'in_range' : 'out_of_range', icon, response.data.message);
+                    }
+                    updateButtonStates();
+                });
+            },
+            (error) => {
+                let message = 'Impossible d\'obtenir la position.';
+                if (error.code === error.PERMISSION_DENIED) {
+                    message = 'Permission de géolocalisation refusée. Activez-la dans les paramètres.';
                 }
+                updateLocationInfo('out_of_range', 'fa-map-marker-slash', message);
+                isInRange = false;
                 updateButtonStates();
-            });
-        };
-
-        // Error callback - THIS IS THE MODIFIED PART
-        const geoError = (error) => {
-            let message = 'Impossible d\'obtenir la position.';
-            if (error.code === error.PERMISSION_DENIED) {
-                message = 'Permission de géolocalisation refusée. Veuillez l\'activer dans les paramètres de votre navigateur.';
-            }
-            // Add the refresh button back to the message
-            locationInfo.innerHTML = message + ' <button id="refresh-location"><i class="fas fa-sync-alt"></i></button>';
-            locationInfo.className = 'out_of_range';
-            isInRange = false;
-            // Re-add the event listener for the new button
-            document.getElementById('refresh-location').addEventListener('click', checkLocationAndSetButtons);
-            updateButtonStates();
-        };
-
-        // Make the call
-        navigator.geolocation.getCurrentPosition(geoSuccess, geoError, geoOptions);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     }
-
 
     function enregistrerPointage(action) {
         const missionSelect = document.getElementById('mission-select');
@@ -218,27 +380,21 @@ $user = getCurrentUser();
             showStatusMessage("Veuillez sélectionner une mission pour pointer.", "error");
             return;
         }
-        
         if (action === 'record_entry' && selectedMission === 'without' && !missionComment.trim()) {
-            showStatusMessage("Veuillez entrer un commentaire pour le pointage sans mission.", "error");
+            showStatusMessage("Veuillez entrer un commentaire.", "error");
             return;
         }
-
         if (!isInRange) {
             showStatusMessage("Vous devez être à proximité d'un site autorisé pour pointer.", "error");
             return;
         }
 
-        const data = { 
-            latitude: currentLatitude, 
-            longitude: currentLongitude 
-        };
-
+        const data = { latitude: currentLatitude, longitude: currentLongitude };
         if (action === 'record_entry') {
             data.mission_id = selectedMission === 'without' ? null : selectedMission;
             data.comment = selectedMission === 'without' ? missionComment : null;
         }
-        
+
         showStatusMessage("Envoi en cours...", "info");
         makeAjaxRequest(action, data, (error, response) => {
             if (error || response.status !== 'success') {
@@ -263,12 +419,12 @@ $user = getCurrentUser();
 
     function loadTimesheetHistory() {
         const tableBody = document.getElementById('timesheet-history');
-        tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Chargement...</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
         makeAjaxRequest('get_history', {}, (error, response) => {
             if (error || response.status !== 'success' || !Array.isArray(response.data)) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Erreur: ${error || response.message}</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Erreur: ${error || response.message}</td></tr>`;
             } else if (response.data.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Aucun pointage trouvé</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Aucun pointage trouvé.</td></tr>';
             } else {
                 tableBody.innerHTML = '';
                 response.data.forEach(entry => {
@@ -276,11 +432,9 @@ $user = getCurrentUser();
                     row.innerHTML = `
                         <td>${entry.date}</td>
                         <td>${entry.logon_time}</td>
-                        <td>${entry.logon_location_name}</td>
                         <td>${entry.logoff_time}</td>
-                        <td>${entry.logoff_location_name}</td>
-                        <td>${entry.break_minutes > 0 ? entry.break_minutes + ' min' : '--'}</td>
-                        <td><strong>${entry.duration || '--'}</strong></td>
+                        <td>${entry.break_minutes}</td>
+                        <td class="total-duration">${entry.duration}</td>
                     `;
                     tableBody.appendChild(row);
                 });
@@ -288,7 +442,7 @@ $user = getCurrentUser();
             fetchLatestEntryStatus();
         });
     }
-    
+
     function fetchLatestEntryStatus() {
         makeAjaxRequest('get_latest_entry_status', {}, (error, response) => {
             if (!error && response.status === 'success' && response.data) {
@@ -296,27 +450,24 @@ $user = getCurrentUser();
             } else {
                 timeSheetStatus = { has_entry: false, has_exit: false };
             }
-            checkLocationAndSetButtons();
+            updateButtonStates();
         });
     }
 
     function updateButtonStates() {
         const btnEntree = document.getElementById('btn-entree');
         const btnSortie = document.getElementById('btn-sortie');
-        const btnBreak = document.getElementById('btn-break');
+        const btnPause = document.getElementById('btn-pause');
         
-        const hasEntry = timeSheetStatus.has_entry;
-        const hasExit = timeSheetStatus.has_exit;
-
-        btnEntree.disabled = !isInRange || hasEntry;
-        btnSortie.disabled = !isInRange || !hasEntry || hasExit;
-        btnBreak.disabled = !hasEntry || hasExit;
+        btnEntree.disabled = !isInRange || timeSheetStatus.has_entry;
+        btnSortie.disabled = !isInRange || !timeSheetStatus.has_entry || timeSheetStatus.has_exit;
+        btnPause.disabled = !isInRange || !timeSheetStatus.has_entry || timeSheetStatus.has_exit;
     }
 
     function loadUserMissions() {
         makeAjaxRequest('get_user_missions_for_today', {}, (error, response) => {
             if (error || response.status !== 'success') {
-                console.error("Erreur de chargement des missions.");
+                console.error("Erreur de chargement des missions:", error || response.message);
                 return;
             }
             const missionSelect = document.getElementById('mission-select');
@@ -331,33 +482,26 @@ $user = getCurrentUser();
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        loadTimesheetHistory();
+        updateClock();
+        setInterval(updateClock, 1000);
+        
         loadUserMissions();
-        // The initial event listener is added here. It gets re-added inside checkLocationAndSetButtons
-        // because we rewrite the innerHTML of the location-info div.
-        document.getElementById('refresh-location').addEventListener('click', checkLocationAndSetButtons);
+        loadTimesheetHistory(); // This will trigger the first location check and button state update
+        setInterval(checkLocationAndSetButtons, 60000); // Refresh location check every minute
 
         document.getElementById('mission-select').addEventListener('change', function() {
-            const commentBox = document.getElementById('mission-comment');
-            if (this.value === 'without') {
-                commentBox.style.display = 'block';
-            } else {
-                commentBox.style.display = 'none';
-            }
+            document.getElementById('comment-group').style.display = (this.value === 'without') ? 'block' : 'none';
         });
 
-        const breakDropdown = document.getElementById('break-dropdown');
-        const btnBreak = document.getElementById('btn-break');
-        btnBreak.addEventListener('click', (event) => {
-            breakDropdown.classList.toggle('show');
-            event.stopPropagation();
-        });
-        window.addEventListener('click', (event) => {
-            if (!event.target.matches('#btn-break')) {
-                if (breakDropdown.classList.contains('show')) breakDropdown.classList.remove('show');
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            // For simplicity, we can use a prompt. A modal would be better for a final product.
+            const breakTime = prompt("Entrez la durée de la pause en minutes (ex: 30, 60):", "30");
+            if (breakTime && !isNaN(breakTime)) {
+                addBreak(parseInt(breakTime, 10));
             }
         });
     });
 </script>
+
 </body>
 </html>
