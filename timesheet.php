@@ -9,6 +9,7 @@ $user = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pointage - Gestion des Ouvriers</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         @media (max-width: 991px) { .navbar-toggler { margin-right: 0; z-index: 1035; } }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
@@ -45,6 +46,7 @@ $user = getCurrentUser();
         .alert { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid transparent; font-size: 14px; text-align: center; }
         .alert-success { background-color: rgba(52, 199, 89, 0.1); border-color: rgba(52, 199, 89, 0.3); color: #2ca048; }
         .alert-error { background-color: rgba(255, 59, 48, 0.1); border-color: rgba(255, 59, 48, 0.3); color: #d63027; }
+        #refresh-location { border: none; background: none; cursor: pointer; }
     </style>
 </head>
 <body class="timesheet-page">
@@ -56,8 +58,19 @@ $user = getCurrentUser();
             <div class="clock-section">
                 <div class="card clock-card">
                     <div class="clock-display" id="current-time">--:--:--</div>
+                    <div class="mission-selection" style="margin-bottom: 15px;">
+                        <label for="mission-select">Mission:</label>
+                        <select id="mission-select" class="form-control" style="margin-bottom: 10px;">
+                            <option value="">-- Choisissez une mission --</option>
+                            <option value="without">Sans mission</option>
+                        </select>
+                        <textarea id="mission-comment" class="form-control" style="display: none; margin-top: 10px;" placeholder="Commentaire..."></textarea>
+                    </div>
                     <div id="location-info">
                         Activation de la géolocalisation...
+                        <button id="refresh-location">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
                     </div>
                     <div class="clock-buttons">
                         <button class="btn-success" id="btn-entree" onclick="enregistrerPointage('record_entry')">Enregistrer Entrée</button>
@@ -174,11 +187,35 @@ $user = getCurrentUser();
     }
 
     function enregistrerPointage(action) {
+        const missionSelect = document.getElementById('mission-select');
+        const selectedMission = missionSelect.value;
+        const missionComment = document.getElementById('mission-comment').value;
+
+        if (action === 'record_entry' && !selectedMission) {
+            showStatusMessage("Veuillez sélectionner une mission pour pointer.", "error");
+            return;
+        }
+        
+        if (action === 'record_entry' && selectedMission === 'without' && !missionComment.trim()) {
+            showStatusMessage("Veuillez entrer un commentaire pour le pointage sans mission.", "error");
+            return;
+        }
+
         if (!isInRange) {
             showStatusMessage("Vous devez être à proximité d'un site autorisé pour pointer.", "error");
             return;
         }
-        const data = { latitude: currentLatitude, longitude: currentLongitude };
+
+        const data = { 
+            latitude: currentLatitude, 
+            longitude: currentLongitude 
+        };
+
+        if (action === 'record_entry') {
+            data.mission_id = selectedMission === 'without' ? null : selectedMission;
+            data.comment = selectedMission === 'without' ? missionComment : null;
+        }
+        
         showStatusMessage("Envoi en cours...", "info");
         makeAjaxRequest(action, data, (error, response) => {
             if (error || response.status !== 'success') {
@@ -253,9 +290,40 @@ $user = getCurrentUser();
         btnBreak.disabled = !hasEntry || hasExit;
     }
 
+    function loadUserMissions() {
+        makeAjaxRequest('get_user_missions_for_today', {}, (error, response) => {
+            if (error || response.status !== 'success') {
+                console.error("Erreur de chargement des missions.");
+                return;
+            }
+            const missionSelect = document.getElementById('mission-select');
+            const withoutOption = missionSelect.querySelector('option[value="without"]');
+            response.data.forEach(mission => {
+                const option = document.createElement('option');
+                option.value = mission.assignment_id;
+                option.textContent = mission.mission_text;
+                missionSelect.insertBefore(option, withoutOption);
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         loadTimesheetHistory();
+        loadUserMissions();
         setInterval(checkLocationAndSetButtons, 30000);
+
+        document.getElementById('refresh-location').addEventListener('click', function() {
+            checkLocationAndSetButtons();
+        });
+        
+        document.getElementById('mission-select').addEventListener('change', function() {
+            const commentBox = document.getElementById('mission-comment');
+            if (this.value === 'without') {
+                commentBox.style.display = 'block';
+            } else {
+                commentBox.style.display = 'none';
+            }
+        });
 
         const breakDropdown = document.getElementById('break-dropdown');
         const btnBreak = document.getElementById('btn-break');
