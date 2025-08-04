@@ -46,7 +46,15 @@ $user = getCurrentUser();
         .alert { padding: 12px 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid transparent; font-size: 14px; text-align: center; }
         .alert-success { background-color: rgba(52, 199, 89, 0.1); border-color: rgba(52, 199, 89, 0.3); color: #2ca048; }
         .alert-error { background-color: rgba(255, 59, 48, 0.1); border-color: rgba(255, 59, 48, 0.3); color: #d63027; }
-        #refresh-location { margin-left: 10px; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; }
+        input:checked + .slider { background-color: #2ecc71; }
+        input:focus + .slider { box-shadow: 0 0 1px #2ecc71; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        .slider.round { border-radius: 24px; }
+        .slider.round:before { border-radius: 50%; }
     </style>
 </head>
 <body class="timesheet-page">
@@ -58,9 +66,16 @@ $user = getCurrentUser();
             <div class="clock-section">
                 <div class="card clock-card">
                     <div class="clock-display" id="current-time">--:--:--</div>
+                    <div style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; border: 1px solid #e9ecef;">
+                        <span style="font-weight: bold;">Localisation:</span>
+                        <label class="switch" style="margin: 0;">
+                            <input type="checkbox" id="toggle-location" checked>
+                            <span class="slider round"></span>
+                        </label>
+                        <span id="location-status-text" style="color: #2ecc71; font-weight: bold;">Activée</span>
+                    </div>
                     <div id="location-info">
                         Activation de la géolocalisation...
-                        <button id="refresh-location" class="btn btn-sm btn-secondary">Rafraîchir</button>
                     </div>
                     <div class="clock-buttons">
                         <button class="btn-success" id="btn-entree">Enregistrer Entrée</button>
@@ -175,6 +190,10 @@ $user = getCurrentUser();
     }
 
     function checkLocationAndSetButtons() {
+        if (!document.getElementById('toggle-location').checked) {
+            updateButtonStates();
+            return;
+        }
         const locationInfo = document.getElementById('location-info');
         if (!navigator.geolocation) {
             locationInfo.textContent = 'Géolocalisation non supportée.';
@@ -292,9 +311,20 @@ $user = getCurrentUser();
         btnSortie.disabled = !isInRange || !hasEntry || hasExit;
         btnBreak.disabled = !hasEntry || hasExit;
     }
-
-    document.getElementById('refresh-location').addEventListener('click', function() {
-        checkLocationAndSetButtons();
+    
+    document.getElementById('toggle-location').addEventListener('change', function() {
+        const statusText = document.getElementById('location-status-text');
+        if (this.checked) {
+            statusText.textContent = "Activée";
+            statusText.style.color = "#2ecc71";
+            checkLocationAndSetButtons();
+        } else {
+            statusText.textContent = "Désactivée";
+            statusText.style.color = "#e74c3c";
+            document.getElementById('location-info').textContent = "Localisation désactivée";
+            isInRange = true; // Allow clocking in without location
+            updateButtonStates();
+        }
     });
     
     document.getElementById('btn-entree').addEventListener('click', function() {
