@@ -148,7 +148,7 @@ $user = getCurrentUser();
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #007aff;
+            border-color: #6A0DAD;
             box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
         }
 
@@ -165,7 +165,7 @@ $user = getCurrentUser();
             line-height: 1.2; /* Ensure text vertical alignment */
         }
 
-        .btn-primary { background-color: #007aff; color: white; }
+        .btn-primary { background-color: #6A0DAD; color: white; }
         .btn-primary:hover { background-color: #0056b3; } /* Darker blue on hover */
 
         .btn-success { background-color: #34c759; color: white; } /* Apple green */
@@ -285,8 +285,8 @@ $user = getCurrentUser();
         }
 
         .tab-button.active {
-            border-bottom-color: #007aff;
-            color: #007aff;
+            border-bottom-color: #6A0DAD;
+            color: #6A0DAD;
             font-weight: 600;
         }
 
@@ -306,7 +306,7 @@ $user = getCurrentUser();
             background-color: #f5f5f7;
             border-radius: 6px;
             font-size: 13px;
-            color: #007aff;
+            color: #6A0DAD;
             text-decoration: none;
             gap: 8px;
         }
@@ -316,7 +316,7 @@ $user = getCurrentUser();
         }
 
         .document-icon {
-            color: #007aff;
+            color: #6A0DAD;
             font-size: 16px;
         }
 
