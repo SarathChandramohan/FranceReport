@@ -109,16 +109,17 @@ $initial_employee_list = getInitialEmployeeList($conn);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tableau de bord - Gestion des Ouvriers</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
         body { background-color: #f5f5f7; color: #1d1d1f; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; padding-bottom: 30px; }
-        .container { width: 100%; margin: 0; padding: 25px; }
+        .container-fluid { padding: 25px; }
         h1 { color: #1d1d1f; font-size: 28px; font-weight: 600; margin-bottom: 25px; }
         .shortcut-buttons-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .shortcut-btn { background-color: #ffffff; border: 1px solid #e0e0e0; color: #333; padding: 20px; text-align: center; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.07); transition: all 0.3s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; font-size: 0.9rem; font-weight: 500; min-height: 120px; cursor: pointer; }
-        .shortcut-btn:hover { background-color: #f0f2f5; transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); color: #007bff; }
-        .shortcut-btn i { color: #007bff; margin-bottom: 10px; font-size: 2.2em; }
+        .shortcut-btn:hover { background-color: #f0f2f5; transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); color: #6A0DAD; }
+        .shortcut-btn i { color: #6A0DAD; margin-bottom: 10px; font-size: 2.2em; }
         .shortcut-btn:hover i { color: #0056b3; }
         .content-card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); padding: 25px; border: 1px solid #e5e5e5; margin-bottom: 30px; }
         h2 { margin-bottom: 20px; color: #1d1d1f; font-size: 22px; font-weight: 600; }
@@ -129,69 +130,18 @@ $initial_employee_list = getInitialEmployeeList($conn);
         .stat-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 8px; line-height: 1.1; color: #333; }
         .stat-label { font-size: 0.95rem; color: #555; font-weight: 500; }
         .stat-icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.7; }
-        .stat-card.total-employees { border-left-color: #007bff; } .stat-card.total-employees .stat-icon { color: #007bff; }
+        .stat-card.total-employees { border-left-color: #6A0DAD; } .stat-card.total-employees .stat-icon { color: #6A0DAD; }
         .stat-card.assigned-today { border-left-color: #ff9500; } .stat-card.assigned-today .stat-icon { color: #ff9500; }
         .stat-card.active-today { border-left-color: #34c759; } .stat-card.active-today .stat-icon { color: #34c759; }
         .stat-card.on-generic-leave-today { border-left-color: #5856d6; } .stat-card.on-generic-leave-today .stat-icon { color: #5856d6; }
         .stat-card.on-sick-leave-today { border-left-color: #ff3b30; } .stat-card.on-sick-leave-today .stat-icon { color: #ff3b30; }
-        #employeeListCardHeader { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        #employeeListCardHeader h3 { margin-bottom: 0.5rem; }
-        #backToListButton { display: none; margin-bottom: 0.5rem; }
-        .filter-controls { margin-bottom: 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
-        .filter-item { display: flex; align-items: center; gap: 8px; }
-        .filter-controls label { font-weight: 500; color: #1d1d1f; font-size: 14px; white-space: nowrap; }
-        .filter-controls .form-control-sm { padding: 0.3rem 0.6rem; font-size: 14px; border-radius: 8px; border: 1px solid #d2d2d7; background-color: #f5f5f7; height: auto; line-height: 1.5; }
-        .filter-item select.form-control-sm { min-width: 200px; flex-grow: 1; }
-        .filter-item input[type="month"].form-control-sm, .filter-item input[type="date"].form-control-sm { min-width: 150px; }
-        .filter-item.export-button-group { margin-left: auto; }
-        .export-button { padding: 8px 15px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out; background-color: #34c759; color: white; }
-        .export-button:hover { background-color: #2ca048; }
-        .table-container { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 8px; margin-top: 15px; }
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        table th, table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e5e5e5; font-size: 14px; color: #1d1d1f; vertical-align: middle; }
-        table td { color: #555; }
-        table th { background-color: #f9f9f9; font-weight: 600; color: #333; border-bottom-width: 2px; }
-        table tr:last-child td { border-bottom: none; }
-        table tr:hover { background-color: #f0f0f0; }
-        .action-button { padding: 5px 10px; border-radius: 6px; border: none; background-color: #007aff; color: white; font-size: 13px; cursor: pointer; transition: background-color 0.2s; margin-right: 5px; margin-bottom: 3px; display: inline-block; }
-        .action-button:hover { background-color: #0056b3; }
-        .btn-sm { padding: .25rem .5rem; font-size: .875rem; line-height: 1.5; border-radius: .2rem; }
-        .status-tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; color: white; }
-        .status-tag.status-pending { background-color: #ff9500; } .status-tag.status-approved { background-color: #34c759; } .status-tag.status-rejected { background-color: #ff3b30; } .status-tag.status-cancelled { background-color: #8e8e93; }
-        .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #ffffff; margin: 5% auto; padding: 25px; border: none; width: 90%; border-radius: 14px; position: relative; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15); }
-        .modal-lg { max-width: 800px; } .modal-xl { max-width: 1140px; }
-        .modal-header .close { padding: 1rem 1rem; margin: -1rem -1rem -1rem auto; }
+        .table-container { overflow-x: auto; border-radius: 8px; margin-top: 15px; }
         .modal-alert { display: none; margin-bottom: 15px; }
-        #congesAdminModal .nav-tabs .nav-link { border-radius: 0.25rem 0.25rem 0 0; color: #007bff; }
-        #congesAdminModal .nav-tabs .nav-link.active { color: #495057; background-color: #fff; border-color: #dee2e6 #dee2e6 #fff; font-weight: bold; }
-        #congesAdminModal .tab-content { border: 1px solid #dee2e6; border-top: none; padding: 15px; border-radius: 0 0 0.25rem 0.25rem; }
-        #leaveDetailsModal .modal-body p { font-size: 1rem; margin-bottom: 0.8rem; }
-        #leaveDetailsModal .modal-body strong { font-weight: 600; color: #333; }
-        #leaveDetailsModal .document-link-modal { display: inline-block; margin-top: 5px; padding: 5px 10px; background-color: #f0f2f5; border-radius: 5px; color: #007bff; text-decoration: none; }
-        #leaveDetailsModal .document-link-modal:hover { background-color: #e9ecef; }
-        #leaveDetailsModal .status-tag-modal { padding: 0.25em 0.6em; font-size: 0.9em; }
         .loading-placeholder, .error-placeholder, .info-placeholder { text-align: center; padding: 40px 20px; color: #6c757d; font-size: 1.1rem; }
         .error-placeholder { color: #dc3545; }
-        .alert-custom { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: .35rem; }
-        .alert-danger-custom { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
-        .alert-info-custom { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
-        @media (max-width: 768px) {
-            h1 { font-size: 24px; } .content-card { padding: 20px; } h2 { font-size: 20px; } h3 { font-size: 18px; }
-            table th, table td { padding: 10px 12px; font-size: 13px; }
-            .filter-controls { flex-direction: column; align-items: stretch; gap: 10px; } .filter-item { width: 100%; gap: 5px; justify-content: space-between; }
-            .filter-item label { flex-shrink: 0; }
-            .filter-controls .form-control-sm { flex-grow: 1; min-width: 100px; }
-            .filter-controls .export-button, .filter-item.export-button-group { margin-left: 0; width: 100%; }
-            .shortcut-buttons-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;}
-            .shortcut-btn { padding: 15px; font-size: 0.8rem;} .shortcut-btn i { font-size: 1.8em;}
-            .modal-content { margin: 10% auto; } #employeeListCardHeader { flex-direction: column; align-items: flex-start; }
-            #employeeListCardHeader h3 { margin-bottom: 10px; } #backToListButton { width: 100%; text-align: center; }
-        }
-        @media (max-width: 480px) {
-            table th, table td { padding: 8px 10px; font-size: 12px; } .modal-content { margin: 5% auto; width: 95%; padding: 15px;}
-            .shortcut-buttons-grid { grid-template-columns: repeat(2, 1fr); }
-        }
+        .status-tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; color: white; }
+        .status-tag.status-pending { background-color: #ff9500; } .status-tag.status-approved { background-color: #34c759; } .status-tag.status-rejected { background-color: #ff3b30; } .status-tag.status-cancelled { background-color: #8e8e93; }
+
     </style>
 </head>
 <body>
@@ -206,19 +156,18 @@ $initial_employee_list = getInitialEmployeeList($conn);
             <button class="shortcut-btn" data-toggle="modal" data-target="#feuilleDeTempsModal"><i class="fas fa-user-clock"></i>Feuille de Temps</button>
         </div>
 
-        <div class="content-card" id="integrated-employes-section">
-             <?php if (isset($GLOBALS['initial_employee_list_error'])) echo '<div class="alert alert-danger-custom text-center">' . htmlspecialchars($GLOBALS['initial_employee_list_error']) . '</div>'; ?>
-            <div class="card" style="border: none; box-shadow: none; padding: 0;"> <h3>Statistiques du Jour</h3>
+        <div class="content-card">
+            <div class="card border-0 shadow-none p-0"> <h3>Statistiques du Jour</h3>
                 <div class="stats-container" id="employee-stats-container">
-                    <div class="loading-placeholder"><div class="spinner-border spinner-border-sm" role="status"></div> Chargement des statistiques...</div>
+                    <div class="loading-placeholder"><div class="spinner-border spinner-border-sm" role="status"></div> Chargement...</div>
                 </div>
             </div>
-            <div class="card" id="employeeListCard" style="border: none; box-shadow: none; padding: 0; margin-top: 20px;">
-                <div id="employeeListCardHeader">
-                    <h3 id="employeeListTitle">Liste Générale des Employés Actifs</h3>
-                    <button id="backToListButton" class="btn btn-sm btn-outline-secondary" onclick="showInitialEmployeeList()"><i class="fas fa-arrow-left"></i> Retour à la liste générale</button>
+            <div class="card border-0 shadow-none p-0 mt-4" id="employeeListCard">
+                <div class="d-flex justify-content-between align-items-center" id="employeeListCardHeader">
+                    <h3 id="employeeListTitle" class="mb-0">Liste Générale des Employés Actifs</h3>
+                    <button id="backToListButton" class="btn btn-sm btn-outline-secondary" style="display: none;" onclick="showInitialEmployeeList()"><i class="fas fa-arrow-left"></i> Retour</button>
                 </div>
-                <div class="table-container">
+                <div class="table-responsive mt-3">
                     <table id="employees-table" class="table table-striped table-hover">
                         <thead class="thead-light" id="employees-table-head"></thead>
                         <tbody id="employees-table-body"></tbody>
@@ -228,12 +177,12 @@ $initial_employee_list = getInitialEmployeeList($conn);
         </div>
         <div class="content-card">
             <h2>Dernières activités</h2>
-            <div class="table-container">
-                <table id="activities-table">
-                    <thead><tr><th>Employé</th><th>Action</th><th>Date</th><th>Heure</th></tr></thead>
+            <div class="table-responsive">
+                <table id="activities-table" class="table table-hover">
+                    <thead class="thead-light"><tr><th>Employé</th><th>Action</th><th>Date</th><th>Heure</th></tr></thead>
                     <tbody id="activities-table-body">
                         <?php if (empty($activities)): ?>
-                            <tr><td colspan="4" style="text-align: center;">Aucune activité recente</td></tr>
+                            <tr><td colspan="4" class="text-center">Aucune activité récente</td></tr>
                         <?php else: ?>
                             <?php foreach ($activities as $activity): ?>
                                 <tr>
@@ -256,23 +205,22 @@ $initial_employee_list = getInitialEmployeeList($conn);
                 <div class="modal-header"><h5 class="modal-title" id="congesAdminModalLabel">Gestion des Congés</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>
                 <div class="modal-body">
                     <ul class="nav nav-tabs" id="congesAdminTabs" role="tablist">
-                        <li class="nav-item" role="presentation"><a class="nav-link active" id="approval-tab-link" data-toggle="tab" href="#leaveApprovalContent" role="tab" aria-controls="leaveApprovalContent" aria-selected="true">Approbation des Congés</a></li>
-                        <li class="nav-item" role="presentation"><a class="nav-link" id="list-all-leaves-tab-link" data-toggle="tab" href="#listAllLeavesContent" role="tab" aria-controls="listAllLeavesContent" aria-selected="false">Liste des Congés (Tous)</a></li>
+                        <li class="nav-item" role="presentation"><a class="nav-link active" id="approval-tab-link" data-toggle="tab" href="#leaveApprovalContent" role="tab" aria-controls="leaveApprovalContent" aria-selected="true">Approbation</a></li>
+                        <li class="nav-item" role="presentation"><a class="nav-link" id="list-all-leaves-tab-link" data-toggle="tab" href="#listAllLeavesContent" role="tab" aria-controls="listAllLeavesContent" aria-selected="false">Liste Complète</a></li>
                     </ul>
                     <div class="tab-content pt-3" id="congesAdminTabsContent">
-                        <div class="tab-pane fade show active" id="leaveApprovalContent" role="tabpanel" aria-labelledby="approval-tab-link">
-                            <h6 class="mt-2">Demandes en Attente</h6><div id="congesAdminAlert" class="alert modal-alert" role="alert" style="display:none;"></div>
-                            <div class="table-container"><table class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Dates</th><th>Type</th><th>Durée</th><th>Document</th><th>Demandé le</th><th>Actions</th></tr></thead><tbody id="congesAdminTableBody"></tbody></table></div>
+                        <div class="tab-pane fade show active" id="leaveApprovalContent" role="tabpanel">
+                            <h6 class="mt-2">Demandes en Attente</h6><div id="congesAdminAlert" class="modal-alert" role="alert"></div>
+                            <div class="table-responsive"><table class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Dates</th><th>Type</th><th>Durée</th><th>Doc.</th><th>Demandé le</th><th>Actions</th></tr></thead><tbody id="congesAdminTableBody"></tbody></table></div>
                         </div>
-                        <div class="tab-pane fade" id="listAllLeavesContent" role="tabpanel" aria-labelledby="list-all-leaves-tab-link">
+                        <div class="tab-pane fade" id="listAllLeavesContent" role="tabpanel">
                             <h6 class="mt-2">Consulter la Liste des Congés</h6>
-                            <div class="filter-controls">
-                                <div class="filter-item"><label for="caLeaveEmployeeFilter">Employé:</label><select id="caLeaveEmployeeFilter" class="form-control form-control-sm"><option value="">Tous</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
-                                <div class="filter-item"><label for="caLeaveMonthFilter">Mois:</label><input type="month" id="caLeaveMonthFilter" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
-                                <div class="filter-item"><label for="caLeaveDayFilter">Jour:</label><input type="date" id="caLeaveDayFilter" class="form-control form-control-sm"></div>
-                                <div class="filter-item export-button-group"><button class="export-button btn-sm" onclick="exportTableToCSV('caListeCongesTable', 'liste_conges_admin_modal.csv')">Exporter CSV</button></div>
+                            <div class="form-row align-items-center mb-3">
+                                <div class="col-auto"><select id="caLeaveEmployeeFilter" class="form-control form-control-sm"><option value="">Tous les employés</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
+                                <div class="col-auto"><input type="month" id="caLeaveMonthFilter" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
+                                <div class="col-auto"><input type="date" id="caLeaveDayFilter" class="form-control form-control-sm"></div>
                             </div>
-                            <div class="table-container"><table id="caListeCongesTable" class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Type</th><th>Début</th><th>Fin</th><th>Durée</th><th>Statut</th></tr></thead><tbody id="caListeCongesTableBody"></tbody></table></div>
+                            <div class="table-responsive"><table id="caListeCongesTable" class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Type</th><th>Début</th><th>Fin</th><th>Durée</th><th>Statut</th></tr></thead><tbody id="caListeCongesTableBody"></tbody></table></div>
                         </div>
                     </div>
                 </div>
@@ -280,30 +228,44 @@ $initial_employee_list = getInitialEmployeeList($conn);
             </div>
         </div>
     </div>
-    <div class="modal fade" id="leaveDetailsModal" tabindex="-1" aria-labelledby="leaveDetailsModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="leaveDetailsModalLabel">Détails de la Demande</h5><button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span></button></div><div class="modal-body" id="leaveDetailsModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button></div></div></div></div>
-    <div class="modal fade" id="eventCreationModal" tabindex="-1" aria-labelledby="eventCreationModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="eventCreationModalLabel">Créer un Nouvel Événement</h5><button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span></button></div><form id="eventCreationForm"><div class="modal-body"><div id="eventCreationAlert" class="alert modal-alert" style="display:none;"></div><div class="form-group"><label for="eventTitleModal">Titre <span class="text-danger">*</span></label><input type="text" class="form-control form-control-sm" id="eventTitleModal" name="title" required></div><div class="form-group"><label for="eventDescriptionModal">Description</label><textarea class="form-control form-control-sm" id="eventDescriptionModal" name="description" rows="3"></textarea></div><div class="row"><div class="col-md-6 form-group"><label for="eventStartModal">Début <span class="text-danger">*</span></label><input type="datetime-local" class="form-control form-control-sm" id="eventStartModal" name="start_datetime" required></div><div class="col-md-6 form-group"><label for="eventEndModal">Fin <span class="text-danger">*</span></label><input type="datetime-local" class="form-control form-control-sm" id="eventEndModal" name="end_datetime" required></div></div><div class="form-group"><label for="eventAssignedUsersModal">Assigner à <span class="text-danger">*</span></label><select class="form-control form-control-sm" id="eventAssignedUsersModal" name="assigned_users[]" multiple required><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select><small class="form-text text-muted">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small></div><div class="form-group"><label for="eventColorModal">Couleur</label><input type="color" class="form-control form-control-sm" id="eventColorModal" name="color" value="#007bff"></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary btn-sm">Enregistrer</button></div></form></div></div></div>
+    
+    <div class="modal fade" id="leaveDetailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Détails de la Demande</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body" id="leaveDetailsModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button></div></div></div></div>
+
+    <div class="modal fade" id="eventCreationModal" tabindex="-1" aria-labelledby="eventCreationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="eventCreationModalLabel">Créer un Nouvel Événement</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+                <form id="eventCreationForm">
+                    <div class="modal-body">
+                        <div id="eventCreationAlert" class="modal-alert alert"></div>
+                        <div class="form-group"><label for="eventTitleModal">Titre <span class="text-danger">*</span></label><input type="text" class="form-control" id="eventTitleModal" name="title" required></div>
+                        <div class="form-group"><label for="eventDescriptionModal">Description</label><textarea class="form-control" id="eventDescriptionModal" name="description" rows="3"></textarea></div>
+                        <div class="form-row">
+                            <div class="col-md-6 form-group"><label for="eventStartModal">Début <span class="text-danger">*</span></label><input type="datetime-local" class="form-control" id="eventStartModal" name="start_datetime" required></div>
+                            <div class="col-md-6 form-group"><label for="eventEndModal">Fin <span class="text-danger">*</span></label><input type="datetime-local" class="form-control" id="eventEndModal" name="end_datetime" required></div>
+                        </div>
+                        <div class="form-group"><label for="eventAssignedUsersModal">Assigner à <span class="text-danger">*</span></label><select class="form-control" id="eventAssignedUsersModal" name="assigned_users[]" multiple required style="height: 150px;"><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select><small class="form-text text-muted">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small></div>
+                        <div class="form-group"><label for="eventColorModal">Couleur</label><input type="color" class="form-control" id="eventColorModal" name="color" value="#6A0DAD"></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary">Enregistrer</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="feuilleDeTempsModal" tabindex="-1" aria-labelledby="feuilleDeTempsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="feuilleDeTempsModalLabel">Feuille de Temps</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title" id="feuilleDeTempsModalLabel">Feuille de Temps</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
                 <div class="modal-body">
-                    <div class="filter-controls">
-                        <div class="filter-item"><label for="timesheetEmployeeFilterModal">Employé:</label><select id="timesheetEmployeeFilterModal" class="form-control form-control-sm"><option value="">Tous</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
-                        <div class="filter-item"><label for="timesheetMonthFilterModal">Mois:</label><input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
-                        <div class="filter-item"><label for="timesheetDayFilterModal">Jour:</label><input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm"></div>
-                        <div class="filter-item export-button-group"><button class="export-button btn-sm" onclick="exportTableToCSV('timesheetTableModal', 'feuille_de_temps.csv')">Exporter CSV</button></div>
+                    <div class="form-row align-items-center mb-3">
+                        <div class="col-auto"><select id="timesheetEmployeeFilterModal" class="form-control form-control-sm"><option value="">Tous les employés</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
+                        <div class="col-auto"><input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
+                        <div class="col-auto"><input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm"></div>
                     </div>
-                    <div class="table-container">
+                    <div class="table-responsive">
                         <table id="timesheetTableModal" class="table table-striped table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Employé</th><th>Date</th><th>Entrée</th><th>Lieu (Entrée)</th><th>Sortie</th><th>Lieu (Sortie)</th><th>Pause prise</th><th>Durée</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>Employé</th><th>Date</th><th>Entrée</th><th>Lieu (Entrée)</th><th>Sortie</th><th>Lieu (Sortie)</th><th>Pause</th><th>Durée</th></tr></thead>
                             <tbody id="timesheetTableBodyModal"></tbody>
                         </table>
                     </div>
@@ -317,8 +279,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-   <script>
-    // This script block contains all your original functions, with targeted fixes.
+    <script>
     const currentUserRole = '<?= $user['role']; ?>';
 
     function escapeHtml(text) {
@@ -330,7 +291,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
 
     function refreshDashboardData() {
         try {
-            // This call now correctly fetches data from the updated handler
             fetch('dashboard-handler.php?action=get_dashboard_all_data')
                 .then(response => {
                     if (!response.ok) {
@@ -352,7 +312,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     displayGlobalError(error.message);
                 });
 
-            // This part for the other stats remains unchanged
             fetchEmployeeStats();
 
         } catch (e) {
@@ -379,7 +338,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
         });
     }
 
-    // **FIXED** This function now renders location names and does not create a map button.
     function loadTimesheetDataForModal() {
         try {
             const employeeId = $('#timesheetEmployeeFilterModal').val();
@@ -436,7 +394,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
         }
     }
 
-    // All your other javascript functions are preserved below
     function displayGlobalError(message) {
         console.error("Global Error:", message);
         alert("ERREUR: " + message);
@@ -516,7 +473,33 @@ $initial_employee_list = getInitialEmployeeList($conn);
         });
     }
     
-    $('#eventCreationForm').on('submit', function(e) { e.preventDefault(); /* Your existing form submission logic */ });
+    $('#eventCreationForm').on('submit', function(e) { 
+        e.preventDefault();
+        const formData = new FormData(this);
+        formData.append('action', 'create_event');
+        
+        $.ajax({
+            url: 'planning-handler.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    displayModalAlert('eventCreationModal', response.message, 'success');
+                    $('#eventCreationForm')[0].reset();
+                    // Optionally close modal after a delay
+                    setTimeout(() => $('#eventCreationModal').modal('hide'), 2000);
+                } else {
+                    displayModalAlert('eventCreationModal', response.message, 'danger');
+                }
+            },
+            error: function(xhr, status, error) {
+                displayModalAlert('eventCreationModal', 'Erreur de communication avec le serveur.', 'danger');
+            }
+        });
+    });
     
     function loadAllLeavesForCongesAdminModal() {
         $('#caListeCongesTableBody').html('<tr><td colspan="6" class="loading-placeholder">Chargement...</td></tr>');
@@ -567,7 +550,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
         $('a[data-toggle="tab"][href="#listAllLeavesContent"]').on('shown.bs.tab', loadAllLeavesForCongesAdminModal);
         $('#caLeaveEmployeeFilter, #caLeaveMonthFilter, #caLeaveDayFilter').on('change', loadAllLeavesForCongesAdminModal);
         $('#feuilleDeTempsModal').on('show.bs.modal', function () { $('#timesheetEmployeeFilterModal, #timesheetDayFilterModal').val(''); $('#timesheetMonthFilterModal').val('<?= date('Y-m'); ?>'); loadTimesheetDataForModal(); });
-        $('#eventCreationModal').on('show.bs.modal', function () { /* Your event modal logic */ });
+        $('#eventCreationModal').on('show.bs.modal', function () { $('#eventCreationForm')[0].reset(); $('#eventCreationAlert').hide(); });
         $('#timesheetEmployeeFilterModal, #timesheetMonthFilterModal, #timesheetDayFilterModal').on('change', function() {
             if ($(this).is('#timesheetMonthFilterModal') && $(this).val()) $('#timesheetDayFilterModal').val('');
             if ($(this).is('#timesheetDayFilterModal') && $(this).val()) $('#timesheetMonthFilterModal').val('');
@@ -656,7 +639,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     }
-</script> 
-    
+    </script> 
 </body>
 </html>
