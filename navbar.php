@@ -44,7 +44,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
 
     /* Left Side: Logo */
     .site-header .header-left .company-logo {
-        height: 32px;
+        height: 55px;
         width: auto;
         display: block;
     }
@@ -341,3 +341,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
