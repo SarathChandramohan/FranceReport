@@ -115,7 +115,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
         body { background-color: #f5f5f7; color: #1d1d1f; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; padding-bottom: 30px; }
         .container { width: 100%; margin: 0; padding: 25px; }
         h1 { color: #1d1d1f; font-size: 28px; font-weight: 600; margin-bottom: 25px; }
-        .shortcut-buttons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .shortcut-buttons-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .shortcut-btn { background-color: #ffffff; border: 1px solid #e0e0e0; color: #333; padding: 20px; text-align: center; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.07); transition: all 0.3s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; font-size: 0.9rem; font-weight: 500; min-height: 120px; cursor: pointer; }
         .shortcut-btn:hover { background-color: #f0f2f5; transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); color: #007bff; }
         .shortcut-btn i { color: #007bff; margin-bottom: 10px; font-size: 2.2em; }
@@ -233,7 +233,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     <thead><tr><th>Employé</th><th>Action</th><th>Date</th><th>Heure</th></tr></thead>
                     <tbody id="activities-table-body">
                         <?php if (empty($activities)): ?>
-                            <tr><td colspan="4" style="text-align: center;">Aucune activité récente</td></tr>
+                            <tr><td colspan="4" style="text-align: center;">Aucune activité recente</td></tr>
                         <?php else: ?>
                             <?php foreach ($activities as $activity): ?>
                                 <tr>
