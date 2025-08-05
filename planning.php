@@ -49,15 +49,15 @@ $default_color = $predefined_colors[0];
         .mission-card.validated { opacity: 0.8; background-color: #f3e8ff; }
         .mission-card-body { cursor: pointer; }
         .mission-title { font-weight: 600; font-size: 0.6rem; margin-bottom: 5px; }
-        .mission-meta { font-size: 0.5rem; color: #6c757d; margin-bottom: 8px; }
+        .mission-meta { font-size: 0.5rem; color: #6A0DAD; margin-bottom: 8px; }
         .assigned-workers-list { list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.5rem; }
         /* Assigned worker list item background changed from light blue to light violet */
         .assigned-workers-list li { background-color: #f3e8ff; padding: 3px 8px; border-radius: 4px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center; }
         .assigned-workers-list li.on-leave { background-color: var(--light-yellow); color: #856404; font-weight: bold; }
         .remove-worker-btn { cursor: pointer; color: #dc3545; }
-        .mission-placeholder { font-size: 0.55rem; color: #6c757d; text-align: center; padding: 20px; border: 2px dashed #ced4da; border-radius: 6px; height: 100%; display: flex; align-items: center; justify-content: center;}
+        .mission-placeholder { font-size: 0.55rem; color: #6A0DAD; text-align: center; padding: 20px; border: 2px dashed #ced4da; border-radius: 6px; height: 100%; display: flex; align-items: center; justify-content: center;}
         .mission-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; background: rgba(255,255,255,0.8); border-radius: 5px; padding: 2px;}
-        .action-btn { background: none; border: none; color: #6c757d; font-size: 0.5rem; cursor: pointer; padding: 3px; }
+        .action-btn { background: none; border: none; color: #6A0DAD; font-size: 0.5rem; cursor: pointer; padding: 3px; }
         /* Validated checkmark icon changed from green to violet */
         .action-btn.validate-btn.validated { color: #8A2BE2; }
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 1060; display: none; justify-content: center; align-items: center; }
@@ -66,7 +66,7 @@ $default_color = $predefined_colors[0];
         #assigned_workers_pills .badge, #assigned_assets_display .badge { margin: 2px; font-size: 0.6rem; }
         .remove-assigned-worker { cursor: pointer; }
         label.list-group-item.disabled { background-color: #f8f9fa; cursor: not-allowed; }
-        .mission-placeholder-bottom { padding: 15px; margin-top: 10px; border: 2px dashed #ced4da; border-radius: 6px; text-align: center; color: #6c757d; font-size: 0.7rem; transition: background-color 0.2s ease, border-color 0.2s ease; }
+        .mission-placeholder-bottom { padding: 15px; margin-top: 10px; border: 2px dashed #ced4da; border-radius: 6px; text-align: center; color: #6A0DAD; font-size: 0.7rem; transition: background-color 0.2s ease, border-color 0.2s ease; }
         /* Hover color changed to use the new primary variable */
         .mission-placeholder-bottom:hover { background-color: #e9ecef; border-color: var(--primary); }
         #missionFormModal.compact-modal .modal-body { padding: 1rem; }
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (isOnLeaveAssignment) {
             missionCardClass += ' on-leave-assignment';
         }
-        const missionCardStyle = `border-left-color: ${mission.color || '#6c757d'};`;
+        const missionCardStyle = `border-left-color: ${mission.color || '#6A0DAD'};`;
 
         return $(`<div class="${missionCardClass}" style="${missionCardStyle}" data-mission-id="${mission.mission_id}">
                 ${actionsHtml}
