@@ -10,7 +10,7 @@ if ($user['role'] !== 'admin') {
     exit();
 }
 
-$predefined_colors = ['#1877f2', '#34c759', '#ff9500', '#5856d6', '#ff3b30', '#007aff', '#ffcc00', '#8e8e93', '#ff2d55', '#00a096'];
+$predefined_colors = ['#1877f2', '#34c759', '#ff9500', '#5856d6', '#ff3b30', '#6A0DAD', '#ffcc00', '#8e8e93', '#ff2d55', '#00a096'];
 $default_color = $predefined_colors[0];
 ?>
 <!DOCTYPE html>
