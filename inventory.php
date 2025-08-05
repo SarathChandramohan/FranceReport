@@ -20,7 +20,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .card { background-color: #ffffff; border-radius: 15px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); border: none; margin-bottom: 25px; padding: 25px; }
         .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e9ecef; }
         .tab { padding: 12px 25px; background: #e9ecef; color: #495057; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; text-align: center; }
-        .tab.active { background: #007bff; color: white; box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25); transform: translateY(-2px); }
+        .tab.active { background: #6A0DAD; color: white; box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25); transform: translateY(-2px); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .scanner-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto 20px; background: #2c3e50; border-radius: 15px; overflow: hidden; }
@@ -28,7 +28,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 25px; }
         .asset-card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.07); transition: all 0.3s ease; border-left: 5px solid; display: flex; flex-direction: column; justify-content: space-between; }
         .asset-card.tool { border-left-color: #28a745; }
-        .asset-card.vehicle { border-left-color: #007bff; }
+        .asset-card.vehicle { border-left-color: #6A0DAD; }
         .asset-card.maintenance { border-left-color: #ffc107; background-color: #ffc1071a; }
         .asset-card.in-use { border-left-color: #dc3545; background-color: #dc35461a; }
         .asset-card.pending_verification { border-left-color: #17a2b8; background-color: #17a2b81a; }
