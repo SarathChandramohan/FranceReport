@@ -47,31 +47,6 @@ try {
         <?php include 'navbar.php'; // Include the navigation bar ?>
 
         <div class="flex flex-1 overflow-hidden">
-            <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
-                <div class="p-4">
-                    <button id="create-event-btn-sidebar" class="w-full bg-white border border-gray-300 rounded-full py-3 px-6 hover:shadow-md transition-shadow flex items-center space-x-3">
-                        <i data-lucide="plus" class="w-5 h-5 text-gray-600"></i>
-                        <span class="text-gray-700 font-medium">Créer</span>
-                    </button>
-                </div>
-                <div class="flex-1 p-4">
-                    <div class="space-y-2">
-                        <div class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 cursor-pointer">
-                            <div class="w-3 h-3 bg-blue-600 rounded-full"></div>
-                            <span class="text-sm text-gray-700">Mes calendriers</span>
-                        </div>
-                        <div class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 cursor-pointer">
-                            <div class="w-3 h-3 bg-green-600 rounded-full"></div>
-                            <span class="text-sm text-gray-700">Travail</span>
-                        </div>
-                        <div class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 cursor-pointer">
-                            <div class="w-3 h-3 bg-red-600 rounded-full"></div>
-                            <span class="text-sm text-gray-700">Personnel</span>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-
             <main class="flex-1 flex flex-col">
                 <div id='calendar' class="flex-1 bg-white p-4">
                     </div>
@@ -165,7 +140,6 @@ try {
             const saveButton = document.getElementById('save-event-btn');
             const updateButton = document.getElementById('update-event-btn');
             const deleteButton = document.getElementById('delete-event-btn');
-            const createEventButtonSidebar = document.getElementById('create-event-btn-sidebar');
             const closeModalButton = document.getElementById('close-modal-btn');
             const cancelModalButton = document.getElementById('cancel-modal-btn');
             
@@ -214,39 +188,17 @@ try {
              }
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: window.innerWidth <= 768 ? 'listWeek' : 'timeGridWeek',
+                initialView: 'dayGridMonth',
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                    right: 'dayGridMonth,listWeek'
                 },
-                views: {
-                     timeGridWeek: {
-                         allDaySlot: false,
-                          slotLabelFormat: {
-                             hour: '2-digit',
-                             minute: '2-digit',
-                             meridiem: false,
-                             hour12: false
-                         }
-                     },
-                     timeGridDay: {
-                         allDaySlot: false,
-                         slotLabelFormat: {
-                             hour: '2-digit',
-                             minute: '2-digit',
-                             meridiem: false,
-                             hour12: false
-                         }
-                     }
-                 },
                 scrollTime: '08:00:00',
                 locale: 'fr',
                 buttonText: {
                     today:    "Aujourd'hui",
                     month:    'Mois',
-                    week:     'Semaine',
-                    day:      'Jour',
                     list:     'Liste'
                 },
                 events: {
@@ -296,7 +248,6 @@ try {
             calendar.render();
             lucide.createIcons();
 
-            createEventButtonSidebar.addEventListener('click', openModal);
             closeModalButton.addEventListener('click', closeModal);
             cancelModalButton.addEventListener('click', closeModal);
             
