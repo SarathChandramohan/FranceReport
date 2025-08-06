@@ -266,7 +266,7 @@ try {
                     } : {
                         left: 'prev,next today',
                         center: 'title',
-post                         right: 'dayGridMonth,listWeek'
+                        right: 'dayGridMonth,listWeek'
                     },
                 locale: 'fr',
                 buttonText: {
