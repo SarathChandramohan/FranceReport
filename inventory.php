@@ -127,7 +127,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Action</th></tr>
+                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th></tr>
                         </thead>
                         <tbody id="individual-active-bookings-table"></tbody>
                     </table>
@@ -145,7 +145,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Action</th></tr>
+                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Statut</th><th>Action</th></tr>
                         </thead>
                         <tbody id="mission-active-bookings-table"></tbody>
                     </table>
@@ -164,7 +164,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th></tr>
+                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
                         </thead>
                         <tbody id="usage-history-table"></tbody>
                     </table>
@@ -231,7 +231,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                             <th>Signalé par</th>
                             <th>Type</th>
                             <th>Commentaires</th>
-                            
+                            <th>Statut</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -497,7 +497,7 @@ function renderMissingItemsTab() {
     const tableBody = document.getElementById('missing-items-table');
     tableBody.innerHTML = '';
     if (missingItems.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun materiel en utilisation.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun matériel manquant.</td></tr>';
         return;
     }
     missingItems.forEach(item => {
@@ -949,7 +949,7 @@ async function openHistoryModal(assetId, assetName) {
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
         if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
-        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
         data.history.forEach(rec => {
             const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
             const checkinTime = (rec.status === 'completed' || rec.status === 'cancelled') && rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';

@@ -79,7 +79,7 @@ function getAssetHistory($conn) {
     $sql = "SELECT b.booking_date, b.mission, b.status, u.prenom, u.nom, b.created_at as checkout_time,
             (SELECT i.last_modified FROM Inventory i WHERE i.asset_id = b.asset_id) as checkin_time
             FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
-            WHERE  pickup_date > NOW() AND b.asset_id = ?
+            WHERE b.asset_id = ?
             ORDER BY b.booking_date DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$asset_id]);
@@ -231,7 +231,7 @@ function getBookingHistory($conn) {
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE  pickup_date > NOW() AND b.status IN ('completed', 'cancelled')
+        WHERE b.status IN ('completed', 'cancelled')
         ORDER BY b.booking_date DESC, b.booking_id DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
@@ -246,7 +246,7 @@ function getAllBookings($conn) {
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE  pickup_date > NOW() AND b.status IN ('booked', 'active') 
+        WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NOT NULL
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
@@ -258,7 +258,7 @@ function getAllBookings($conn) {
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        WHERE  pickup_date > NOW() AND b.status IN ('booked', 'active') 
+        WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NULL
         ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
     $stmt_mission = $conn->prepare($sql_mission);
@@ -277,7 +277,7 @@ function cancelBooking($conn, $user) {
     $data = json_decode(file_get_contents('php://input'), true);
     $booking_id = isset($data['booking_id']) ? $data['booking_id'] : 0;
     if (!$booking_id) throw new Exception("ID de réservation manquant.");
-    $stmt_check = $conn->prepare("SELECT user_id FROM Bookings WHERE  pickup_date > NOW() AND booking_id = ?");
+    $stmt_check = $conn->prepare("SELECT user_id FROM Bookings WHERE booking_id = ?");
     $stmt_check->execute([$booking_id]);
     $booking_user_id = $stmt_check->fetchColumn();
     
@@ -339,7 +339,7 @@ function processScan($conn, $user) {
             SELECT b.*, u.prenom, u.nom
             FROM Bookings b
             LEFT JOIN Users u ON b.user_id = u.user_id
-            WHERE  pickup_date > NOW() AND b.asset_id = ? AND b.booking_date = ? AND b.status = 'booked'
+            WHERE b.asset_id = ? AND b.booking_date = ? AND b.status = 'booked'
         ");
         $stmt_booking->execute([$asset['asset_id'], $today]);
         $booking = $stmt_booking->fetch(PDO::FETCH_ASSOC);
@@ -367,7 +367,7 @@ function processScan($conn, $user) {
 }
 
 function getInventory($conn) {
-    $sql = "SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE  pickup_date > NOW() AND b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE  pickup_date > NOW() AND b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id ORDER BY i.asset_name ASC";
+    $sql = "SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id ORDER BY i.asset_name ASC";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
     $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -389,7 +389,7 @@ function updateAsset($conn, $user) {
     $params = [$barcode, $data['asset_type'], empty($data['category_id']) ? null : $data['category_id'], $asset_name, empty($data['brand']) ? null : trim($data['brand']), empty($data['serial_or_plate']) ? null : trim($data['serial_or_plate']), empty($data['position_or_info']) ? null : trim($data['position_or_info']), empty($data['fuel_level']) ? null : $data['fuel_level'], $asset_id];
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
-    $select_stmt = $conn->prepare("SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE  pickup_date > NOW() AND b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE  pickup_date > NOW() AND b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id WHERE i.asset_id = ?");
+    $select_stmt = $conn->prepare("SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id WHERE i.asset_id = ?");
     $select_stmt->execute([$asset_id]);
     $updatedAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
     if ($updatedAsset) respondWithSuccess(['asset' => $updatedAsset], "Actif mis à jour avec succès.");
@@ -454,7 +454,7 @@ function bookAsset($conn, $user) {
     $booking_date = $data['booking_date'];
     $mission = isset($data['mission']) ? trim($data['mission']) : 'Non spécifiée';
     $user_id = $user['user_id'];
-    $stmt_check = $conn->prepare("SELECT booking_id FROM Bookings WHERE  pickup_date > NOW() AND asset_id = ? AND booking_date = ? AND status IN ('booked', 'active')");
+    $stmt_check = $conn->prepare("SELECT booking_id FROM Bookings WHERE asset_id = ? AND booking_date = ? AND status IN ('booked', 'active')");
     $stmt_check->execute([$asset_id, $booking_date]);
     if ($stmt_check->fetch()) throw new Exception("Cet actif est déjà réservé pour cette date.");
     $sql = "INSERT INTO Bookings (asset_id, user_id, booking_date, mission) VALUES (?, ?, ?, ?)";
@@ -466,7 +466,7 @@ function bookAsset($conn, $user) {
 function getAssetAvailability($conn) {
     $asset_id = isset($_GET['asset_id']) ? $_GET['asset_id'] : 0;
     if (!$asset_id) throw new Exception("ID de l'actif manquant.");
-    $sql = "SELECT booking_date FROM Bookings WHERE  pickup_date > NOW() AND asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')";
+    $sql = "SELECT booking_date FROM Bookings WHERE asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$asset_id]);
     $dates = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -479,7 +479,7 @@ function updateMaintenanceStatus($conn, $user) {
     $status = $data['status'];
     if (!in_array($status, ['maintenance', 'available'])) throw new Exception("Statut non valide.");
     if ($status === 'maintenance') {
-        $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE  pickup_date > NOW() AND asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')");
+        $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')");
         $stmt_check->execute([$asset_id]);
         if ($stmt_check->fetchColumn() > 0) throw new Exception("Impossible de mettre en maintenance. L'actif a des réservations futures. Veuillez les annuler d'abord.");
     }
@@ -510,7 +510,7 @@ function addAsset($conn, $user) {
     $stmt = $conn->prepare($sql);
     $stmt->execute($params);
     $newId = $stmt->fetchColumn();
-    $select_stmt = $conn->prepare("SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE  pickup_date > NOW() AND b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE  pickup_date > NOW() AND b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id WHERE i.asset_id = ?");
+    $select_stmt = $conn->prepare("SELECT i.*, ac.category_name, u_assigned.prenom AS assigned_to_prenom, u_assigned.nom AS assigned_to_nom, (SELECT MIN(b.booking_date) FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date > CAST(GETDATE() AS DATE) AND b.status = 'booked') as next_future_booking_date, todays_booking.user_id AS todays_booking_user_id, todays_booking.mission AS todays_booking_mission, u_booking.prenom AS todays_booking_prenom, u_booking.nom AS todays_booking_nom FROM Inventory i LEFT JOIN AssetCategories ac ON i.category_id = ac.category_id LEFT JOIN Users u_assigned ON i.assigned_to_user_id = u_assigned.user_id OUTER APPLY ( SELECT TOP 1 b.user_id, b.mission FROM Bookings b WHERE b.asset_id = i.asset_id AND b.booking_date = CAST(GETDATE() AS DATE) AND b.status = 'booked' ) AS todays_booking LEFT JOIN Users u_booking ON todays_booking.user_id = u_booking.user_id WHERE i.asset_id = ?");
     $select_stmt->execute([$newId]);
     $newAsset = $select_stmt->fetch(PDO::FETCH_ASSOC);
     if ($newAsset) respondWithSuccess(['asset' => $newAsset], "Actif ajouté avec succès.");
