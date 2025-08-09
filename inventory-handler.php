@@ -221,32 +221,25 @@ function getBookingHistory($conn) {
     $sql = "
         SELECT 
             b.booking_id, 
-            b.created_at as pickedup_date,
-            i.last_modified as submitted_date,
-            i.asset_name, 
+            b.booking_date, 
+            b.mission, 
+            b.status, 
+            a.asset_name, 
             u.user_id,
             u.prenom, 
-            u.nom,
-            b.mission
+            u.nom
         FROM Bookings b 
-        LEFT JOIN Inventory i ON b.asset_id = i.asset_id 
+        LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
         WHERE b.status IN ('completed', 'cancelled')
-        ORDER BY b.created_at DESC";
+        ORDER BY b.booking_date DESC, b.booking_id DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     respondWithSuccess(['history' => $history]);
 }
 
-function autoCancelPastBookings($conn) {
-    $sql = "UPDATE Bookings SET status = 'cancelled' WHERE status = 'booked' AND booking_date < GETDATE()";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute();
-}
-
 function getAllBookings($conn) {
-    autoCancelPastBookings($conn);
     // Fetch individual bookings
     $sql_individual = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
@@ -255,7 +248,6 @@ function getAllBookings($conn) {
         LEFT JOIN Users u ON b.user_id = u.user_id 
         WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NOT NULL
-        AND b.booking_date >= GETDATE()
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
     $stmt_individual->execute();
@@ -268,7 +260,6 @@ function getAllBookings($conn) {
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NULL
-        AND b.booking_date >= GETDATE()
         ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
     $stmt_mission = $conn->prepare($sql_mission);
     $stmt_mission->execute();
