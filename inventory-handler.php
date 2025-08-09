@@ -1,4 +1,3 @@
-<?php
 // inventory-handler.php
 
 require_once 'session-management.php';
@@ -227,10 +226,13 @@ function getBookingHistory($conn) {
             a.asset_name, 
             u.user_id,
             u.prenom, 
-            u.nom
+            u.nom,
+            t.logon_time as picked_up_date,
+            t.logoff_time as submitted_date
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
+        LEFT JOIN Timesheet t ON u.user_id = t.user_id AND b.booking_date = t.entry_date
         WHERE b.status IN ('completed', 'cancelled')
         ORDER BY b.booking_date DESC, b.booking_id DESC";
     $stmt = $conn->prepare($sql);
@@ -239,14 +241,22 @@ function getBookingHistory($conn) {
     respondWithSuccess(['history' => $history]);
 }
 
+function autoCancelPastBookings($conn) {
+    $today = date('Y-m-d');
+    $sql = "UPDATE Bookings SET status = 'cancelled' WHERE booking_date < ? AND status = 'booked'";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$today]);
+}
+
 function getAllBookings($conn) {
+    autoCancelPastBookings($conn);
     // Fetch individual bookings
     $sql_individual = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE b.status IN ('booked', 'active') 
+        WHERE b.status IN ('booked', 'active') AND b.booking_date >= GETDATE()
         AND b.user_id IS NOT NULL
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
@@ -258,7 +268,7 @@ function getAllBookings($conn) {
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        WHERE b.status IN ('booked', 'active') 
+        WHERE b.status IN ('booked', 'active') AND b.booking_date >= GETDATE()
         AND b.user_id IS NULL
         ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
     $stmt_mission = $conn->prepare($sql_mission);
