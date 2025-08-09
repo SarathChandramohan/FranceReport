@@ -118,7 +118,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         
         <div id="individual-bookings-content" class="booking-content-pane active">
             <div class="card">
-                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
+                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Futures)</h3>
                 <div class="booking-filters">
                     <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
@@ -127,7 +127,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th></tr>
+                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Action</th></tr>
                         </thead>
                         <tbody id="individual-active-bookings-table"></tbody>
                     </table>
@@ -137,7 +137,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
 
         <div id="mission-bookings-content" class="booking-content-pane">
             <div class="card">
-                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
+                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Futures)</h3>
                  <div class="booking-filters">
                     <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
@@ -145,7 +145,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Statut</th><th>Action</th></tr>
+                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Action</th></tr>
                         </thead>
                         <tbody id="mission-active-bookings-table"></tbody>
                     </table>
@@ -164,7 +164,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
+                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Picked-up Date</th><th>Submitted Date</th></tr>
                         </thead>
                         <tbody id="usage-history-table"></tbody>
                     </table>
@@ -645,8 +645,12 @@ function initializeBookingTabFilters() {
     const commonConfig = { locale: "fr", dateFormat: "Y-m-d", allowInput: true };
     flatpickr("#individualFilterDate", commonConfig);
     flatpickr("#missionFilterDate", commonConfig);
-    flatpickr("#historyFilterDate", commonConfig);
+    flatpickr("#historyFilterDate", {
+        ...commonConfig,
+        mode: "range"
+    });
 }
+
 
 function populateUserFilters() {
     const userFilters = ['individualFilterUser', 'historyFilterUser'];
@@ -848,10 +852,10 @@ function renderIndividualBookingsTable() {
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
     const filtered = allBookings.individual.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!userFilter || b.user_id == userFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
@@ -861,10 +865,10 @@ function renderMissionBookingsTable() {
     const missionFilter = document.getElementById('missionFilterMission').value.toLowerCase();
     const filtered = allBookings.mission.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
@@ -873,13 +877,18 @@ function renderUsageHistoryTable() {
     const dateFilter = document.getElementById('historyFilterDate')._flatpickr.input.value;
     const userFilter = document.getElementById('historyFilterUser').value;
     const missionFilter = document.getElementById('historyFilterMission').value.toLowerCase();
-    const filtered = usageHistory.filter(h => (!dateFilter || h.booking_date === dateFilter) && (!userFilter || h.user_id == userFilter) && (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter))));
+    const filtered = usageHistory.filter(h => {
+        if (!dateFilter) return true;
+        const [startDate, endDate] = dateFilter.split(' to ');
+        const bookingDate = new Date(h.booking_date);
+        return bookingDate >= new Date(startDate) && bookingDate <= new Date(endDate);
+    }).filter(h => (!userFilter || h.user_id == userFilter) && (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter))));
+
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
-    const statusBadges = { completed: 'badge-secondary', cancelled: 'badge-danger' };
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
     filtered.forEach(h => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td><td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>`;
+        row.innerHTML = `<td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td><td>${h.picked_up_date ? new Date(h.picked_up_date).toLocaleString('fr-FR') : 'N/A'}</td><td>${h.submitted_date ? new Date(h.submitted_date).toLocaleString('fr-FR') : 'N/A'}</td>`;
     });
 }
 
