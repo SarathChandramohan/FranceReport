@@ -1,3 +1,4 @@
+<?php
 // inventory-handler.php
 
 require_once 'session-management.php';
