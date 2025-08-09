@@ -43,7 +43,7 @@ try {
         case 'get_asset_history': getAssetHistory($conn); break;
         case 'get_booking_history': getBookingHistory($conn); break; 
         case 'cancel_booking': cancelBooking($conn, $currentUser); break;
-        case 'get_missing_items': getMissingItems($conn); break;
+        case 'get_in_use_items': getInUseItems($conn); break;
         case 'get_items_for_verification': getItemsForVerification($conn, $currentUser); break;
         case 'verify_item_return': verifyItemReturn($conn, $currentUser); break;
 
@@ -76,11 +76,12 @@ function getAssetHistory($conn) {
     $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
     if (!$asset_id) throw new Exception("ID de l'actif manquant.");
 
-    $sql = "SELECT b.booking_date, b.mission, b.status, u.prenom, u.nom, b.created_at as checkout_time,
-            (SELECT i.last_modified FROM Inventory i WHERE i.asset_id = b.asset_id) as checkin_time
-            FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
+    $sql = "SELECT b.created_at AS checkout_time, i.last_modified AS checkin_time, i.asset_name, u.prenom, u.nom, b.mission
+            FROM Bookings b
+            JOIN Inventory i ON b.asset_id = i.asset_id
+            LEFT JOIN Users u ON b.user_id = u.user_id
             WHERE b.asset_id = ?
-            ORDER BY b.booking_date DESC";
+            ORDER BY b.created_at DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$asset_id]);
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -194,7 +195,7 @@ function verifyItemReturn($conn, $user) {
 }
 
 
-function getMissingItems($conn) {
+function getInUseItems($conn) {
     $sql = "
         SELECT 
             i.asset_name, 
@@ -204,36 +205,31 @@ function getMissingItems($conn) {
             b.booking_date, 
             b.mission
         FROM Inventory i
-        JOIN Bookings b ON i.asset_id = b.asset_id
-        JOIN Users u ON i.assigned_to_user_id = u.user_id
+        LEFT JOIN Bookings b ON i.asset_id = b.asset_id
+        LEFT JOIN Users u ON i.assigned_to_user_id = u.user_id
         WHERE i.status = 'in-use'
-        AND b.status = 'active' 
-        AND b.booking_date < GETDATE()
+        AND b.status = 'active'
         ORDER BY b.booking_date ASC
     ";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
-    $missing_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    respondWithSuccess(['missing_items' => $missing_items]);
+    $in_use_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    respondWithSuccess(['in_use_items' => $in_use_items]);
 }
 
 function getBookingHistory($conn) {
     $sql = "
         SELECT 
-            b.booking_id, 
-            b.booking_date, 
-            b.mission, 
-            b.status, 
+            b.created_at AS checkout_time,
+            i.last_modified AS checkin_time,
             a.asset_name, 
             u.user_id,
             u.prenom, 
             u.nom,
-            t.logon_time as picked_up_date,
-            t.logoff_time as submitted_date
+            b.mission
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        LEFT JOIN Timesheet t ON u.user_id = t.user_id AND b.booking_date = t.entry_date
         WHERE b.status IN ('completed', 'cancelled')
         ORDER BY b.booking_date DESC, b.booking_id DESC";
     $stmt = $conn->prepare($sql);
@@ -242,26 +238,24 @@ function getBookingHistory($conn) {
     respondWithSuccess(['history' => $history]);
 }
 
-function autoCancelPastBookings($conn) {
-    $today = date('Y-m-d');
-    $sql = "UPDATE Bookings SET status = 'cancelled' WHERE booking_date < ? AND status = 'booked'";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$today]);
-}
-
 function getAllBookings($conn) {
-    autoCancelPastBookings($conn);
+    // Cancel past bookings that were not picked up
+    $today = date('Y-m-d');
+    $stmt_cancel_past_bookings = $conn->prepare("UPDATE Bookings SET status = 'cancelled' WHERE booking_date < ? AND status = 'booked'");
+    $stmt_cancel_past_bookings->execute([$today]);
+
     // Fetch individual bookings
     $sql_individual = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE b.status IN ('booked', 'active') AND b.booking_date >= GETDATE()
+        WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NOT NULL
+        AND b.booking_date >= ?
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
-    $stmt_individual->execute();
+    $stmt_individual->execute([$today]);
     $individual_bookings = $stmt_individual->fetchAll(PDO::FETCH_ASSOC);
 
     // Fetch mission bookings
@@ -269,11 +263,12 @@ function getAllBookings($conn) {
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        WHERE b.status IN ('booked', 'active') AND b.booking_date >= GETDATE()
+        WHERE b.status IN ('booked', 'active') 
         AND b.user_id IS NULL
+        AND b.booking_date >= ?
         ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
     $stmt_mission = $conn->prepare($sql_mission);
-    $stmt_mission->execute();
+    $stmt_mission->execute([$today]);
     $mission_bookings = $stmt_mission->fetchAll(PDO::FETCH_ASSOC);
 
     $bookings = [
@@ -552,4 +547,3 @@ function deleteAsset($conn, $user) {
         throw $e;
     }
 }
-?>
