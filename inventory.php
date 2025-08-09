@@ -23,7 +23,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .tab.active { background: #6A0DAD; color: white; box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25); transform: translateY(-2px); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .scanner-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto 20px; background: #2c3e50; border-radius: 15px; overflow: hidden; }
+        .scanner-container { position: relative; width: 100%; max-width: 500px; margin: 20px auto; background: #2c3e50; border-radius: 15px; overflow: hidden; }
         #video { width: 100%; height: auto; }
         .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 25px; }
         .asset-card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.07); transition: all 0.3s ease; border-left: 5px solid; display: flex; flex-direction: column; justify-content: space-between; }
@@ -55,7 +55,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .category-actions button { margin-left: 5px; }
         #categoryFilterContainer { display: flex; flex-wrap: wrap; gap: 10px; }
         #categoryFilterContainer .btn { border-radius: 20px; padding: 5px 15px; font-size: 0.9em; }
-        .booking-filters { display: flex; gap: 15px; margin-top: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .booking-filters { display: flex; gap: 15px; margin-top: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .booking-sub-nav { display: flex; gap: 10px; flex-wrap: wrap; }
         .booking-sub-nav .btn { font-weight: 600; }
         .booking-content-pane { display: none; }
@@ -73,10 +73,9 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="verify_return"><i class="fas fa-user-check"></i> Vérifier Retour</div>
-                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
+                <div class="tab" data-tab="in_use_items"><i class="fas fa-tools"></i> Matériel en Utilisation</div>
                 <div class="tab" data-tab="reports"><i class="fas fa-flag"></i> Rapports</div>
             <?php endif; ?>
-            <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
                 <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
@@ -118,7 +117,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         
         <div id="individual-bookings-content" class="booking-content-pane active">
             <div class="card">
-                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
+                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Futures)</h3>
                 <div class="booking-filters">
                     <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
@@ -137,7 +136,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
 
         <div id="mission-bookings-content" class="booking-content-pane">
             <div class="card">
-                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
+                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Futures)</h3>
                  <div class="booking-filters">
                     <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
@@ -157,14 +156,15 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="card">
                 <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
                 <div class="booking-filters">
-                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
+                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par période..." style="max-width: 220px;">
+                    <select id="historyFilterItem" class="form-control" style="max-width: 200px;"></select>
+                    <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
                     <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
+                            <tr><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Date de Prise</th><th>Date de Remise</th></tr>
                         </thead>
                         <tbody id="usage-history-table"></tbody>
                     </table>
@@ -173,17 +173,6 @@ $isAdmin = ($currentUser['role'] === 'admin');
         </div>
     </div>
     
-    <div id="scanner" class="tab-content">
-        <div class="card">
-             <h3 class="text-center mb-4">Scanner un Code-barres</h3>
-             <div class="scanner-container"><video id="video" autoplay playsinline></video></div>
-             <div class="text-center mt-3">
-                <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
-                <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
-            </div>
-        </div>
-    </div>
-
     <?php if ($isAdmin): ?>
     <div id="verify_return" class="tab-content">
         <div class="card">
@@ -205,15 +194,15 @@ $isAdmin = ($currentUser['role'] === 'admin');
         </div>
     </div>
     
-    <div id="missing_items" class="tab-content">
+    <div id="in_use_items" class="tab-content">
         <div class="card">
-            <h3 class="mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Matériel Manquant ou Non Retourné</h3>
+            <h3 class="mb-3"><i class="fas fa-tools mr-2"></i>Matériel Actuellement en Utilisation</h3>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead class="thead-light">
-                        <tr><th>Actif</th><th>Code-barres</th><th>Sorti par</th><th>Date de réservation</th><th>Mission</th></tr>
+                        <tr><th>Actif</th><th>Code-barres</th><th>Sorti par</th><th>Date de sortie</th><th>Mission</th></tr>
                     </thead>
-                    <tbody id="missing-items-table"></tbody>
+                    <tbody id="in-use-items-table"></tbody>
                 </table>
             </div>
         </div>
@@ -246,6 +235,20 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <h3>Ajouter un Nouvel Actif</h3>
             <form id="addAssetForm">
             </form>
+            <hr class="my-4">
+            <div id="scanner-section">
+                <h4 class="text-center">Scanner un Code-barres</h4>
+                <p class="text-center text-muted">Utilisez le scanner pour prendre ou retourner un article, ou pour remplir rapidement le champ code-barres ci-dessus.</p>
+                <div id="scanner-ui" style="display: none;">
+                    <div class="scanner-container"><video id="video" autoplay playsinline></video></div>
+                    <div class="text-center mt-3">
+                        <button id="stopScanBtn" class="btn btn-danger"><i class="fas fa-stop"></i> Arrêter le Scan</button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button id="startScanBtn" class="btn btn-success"><i class="fas fa-barcode"></i> Lancer le Scanner</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -308,7 +311,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Historique pour : <span id="historyModalAssetName"></span></h5>
+                <h5 class="modal-title">Historique des Retours pour : <span id="historyModalAssetName"></span></h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body" id="historyModalBody">
@@ -378,7 +381,7 @@ let inventory = [];
 let assetCategories = [];
 let allBookings = { individual: [], mission: [] };
 let usageHistory = [];
-let missingItems = [];
+let inUseItems = [];
 let itemsForVerification = [];
 let allUsers = [];
 let selectedCategoryId = 'all'; 
@@ -415,7 +418,7 @@ async function fetchAllData() {
         ];
 
         if (IS_ADMIN) {
-            apiCalls.push(apiCall('get_missing_items', 'GET'));
+            apiCalls.push(apiCall('get_in_use_items', 'GET'));
             apiCalls.push(apiCall('get_items_for_verification', 'GET'));
             apiCalls.push(apiCall('get_reports', 'GET'));
         }
@@ -430,7 +433,7 @@ async function fetchAllData() {
         allUsers = results[4].users || [];
         
         if (IS_ADMIN) {
-            missingItems = results[5].missing_items || [];
+            inUseItems = results[5].in_use_items || [];
             itemsForVerification = results[6].items_for_verification || [];
             reports = results[7].reports || [];
         }
@@ -488,21 +491,23 @@ function renderInventoryTab() {
 
 function renderBookingTab() {
     populateUserFilters();
+    populateHistoryItemFilter();
     renderIndividualBookingsTable();
     renderMissionBookingsTable();
     renderUsageHistoryTable();
 }
 
-function renderMissingItemsTab() {
-    const tableBody = document.getElementById('missing-items-table');
+function renderInUseItemsTab() {
+    const tableBody = document.getElementById('in-use-items-table');
     tableBody.innerHTML = '';
-    if (missingItems.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun matériel manquant.</td></tr>';
+    if (inUseItems.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun matériel en cours d\'utilisation.</td></tr>';
         return;
     }
-    missingItems.forEach(item => {
+    inUseItems.forEach(item => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${item.asset_name}</td><td>${item.barcode}</td><td>${item.prenom} ${item.nom}</td><td>${new Date(item.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${item.mission || 'N/A'}</td>`;
+        const checkoutDate = item.checkout_time ? new Date(item.checkout_time).toLocaleString('fr-FR') : 'N/A';
+        row.innerHTML = `<td>${item.asset_name}</td><td>${item.barcode}</td><td>${item.prenom} ${item.nom}</td><td>${checkoutDate}</td><td>${item.mission || 'N/A'}</td>`;
     });
 }
 
@@ -536,17 +541,9 @@ async function handleVerifyReturn(assetId) {
     try {
         await apiCall('verify_item_return', 'POST', { asset_id: assetId });
         showNotification('Retour de l\'article vérifié.', 'success');
-        
-        // Optimistic update
-        itemsForVerification = itemsForVerification.filter(item => item.asset_id != assetId);
-        const assetInInventory = inventory.find(item => item.asset_id == assetId);
-        if (assetInInventory) {
-            assetInInventory.status = 'available';
-            assetInInventory.assigned_to_user_id = null;
-        }
+        await fetchAllData();
         renderVerifyReturnTab();
-        renderInventory(); // Refresh the main grid to show the updated status
-
+        renderInventory();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -610,6 +607,8 @@ function setupEventListeners() {
         document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
         document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
         document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
+        document.getElementById('startScanBtn').addEventListener('click', startScanning);
+        document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     }
     
     document.querySelector('.booking-sub-nav').addEventListener('click', (e) => {
@@ -627,8 +626,6 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('startScanBtn').addEventListener('click', startScanning);
-    document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
     
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
@@ -637,6 +634,7 @@ function setupEventListeners() {
     document.getElementById('missionFilterDate').addEventListener('change', renderMissionBookingsTable);
     document.getElementById('missionFilterMission').addEventListener('input', renderMissionBookingsTable);
     document.getElementById('historyFilterDate').addEventListener('change', renderUsageHistoryTable);
+    document.getElementById('historyFilterItem').addEventListener('change', renderUsageHistoryTable);
     document.getElementById('historyFilterUser').addEventListener('change', renderUsageHistoryTable);
     document.getElementById('historyFilterMission').addEventListener('input', renderUsageHistoryTable);
 }
@@ -645,7 +643,7 @@ function initializeBookingTabFilters() {
     const commonConfig = { locale: "fr", dateFormat: "Y-m-d", allowInput: true };
     flatpickr("#individualFilterDate", commonConfig);
     flatpickr("#missionFilterDate", commonConfig);
-    flatpickr("#historyFilterDate", commonConfig);
+    flatpickr("#historyFilterDate", { ...commonConfig, mode: "range" });
 }
 
 function populateUserFilters() {
@@ -658,14 +656,28 @@ function populateUserFilters() {
     });
 }
 
+function populateHistoryItemFilter() {
+    const select = document.getElementById('historyFilterItem');
+    if (select.options.length > 1) return; // Populate only once
+    select.innerHTML = '<option value="">Tous les actifs</option>';
+    // Create a unique list of items from history
+    const itemsInHistory = [...new Map(usageHistory.map(item => [item['asset_id'], item])).values()];
+    itemsInHistory.sort((a, b) => a.asset_name.localeCompare(b.asset_name));
+    itemsInHistory.forEach(item => {
+        if(item.asset_id && item.asset_name) {
+            select.add(new Option(item.asset_name, item.asset_id));
+        }
+    });
+}
+
 function showTab(tabName) {
     document.querySelectorAll('.tab-content, .tab').forEach(el => el.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
     
-    if (tabName !== 'scanner' && codeReader) stopScanning();
+    if (tabName !== 'add_asset' && codeReader) stopScanning();
 
-    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items', 'verify_return', 'reports'].includes(tabName);
+    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'in_use_items', 'verify_return', 'reports'].includes(tabName);
     
     if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
@@ -674,7 +686,7 @@ function showTab(tabName) {
             else if (tabName === 'booking') renderBookingTab();
             else if (IS_ADMIN) {
                 if (tabName === 'manage_categories') renderCategoriesList();
-                else if (tabName === 'missing_items') renderMissingItemsTab();
+                else if (tabName === 'in_use_items') renderInUseItemsTab();
                 else if (tabName === 'verify_return') renderVerifyReturnTab();
                 else if (tabName === 'reports') renderReportsTab();
             }
@@ -799,7 +811,7 @@ function createAssetCard(asset) {
         case 'available':
              if (asset.todays_booking_user_id != null) {
                 statusText = 'Réservé';
-                cardStatusClass = 'in-use'; // Use same visual cue as in-use
+                cardStatusClass = 'in-use';
                 assignedToText = `<strong>Réservé par:</strong> ${asset.todays_booking_prenom || 'Équipe'}<br><strong>Mission:</strong> ${asset.todays_booking_mission || 'N/A'}<br>`;
             } else {
                 statusText = 'Disponible';
@@ -810,7 +822,7 @@ function createAssetCard(asset) {
             break;
         case 'pending_verification':
             statusText = 'Attente Vérification';
-             assignedToText = `<strong>Retourné par:</strong> ${asset.assigned_to_prenom || ''} ${asset.assigned_to_nom || ''}<br>`;
+             assignedToText = `<strong>Retourné par:</strong> ${asset.returned_by_prenom || ''} ${asset.returned_by_nom || ''}<br>`;
             break;
     }
     
@@ -819,11 +831,10 @@ function createAssetCard(asset) {
     const details = asset.asset_type === 'tool' ? `<strong>N° série:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Lieu:</strong> ${asset.position_or_info || 'N/A'}<br>` : `<strong>Plaque:</strong> ${asset.serial_or_plate || 'N/A'}<br><strong>Carburant:</strong> ${asset.fuel_level || 'N/A'}<br>`;
     
     let buttons = '';
-    buttons += `<button class="btn btn-info btn-small" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-history"></i> Voir l'historique</button>`;
+    buttons += `<button class="btn btn-info btn-small" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-history"></i> Historique Retours</button>`;
     
     if (asset.status === 'available' || asset.status === 'pending_verification') {
-        // As requested, 'Réserver' button functionality is kept but commented out
-        // buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
+        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
         if (IS_ADMIN) {
              buttons += ` <button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
         }
@@ -846,9 +857,17 @@ function renderIndividualBookingsTable() {
     const dateFilter = document.getElementById('individualFilterDate')._flatpickr.input.value;
     const userFilter = document.getElementById('individualFilterUser').value;
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
-    const filtered = allBookings.individual.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!userFilter || b.user_id == userFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
+    
+    const today = new Date().toISOString().split('T')[0];
+    const filtered = allBookings.individual.filter(b => 
+        b.booking_date >= today &&
+        (!dateFilter || b.booking_date === dateFilter) && 
+        (!userFilter || b.user_id == userFilter) && 
+        (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter)))
+    );
+
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation future correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
         row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
@@ -859,9 +878,16 @@ function renderMissionBookingsTable() {
     const tableBody = document.getElementById('mission-active-bookings-table');
     const dateFilter = document.getElementById('missionFilterDate')._flatpickr.input.value;
     const missionFilter = document.getElementById('missionFilterMission').value.toLowerCase();
-    const filtered = allBookings.mission.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
+    
+    const today = new Date().toISOString().split('T')[0];
+    const filtered = allBookings.mission.filter(b => 
+        b.booking_date >= today &&
+        (!dateFilter || b.booking_date === dateFilter) && 
+        (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter)))
+    );
+
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation future correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
         row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
@@ -870,16 +896,34 @@ function renderMissionBookingsTable() {
 
 function renderUsageHistoryTable() {
     const tableBody = document.getElementById('usage-history-table');
-    const dateFilter = document.getElementById('historyFilterDate')._flatpickr.input.value;
+    const dateRange = document.getElementById('historyFilterDate')._flatpickr.selectedDates;
+    const itemFilter = document.getElementById('historyFilterItem').value;
     const userFilter = document.getElementById('historyFilterUser').value;
     const missionFilter = document.getElementById('historyFilterMission').value.toLowerCase();
-    const filtered = usageHistory.filter(h => (!dateFilter || h.booking_date === dateFilter) && (!userFilter || h.user_id == userFilter) && (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter))));
+
+    const filtered = usageHistory.filter(h => {
+        const bookingDate = new Date(h.booking_date);
+        const dateMatch = (dateRange.length === 0) || (bookingDate >= dateRange[0] && (dateRange.length === 1 || bookingDate <= dateRange[1]));
+        return dateMatch &&
+            (!itemFilter || h.asset_id == itemFilter) &&
+            (!userFilter || h.user_id == userFilter) &&
+            (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter)));
+    });
+
     tableBody.innerHTML = '';
     if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
-    const statusBadges = { completed: 'badge-secondary', cancelled: 'badge-danger' };
+    
     filtered.forEach(h => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td><td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>`;
+        const checkoutTime = h.checkout_time ? new Date(h.checkout_time).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
+        const checkinTime = h.checkin_time ? new Date(h.checkin_time).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
+        row.innerHTML = `
+            <td>${h.asset_name || '(Supprimé)'}</td>
+            <td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td>
+            <td>${h.mission || 'N/A'}</td>
+            <td>${checkoutTime}</td>
+            <td>${checkinTime}</td>
+        `;
     });
 }
 
@@ -913,7 +957,7 @@ async function openBookingModal(assetId) {
         datePicker.set('disable', data.booked_dates);
         if (data.booked_dates && data.booked_dates.length > 0) {
             const todayStr = new Date().toISOString().split('T')[0];
-            const futureDates = data.booked_dates.filter(d => d > todayStr).map(d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR'));
+            const futureDates = data.booked_dates.filter(d => d >= todayStr).map(d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR'));
             if (futureDates.length > 0) {
                 $('#futureBookingsInfo').html(`<strong>Déjà réservé le:</strong> ${futureDates.join(', ')}`).show();
             }
@@ -948,18 +992,14 @@ async function openHistoryModal(assetId, assetName) {
     $('#historyModal').modal('show');
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
-        if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
-        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
+        if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique de retour pour cet article.</p>'); return; }
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
         data.history.forEach(rec => {
-            const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
-            const checkinTime = (rec.status === 'completed' || rec.status === 'cancelled') && rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
-            
+            const checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'N/A';
             tableHtml += `<tr>
-                            <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
                             <td>${(rec.prenom || '')} ${(rec.nom || '')}</td>
                             <td>${rec.mission || 'N/A'}</td>
-                            <td><span class="badge badge-info">${rec.status}</span></td>
                           </tr>`;
         });
         tableHtml += '</tbody></table></div>';
@@ -972,12 +1012,20 @@ async function openHistoryModal(assetId, assetName) {
 function startScanning() {
     if (codeReader) codeReader.reset();
     codeReader = new ZXing.BrowserMultiFormatReader();
+    $('#scanner-ui').show();
     $('#startScanBtn').hide();
-    $('#stopScanBtn').show();
+    
+    const currentTab = document.querySelector('.tab.active').dataset.tab;
+
     codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
         if (result) {
             stopScanning();
-            processScanResult(result.text);
+            if (currentTab === 'add_asset') {
+                document.getElementById('add_barcode').value = result.text;
+                showNotification('Code-barres inséré dans le formulaire.', 'info');
+            } else {
+                processScanResult(result.text);
+            }
         }
         if (err && !(err instanceof ZXing.NotFoundException)) {
           console.error(err);
@@ -996,9 +1044,12 @@ function stopScanning() {
         codeReader = null;
     }
     const videoElem = document.getElementById('video');
-    if (videoElem && videoElem.srcObject) videoElem.srcObject.getTracks().forEach(track => track.stop());
+    if (videoElem && videoElem.srcObject) {
+        videoElem.srcObject.getTracks().forEach(track => track.stop());
+        videoElem.srcObject = null;
+    }
+    $('#scanner-ui').hide();
     $('#startScanBtn').show();
-    $('#stopScanBtn').hide();
 }
 
 async function processScanResult(barcode) {
@@ -1161,7 +1212,7 @@ async function handleUpdateAsset(e) {
     const assetData = {
         asset_id: $('#edit_asset_id').val(), barcode: $('#edit_barcode').val(), asset_type: type, asset_name: $('#edit_asset_name').val(),
         brand: $('#edit_brand').val(), category_id: $('#edit_category_id').val() || null,
-        serial_or_plate: type === 'tool' ? $('#edit_serial_or_plate_tool').val() : $('#edit_serial_or_plate_vehicle').val(),
+        serial_or_plate: type === 'tool' ? $('#edit_serial_or_plate_tool').val() : $('#add_serial_or_plate_vehicle').val(),
         position_or_info: type === 'tool' ? $('#edit_position_or_info_tool').val() : null,
         fuel_level: type === 'vehicle' ? $('#edit_fuel_level').val() : null,
     };
