@@ -8,23 +8,20 @@ require_once 'db-connection.php';
 header('Content-Type: application/json');
 $currentUser = getCurrentUser();
 $action = '';
-// Check if the request content type is JSON
+
+// This logic correctly determines the action from either a GET request or a POST request with JSON
 $contentType = isset($_SERVER["CONTENT_TYPE"]) ? trim($_SERVER["CONTENT_TYPE"]) : '';
 if (strpos($contentType, 'application/json') !== false) {
-    // Attempt to read and decode JSON input
     $jsonInput = file_get_contents('php://input');
     $inputData = json_decode($jsonInput, true);
-
-    // If JSON is successfully decoded, use it
-    if (json_last_error() === JSON_ERROR_NONE) {
-        $action = $inputData['action'] ?? '';
+    if (json_last_error() === JSON_ERROR_NONE && isset($inputData['action'])) {
+        $action = $inputData['action'];
     }
 }
-
-// Fallback to $_REQUEST if action not found in JSON or if not a JSON request
 if (empty($action) && isset($_REQUEST['action'])) {
     $action = $_REQUEST['action'];
 }
+
 
 try {
     switch ($action) {
@@ -62,7 +59,7 @@ try {
         case 'update_report_status': updateReportStatus($conn, $currentUser); break;
             
         default:
-            throw new Exception("Action non valide ou non spécifiée.");
+            throw new Exception("Action non valide ou non spécifiée: '{$action}'");
     }
 } catch (PDOException $e) {
     error_log("Database Error in inventory-handler.php: " . $e->getMessage());
@@ -79,7 +76,7 @@ function getAssetHistory($conn) {
     // This query now correctly fetches only completed bookings for the history modal
     $sql = "SELECT b.mission, b.checkin_time, u.prenom, u.nom
             FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
-            WHERE b.asset_id = ? AND b.status = 'completed'
+            WHERE b.asset_id = ? AND b.status = 'completed' AND b.checkin_time IS NOT NULL
             ORDER BY b.checkin_time DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$asset_id]);
@@ -184,19 +181,19 @@ function verifyItemReturn($conn, $user) {
 
     $conn->beginTransaction();
     try {
-        // Find the active booking to update
-        $stmt_booking = $conn->prepare("UPDATE Bookings SET status = 'completed', checkin_time = GETDATE() WHERE asset_id = ? AND status = 'active' RETURNING user_id");
+        // Update the active booking to 'completed'
+        $stmt_booking = $conn->prepare("UPDATE Bookings SET status = 'completed', checkin_time = GETDATE() WHERE asset_id = ? AND status = 'active'");
         $stmt_booking->execute([$asset_id]);
-        $booking_user = $stmt_booking->fetch(PDO::FETCH_ASSOC);
 
-        // Update inventory status
-        $stmt_inventory = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL WHERE asset_id = ?");
+        // Update inventory status to 'available' and clear user assignment
+        $stmt_inventory = $conn->prepare("UPDATE Inventory SET status = 'available', assigned_to_user_id = NULL, assigned_mission = NULL, last_modified = GETDATE() WHERE asset_id = ?");
         $stmt_inventory->execute([$asset_id]);
 
         if ($stmt_inventory->rowCount() > 0) {
             $conn->commit();
             respondWithSuccess([], "Retour vérifié et l'actif est maintenant disponible.");
         } else {
+            $conn->rollBack();
             throw new Exception("L'actif n'a pas pu être trouvé ou a déjà été vérifié.");
         }
     } catch (Exception $e) {
@@ -207,6 +204,7 @@ function verifyItemReturn($conn, $user) {
 
 
 function getInUseItems($conn) {
+    if (!getCurrentUser()['role'] === 'admin') respondWithError("Accès non autorisé.", 403);
     $sql = "
         SELECT 
             i.asset_name, 
@@ -341,16 +339,12 @@ function processScan($conn, $user) {
     if ($asset['status'] === 'in-use') {
         $conn->beginTransaction();
         try {
-            // Update the booking to completed and set the check-in time
-            $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'completed', checkin_time = GETDATE() WHERE asset_id = ? AND status = 'active'");
-            $stmt_update_booking->execute([$asset['asset_id']]);
-
             // Set inventory to PENDING VERIFICATION, keeping assigned_to_user_id for tracking who returned it
             $stmt_update_inventory = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
             $stmt_update_inventory->execute([$asset['asset_id']]);
             
             $conn->commit();
-            respondWithSuccess(['scan_code' => 'return_success'], "Actif retourné. En attente de vérification.");
+            respondWithSuccess(['scan_code' => 'return_success'], "Actif retourné. En attente de vérification par un admin.");
         } catch (Exception $e) {
             $conn->rollBack();
             throw $e;
@@ -580,6 +574,7 @@ function deleteAsset($conn, $user) {
             $conn->commit();
             respondWithSuccess([], "Actif et toutes les données associées ont été supprimés.");
         } else {
+            $conn->rollBack();
             throw new Exception("L'actif à supprimer n'a pas été trouvé.");
         }
     } catch (Exception $e) {
