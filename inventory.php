@@ -73,9 +73,10 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="verify_return"><i class="fas fa-user-check"></i> Vérifier Retour</div>
-                <div class="tab" data-tab="in_use_items"><i class="fas fa-exclamation-triangle"></i> Matériel en Utilisation</div>
+                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
                 <div class="tab" data-tab="reports"><i class="fas fa-flag"></i> Rapports</div>
             <?php endif; ?>
+            <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
                 <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
@@ -117,7 +118,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
         
         <div id="individual-bookings-content" class="booking-content-pane active">
             <div class="card">
-                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Futures)</h3>
+                <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
                 <div class="booking-filters">
                     <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
@@ -136,7 +137,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
 
         <div id="mission-bookings-content" class="booking-content-pane">
             <div class="card">
-                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Futures)</h3>
+                <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
                  <div class="booking-filters">
                     <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
@@ -163,7 +164,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date de Sortie</th><th>Date de Retour</th><th>Actif</th><th>Utilisé par</th><th>Mission</th></tr>
+                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th></tr>
                         </thead>
                         <tbody id="usage-history-table"></tbody>
                     </table>
@@ -172,6 +173,17 @@ $isAdmin = ($currentUser['role'] === 'admin');
         </div>
     </div>
     
+    <div id="scanner" class="tab-content">
+        <div class="card">
+             <h3 class="text-center mb-4">Scanner un Code-barres</h3>
+             <div class="scanner-container"><video id="video" autoplay playsinline></video></div>
+             <div class="text-center mt-3">
+                <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
+                <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
+            </div>
+        </div>
+    </div>
+
     <?php if ($isAdmin): ?>
     <div id="verify_return" class="tab-content">
         <div class="card">
@@ -193,15 +205,15 @@ $isAdmin = ($currentUser['role'] === 'admin');
         </div>
     </div>
     
-    <div id="in_use_items" class="tab-content">
+    <div id="missing_items" class="tab-content">
         <div class="card">
-            <h3 class="mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Matériel en Utilisation</h3>
+            <h3 class="mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Matériel Manquant ou Non Retourné</h3>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead class="thead-light">
                         <tr><th>Actif</th><th>Code-barres</th><th>Sorti par</th><th>Date de réservation</th><th>Mission</th></tr>
                     </thead>
-                    <tbody id="in-use-items-table"></tbody>
+                    <tbody id="missing-items-table"></tbody>
                 </table>
             </div>
         </div>
@@ -219,7 +231,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                             <th>Signalé par</th>
                             <th>Type</th>
                             <th>Commentaires</th>
-                            <th>Statut</th>
+                            
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -234,15 +246,6 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <h3>Ajouter un Nouvel Actif</h3>
             <form id="addAssetForm">
             </form>
-             <hr class="my-4">
-            <div class="card">
-             <h3 class="text-center mb-4">Scanner un Code-barres</h3>
-             <div class="scanner-container"><video id="video" autoplay playsinline></video></div>
-             <div class="text-center mt-3">
-                <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
-                <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
-            </div>
-        </div>
         </div>
     </div>
 
@@ -375,10 +378,10 @@ let inventory = [];
 let assetCategories = [];
 let allBookings = { individual: [], mission: [] };
 let usageHistory = [];
-let inUseItems = [];
+let missingItems = [];
 let itemsForVerification = [];
 let allUsers = [];
-let selectedCategoryId = 'all';
+let selectedCategoryId = 'all'; 
 let codeReader = null;
 let datePicker = null;
 
@@ -412,7 +415,7 @@ async function fetchAllData() {
         ];
 
         if (IS_ADMIN) {
-            apiCalls.push(apiCall('get_in_use_items', 'GET'));
+            apiCalls.push(apiCall('get_missing_items', 'GET'));
             apiCalls.push(apiCall('get_items_for_verification', 'GET'));
             apiCalls.push(apiCall('get_reports', 'GET'));
         }
@@ -427,7 +430,7 @@ async function fetchAllData() {
         allUsers = results[4].users || [];
         
         if (IS_ADMIN) {
-            inUseItems = results[5].in_use_items || [];
+            missingItems = results[5].missing_items || [];
             itemsForVerification = results[6].items_for_verification || [];
             reports = results[7].reports || [];
         }
@@ -490,14 +493,14 @@ function renderBookingTab() {
     renderUsageHistoryTable();
 }
 
-function renderInUseItemsTab() {
-    const tableBody = document.getElementById('in-use-items-table');
+function renderMissingItemsTab() {
+    const tableBody = document.getElementById('missing-items-table');
     tableBody.innerHTML = '';
-    if (inUseItems.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun matériel en utilisation.</td></tr>';
+    if (missingItems.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Aucun materiel en utilisation.</td></tr>';
         return;
     }
-    inUseItems.forEach(item => {
+    missingItems.forEach(item => {
         const row = tableBody.insertRow();
         row.innerHTML = `<td>${item.asset_name}</td><td>${item.barcode}</td><td>${item.prenom} ${item.nom}</td><td>${new Date(item.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${item.mission || 'N/A'}</td>`;
     });
@@ -660,7 +663,9 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
     
-    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'in_use_items', 'verify_return', 'reports'].includes(tabName);
+    if (tabName !== 'scanner' && codeReader) stopScanning();
+
+    const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items', 'verify_return', 'reports'].includes(tabName);
     
     if (needsDataRefresh) {
         loadingOverlay.style.display = 'flex';
@@ -669,7 +674,7 @@ function showTab(tabName) {
             else if (tabName === 'booking') renderBookingTab();
             else if (IS_ADMIN) {
                 if (tabName === 'manage_categories') renderCategoriesList();
-                else if (tabName === 'in_use_items') renderInUseItemsTab();
+                else if (tabName === 'missing_items') renderMissingItemsTab();
                 else if (tabName === 'verify_return') renderVerifyReturnTab();
                 else if (tabName === 'reports') renderReportsTab();
             }
@@ -838,30 +843,28 @@ function escapeSingleQuotes(str) { return typeof str === 'string' ? str.replace(
 
 function renderIndividualBookingsTable() {
     const tableBody = document.getElementById('individual-active-bookings-table');
-    const today = new Date().toISOString().split('T')[0];
     const dateFilter = document.getElementById('individualFilterDate')._flatpickr.input.value;
     const userFilter = document.getElementById('individualFilterUser').value;
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
-    const filtered = allBookings.individual.filter(b => (b.booking_date >= today) && (!dateFilter || b.booking_date === dateFilter) && (!userFilter || b.user_id == userFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
+    const filtered = allBookings.individual.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!userFilter || b.user_id == userFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td>${(IS_ADMIN || b.user_id == CURRENT_USER_ID) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
 function renderMissionBookingsTable() {
     const tableBody = document.getElementById('mission-active-bookings-table');
-    const today = new Date().toISOString().split('T')[0];
     const dateFilter = document.getElementById('missionFilterDate')._flatpickr.input.value;
     const missionFilter = document.getElementById('missionFilterMission').value.toLowerCase();
-    const filtered = allBookings.mission.filter(b => (b.booking_date >= today) && (!dateFilter || b.booking_date === dateFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
+    const filtered = allBookings.mission.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${IS_ADMIN ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
@@ -873,11 +876,10 @@ function renderUsageHistoryTable() {
     const filtered = usageHistory.filter(h => (!dateFilter || h.booking_date === dateFilter) && (!userFilter || h.user_id == userFilter) && (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter))));
     tableBody.innerHTML = '';
     if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
+    const statusBadges = { completed: 'badge-secondary', cancelled: 'badge-danger' };
     filtered.forEach(h => {
         const row = tableBody.insertRow();
-        const checkoutTime = h.checkout_time ? new Date(h.checkout_time).toLocaleString('fr-FR') : 'N/A';
-        const checkinTime = h.checkin_time ? new Date(h.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
-        row.innerHTML = `<td>${checkoutTime}</td><td>${checkinTime}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td>`;
+        row.innerHTML = `<td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td><td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>`;
     });
 }
 
@@ -947,16 +949,17 @@ async function openHistoryModal(assetId, assetName) {
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
         if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
-        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de Sortie</th><th>Date de Retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
         data.history.forEach(rec => {
             const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
-            const checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
+            const checkinTime = (rec.status === 'completed' || rec.status === 'cancelled') && rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
             
             tableHtml += `<tr>
                             <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
                             <td>${(rec.prenom || '')} ${(rec.nom || '')}</td>
                             <td>${rec.mission || 'N/A'}</td>
+                            <td><span class="badge badge-info">${rec.status}</span></td>
                           </tr>`;
         });
         tableHtml += '</tbody></table></div>';
