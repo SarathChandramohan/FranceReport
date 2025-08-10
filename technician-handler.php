@@ -335,11 +335,11 @@ function returnItem($conn, $userId, $assetId) {
         $mission_group_id = $stmt_find_mission->fetchColumn();
 
         if ($mission_group_id) {
-            // Mark the current day's booking as 'completed'
-            $stmt_complete_mission = $conn->prepare(
-                "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND mission_group_id = ? AND booking_date = ?"
-            );
-            $stmt_complete_mission->execute([$assetId, $mission_group_id, $today]);
+    // Mark the current day's booking as 'completed'
+    $stmt_complete_mission = $conn->prepare(
+        "UPDATE Bookings SET status = 'completed', user_id = ? WHERE asset_id = ? AND mission_group_id = ? AND booking_date = ?"
+    );
+    $stmt_complete_mission->execute([$userId, $assetId, $mission_group_id, $today]);
 
             // Cancel any future bookings for this mission group
             $stmt_cancel_future_mission = $conn->prepare(
