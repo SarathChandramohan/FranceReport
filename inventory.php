@@ -951,34 +951,58 @@ async function handleSaveBooking() {
 }
 
 async function openHistoryModal(assetId, assetName) {
-    const modal = document.getElementById('historyModal');
-    const modalTitle = document.getElementById('historyModalTitle');
+    // --- Corrected the ID to 'historyModalLabel' ---
+    const modalTitle = document.getElementById('historyModalLabel');
     const modalBody = document.getElementById('historyModalBody');
     const historySpinner = document.getElementById('historySpinner');
+    const historyModalElement = document.getElementById('historyModal');
+    
+    // Ensure the modal element exists before trying to create an instance
+    if (!historyModalElement) {
+        console.error("History modal element not found!");
+        return;
+    }
+    const modal = new bootstrap.Modal(historyModalElement);
 
-    modalTitle.textContent = 'Historique pour : ' + assetName;
-    modalBody.innerHTML = ''; // Clear previous content
-    historySpinner.style.display = 'block';
+    // Set the title of the modal
+    if (modalTitle) {
+        modalTitle.textContent = 'Historique pour : ' + assetName;
+    }
+
+    // Clear previous content and show spinner
+    if (modalBody) {
+        modalBody.innerHTML = '';
+    }
+    if (historySpinner) {
+        historySpinner.style.display = 'block';
+    }
+
+    // Show the modal
+    modal.show();
 
     try {
-        // Here we call our API to get the history data
+        // Call the API to get history data
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
 
-        historySpinner.style.display = 'none';
+        if (historySpinner) {
+            historySpinner.style.display = 'none';
+        }
 
-        if (data.history.length === 0) {
-            modalBody.innerHTML = '<p>Aucun historique trouvé pour cet article.</p>';
+        // Check if there is any history to display
+        if (!data || !data.history || data.history.length === 0) {
+            if (modalBody) {
+                modalBody.innerHTML = '<p>Aucun historique trouvé pour cet article.</p>';
+            }
             return;
         }
 
-        // --- Table Creation ---
+        // --- Table Creation (Status column is removed) ---
         let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
 
         data.history.forEach(rec => {
             let checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
             let checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'N/A';
 
-            // This is where the row for each history record is created
             tableHtml += `<tr>
                             <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
@@ -988,11 +1012,17 @@ async function openHistoryModal(assetId, assetName) {
         });
 
         tableHtml += '</tbody></table></div>';
-        modalBody.innerHTML = tableHtml;
+        if (modalBody) {
+            modalBody.innerHTML = tableHtml;
+        }
 
     } catch (error) {
-        historySpinner.style.display = 'none';
-        modalBody.innerHTML = `<p class="text-danger">Erreur lors de la récupération de l'historique : ${error.message}</p><p>Veuillez réessayer plus tard.</p>`;
+        if (historySpinner) {
+            historySpinner.style.display = 'none';
+        }
+        if (modalBody) {
+            modalBody.innerHTML = `<p class="text-danger">Erreur lors de la récupération de l'historique : ${error.message}</p><p>Veuillez réessayer plus tard.</p>`;
+        }
         console.error("Error fetching asset history:", error);
     }
 }
