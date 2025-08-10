@@ -256,14 +256,14 @@ function getAllBookings($conn) {
     // 1. All 'active' items, regardless of the date.
     // 2. All 'booked' items for today or a future date.
     $sql_individual = "
-        SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
-        FROM Bookings b 
-        LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE 
-            b.user_id IS NOT NULL AND
-            (b.status = 'active' OR (b.status = 'booked' AND b.booking_date >= ?))
-        ORDER BY b.booking_date ASC, a.asset_name ASC";
+    SELECT b.booking_id, b.booking_date, b.mission, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
+    FROM Bookings b 
+    LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
+    LEFT JOIN Users u ON b.user_id = u.user_id 
+    WHERE 
+        b.user_id IS NOT NULL AND
+        (b.status = 'active' OR (b.status = 'booked' AND b.booking_date >= ?))
+    ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
     $stmt_individual->execute([$today]);
     $individual_bookings = $stmt_individual->fetchAll(PDO::FETCH_ASSOC);
