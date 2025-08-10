@@ -951,16 +951,34 @@ async function handleSaveBooking() {
 }
 
 async function openHistoryModal(assetId, assetName) {
-    $('#historyModalAssetName').text(assetName);
-    const modalBody = $('#historyModalBody');
-    modalBody.html('<div class="text-center"><div class="spinner-border text-primary"></div></div>');
-    $('#historyModal').modal('show');
-   try {
+    const modal = document.getElementById('historyModal');
+    const modalTitle = document.getElementById('historyModalTitle');
+    const modalBody = document.getElementById('historyModalBody');
+    const historySpinner = document.getElementById('historySpinner');
+
+    modalTitle.textContent = 'Historique pour : ' + assetName;
+    modalBody.innerHTML = ''; // Clear previous content
+    historySpinner.style.display = 'block';
+
+    try {
+        // Here we call our API to get the history data
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
-        if (data.history.length === 0) { /* ... */ }
+
+        historySpinner.style.display = 'none';
+
+        if (data.history.length === 0) {
+            modalBody.innerHTML = '<p>Aucun historique trouvé pour cet article.</p>';
+            return;
+        }
+
+        // --- Table Creation ---
         let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
+
         data.history.forEach(rec => {
-            // ...
+            let checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
+            let checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'N/A';
+
+            // This is where the row for each history record is created
             tableHtml += `<tr>
                             <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
@@ -968,10 +986,14 @@ async function openHistoryModal(assetId, assetName) {
                             <td>${rec.mission || 'N/A'}</td>
                           </tr>`;
         });
+
         tableHtml += '</tbody></table></div>';
-        modalBody.html(tableHtml);
+        modalBody.innerHTML = tableHtml;
+
     } catch (error) {
-        modalBody.html('<p class="text-danger text-center">Erreur de chargement.</p>');
+        historySpinner.style.display = 'none';
+        modalBody.innerHTML = `<p class="text-danger">Erreur lors de la récupération de l'historique : ${error.message}</p><p>Veuillez réessayer plus tard.</p>`;
+        console.error("Error fetching asset history:", error);
     }
 }
 
