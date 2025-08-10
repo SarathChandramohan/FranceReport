@@ -73,7 +73,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="verify_return"><i class="fas fa-user-check"></i> Vérifier Retour</div>
-                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Matériel Manquant</div>
+                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Materiel En Utilisationt</div>
                 <div class="tab" data-tab="reports"><i class="fas fa-flag"></i> Rapports</div>
             <?php endif; ?>
             <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
