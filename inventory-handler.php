@@ -40,7 +40,7 @@ try {
         case 'book_asset': bookAsset($conn, $currentUser); break;
         case 'get_all_bookings': getAllBookings($conn); break;
         case 'get_asset_availability': getAssetAvailability($conn); break;
-        case 'get_asset_history': getAssetHistory($conn); break;
+        case 'get_asset_history': ($conn); break;
         case 'get_booking_history': getBookingHistory($conn); break; 
         case 'cancel_booking': cancelBooking($conn, $currentUser); break;
         case 'get_missing_items': getMissingItems($conn); break;
@@ -76,7 +76,7 @@ function getAssetHistory($conn) {
     $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
     if (!$asset_id) throw new Exception("ID de l'actif manquant.");
 
-    $sql = "SELECT b.booking_date, b.mission, b.status, u.prenom, u.nom, b.created_at as checkout_time,
+    $sql = "SELECT b.booking_date, b.mission, u.prenom, u.nom, b.created_at as checkout_time,
             (SELECT i.last_modified FROM Inventory i WHERE i.asset_id = b.asset_id) as checkin_time
             FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
             WHERE b.asset_id = ? AND b.status = 'completed'
