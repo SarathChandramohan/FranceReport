@@ -244,28 +244,31 @@ function getBookingHistory($conn) {
 function getAllBookings($conn) {
     $today = date('Y-m-d');
 
-    // Auto-cancel past due bookings that were not picked up
-    // This runs each time the bookings are loaded, acting as a pseudo-cron
+    // Auto-cancel past-due bookings that were never picked up.
+    // This runs each time bookings are loaded, acting as a pseudo-cron job.
     $sql_cancel_past = "UPDATE Bookings SET status = 'cancelled' WHERE status = 'booked' AND booking_date < ?";
     $stmt_cancel_past = $conn->prepare($sql_cancel_past);
     $stmt_cancel_past->execute([$today]);
 
-
-    // Fetch individual bookings for today and future that are 'booked' or 'active'
+    // Fetch individual bookings.
+    // This now correctly includes:
+    // 1. All 'active' items, regardless of the date.
+    // 2. All 'booked' items for today or a future date.
     $sql_individual = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE b.status IN ('booked', 'active') -- Show items waiting for pickup or already picked up
-        AND b.booking_date >= ? 
-        AND b.user_id IS NOT NULL
+        WHERE 
+            b.user_id IS NOT NULL AND
+            (b.status = 'active' OR (b.status = 'booked' AND b.booking_date >= ?))
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
     $stmt_individual->execute([$today]);
     $individual_bookings = $stmt_individual->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch mission bookings for today and future that are still 'booked'
+    // Fetch mission bookings for today and the future that are still 'booked'.
+    // This logic remains unchanged.
     $sql_mission = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
         FROM Bookings b 
