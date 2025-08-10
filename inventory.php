@@ -957,18 +957,23 @@ async function openHistoryModal(assetId, assetName) {
     $('#historyModal').modal('show');
     try {
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
-        if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
-        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
+        if (data.history.length === 0) {
+            modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>');
+            return;
+        }
+        // Removed 'Statut' from the table header here
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
         data.history.forEach(rec => {
             const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
-            const checkinTime = (rec.status === 'completed' || rec.status === 'cancelled') && rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
+            // Simplified the checkinTime logic as the backend now only sends 'completed' records
+            const checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
             
+            // Removed the table cell for 'status' from the row below
             tableHtml += `<tr>
                             <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
                             <td>${(rec.prenom || '')} ${(rec.nom || '')}</td>
                             <td>${rec.mission || 'N/A'}</td>
-                            <td><span class="badge badge-info">${rec.status}</span></td>
                           </tr>`;
         });
         tableHtml += '</tbody></table></div>';
@@ -977,6 +982,7 @@ async function openHistoryModal(assetId, assetName) {
         modalBody.html('<p class="text-danger text-center">Erreur de chargement.</p>');
     }
 }
+
 
 function startScanning() {
     if (codeReader) codeReader.reset();
