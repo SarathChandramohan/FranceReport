@@ -79,7 +79,7 @@ function getAssetHistory($conn) {
     $sql = "SELECT b.booking_date, b.mission, b.status, u.prenom, u.nom, b.created_at as checkout_time,
             (SELECT i.last_modified FROM Inventory i WHERE i.asset_id = b.asset_id) as checkin_time
             FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
-            WHERE b.asset_id = ?
+            WHERE b.asset_id = ? AND b.status = 'completed'
             ORDER BY b.booking_date DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$asset_id]);
