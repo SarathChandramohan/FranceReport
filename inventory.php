@@ -843,20 +843,24 @@ function createAssetCard(asset) {
 function escapeSingleQuotes(str) { return typeof str === 'string' ? str.replace(/'/g, "\\'") : ''; }
 
 function renderIndividualBookingsTable() {
-    const searchTerm = document.getElementById('individual-booking-search').value.toLowerCase();
+    const dateFilter = document.getElementById('individualFilterDate').value;
+    const userFilter = document.getElementById('individualFilterUser').value;
+    const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
+
     const tableBody = document.getElementById('individual-active-bookings-table');
 
-    // Filter bookings based on the search term
-    const filtered = bookings.individual.filter(b => {
-        const bookingDate = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
+    // Filter bookings based on the search terms
+    const filtered = allBookings.individual.filter(b => {
+        const bookingDate = b.booking_date;
         const assetName = (b.asset_name || '').toLowerCase();
-        const userName = ((b.prenom || '') + ' ' + (b.nom || '')).toLowerCase();
+        const userId = b.user_id;
         const mission = (b.mission || '').toLowerCase();
 
-        return bookingDate.includes(searchTerm) ||
-               assetName.includes(searchTerm) ||
-               userName.includes(searchTerm) ||
-               mission.includes(searchTerm);
+        const dateMatch = !dateFilter || bookingDate === dateFilter;
+        const userMatch = !userFilter || userId == userFilter;
+        const missionMatch = !missionFilter || mission.includes(missionFilter);
+
+        return dateMatch && userMatch && missionMatch;
     });
 
     // Clear the existing table body
