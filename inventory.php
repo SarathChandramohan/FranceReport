@@ -951,79 +951,30 @@ async function handleSaveBooking() {
 }
 
 async function openHistoryModal(assetId, assetName) {
-    // --- Corrected the ID to 'historyModalLabel' ---
-    const modalTitle = document.getElementById('historyModalLabel');
-    const modalBody = document.getElementById('historyModalBody');
-    const historySpinner = document.getElementById('historySpinner');
-    const historyModalElement = document.getElementById('historyModal');
-    
-    // Ensure the modal element exists before trying to create an instance
-    if (!historyModalElement) {
-        console.error("History modal element not found!");
-        return;
-    }
-    const modal = new bootstrap.Modal(historyModalElement);
-
-    // Set the title of the modal
-    if (modalTitle) {
-        modalTitle.textContent = 'Historique pour : ' + assetName;
-    }
-
-    // Clear previous content and show spinner
-    if (modalBody) {
-        modalBody.innerHTML = '';
-    }
-    if (historySpinner) {
-        historySpinner.style.display = 'block';
-    }
-
-    // Show the modal
-    modal.show();
-
+    $('#historyModalAssetName').text(assetName);
+    const modalBody = $('#historyModalBody');
+    modalBody.html('<div class="text-center"><div class="spinner-border text-primary"></div></div>');
+    $('#historyModal').modal('show');
     try {
-        // Call the API to get history data
         const data = await apiCall('get_asset_history', 'GET', { asset_id: assetId });
-
-        if (historySpinner) {
-            historySpinner.style.display = 'none';
-        }
-
-        // Check if there is any history to display
-        if (!data || !data.history || data.history.length === 0) {
-            if (modalBody) {
-                modalBody.innerHTML = '<p>Aucun historique trouvé pour cet article.</p>';
-            }
-            return;
-        }
-
-        // --- Table Creation (Status column is removed) ---
-        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
-
+        if (data.history.length === 0) { modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>'); return; }
+        let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th><th>Statut</th></tr></thead><tbody>';
         data.history.forEach(rec => {
-            let checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
-            let checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'N/A';
-
+            const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
+            const checkinTime = (rec.status === 'completed' || rec.status === 'cancelled') && rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
+            
             tableHtml += `<tr>
                             <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
                             <td>${(rec.prenom || '')} ${(rec.nom || '')}</td>
                             <td>${rec.mission || 'N/A'}</td>
+                            <td><span class="badge badge-info">${rec.status}</span></td>
                           </tr>`;
         });
-
         tableHtml += '</tbody></table></div>';
-        if (modalBody) {
-            modalBody.innerHTML = tableHtml;
-        }
-
+        modalBody.html(tableHtml);
     } catch (error) {
-        if (historySpinner) {
-            historySpinner.style.display = 'none';
-        }
-        if (modalBody) {
-            modalBody.innerHTML = `<p class="text-danger">Erreur lors de la récupération de l'historique : ${error.message}</p><p>Veuillez réessayer plus tard.</p>`;
-        }
-        console.error("Error fetching asset history:", error);
+        modalBody.html('<p class="text-danger text-center">Erreur de chargement.</p>');
     }
 }
 
