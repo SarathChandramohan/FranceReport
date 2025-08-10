@@ -219,18 +219,19 @@ function getMissingItems($conn) {
 
 function getBookingHistory($conn) {
     $sql = "
-        SELECT 
-            b.booking_id, 
-            b.booking_date, 
-            b.mission, 
-            b.status, 
-            a.asset_name, 
+        SELECT
+            b.booking_id,
+            b.booking_date,
+            b.mission,
+            b.status,
+            a.asset_name,
             u.user_id,
-            u.prenom, 
-            u.nom
-        FROM Bookings b 
-        LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        LEFT JOIN Users u ON b.user_id = u.user_id 
+            u.prenom,
+            u.nom,
+            b.created_at -- This is the submitted date
+        FROM Bookings b
+        LEFT JOIN Inventory a ON b.asset_id = a.asset_id
+        LEFT JOIN Users u ON b.user_id = u.user_id
         WHERE b.status IN ('completed', 'cancelled')
         ORDER BY b.booking_date DESC, b.booking_id DESC";
     $stmt = $conn->prepare($sql);
