@@ -251,13 +251,13 @@ function getAllBookings($conn) {
     $stmt_cancel_past->execute([$today]);
 
 
-    // Fetch individual bookings for today and future that are still 'booked'
+    // Fetch individual bookings for today and future that are 'booked' or 'active'
     $sql_individual = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE b.status = 'booked' -- Only show items waiting to be picked up
+        WHERE b.status IN ('booked', 'active') -- Show items waiting for pickup or already picked up
         AND b.booking_date >= ? 
         AND b.user_id IS NOT NULL
         ORDER BY b.booking_date ASC, a.asset_name ASC";
