@@ -843,16 +843,35 @@ function createAssetCard(asset) {
 function escapeSingleQuotes(str) { return typeof str === 'string' ? str.replace(/'/g, "\\'") : ''; }
 
 function renderIndividualBookingsTable() {
+    const searchTerm = document.getElementById('individual-booking-search').value.toLowerCase();
     const tableBody = document.getElementById('individual-active-bookings-table');
-    const dateFilter = document.getElementById('individualFilterDate')._flatpickr.input.value;
-    const userFilter = document.getElementById('individualFilterUser').value;
-    const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
-    const filtered = allBookings.individual.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!userFilter || b.user_id == userFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
+
+    // Filter bookings based on the search term
+    const filtered = bookings.individual.filter(b => {
+        const bookingDate = new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR');
+        const assetName = (b.asset_name || '').toLowerCase();
+        const userName = ((b.prenom || '') + ' ' + (b.nom || '')).toLowerCase();
+        const mission = (b.mission || '').toLowerCase();
+
+        return bookingDate.includes(searchTerm) ||
+               assetName.includes(searchTerm) ||
+               userName.includes(searchTerm) ||
+               mission.includes(searchTerm);
+    });
+
+    // Clear the existing table body
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+
+    // If no bookings match the filter, display a message
+    if (filtered.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation correspondante.</td></tr>';
+        return;
+    }
+
+    // Populate the table with the filtered bookings
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'primary' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && (IS_ADMIN || b.user_id == CURRENT_USER_ID)) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
+        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td>`;
     });
 }
 
