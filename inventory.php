@@ -847,16 +847,29 @@ function renderIndividualBookingsTable() {
     const userFilter = document.getElementById('individualFilterUser').value;
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
 
+    // Get today's date and set the time to the beginning of the day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const tableBody = document.getElementById('individual-active-bookings-table');
 
-    // Filter bookings based on the search terms
+    // Filter bookings
     const filtered = allBookings.individual.filter(b => {
-        const bookingDate = b.booking_date;
+        // Create a Date object from the booking_date string
+        const bookingDate = new Date(b.booking_date + 'T00:00:00');
+
+        // **New check**: Return false for any bookings in the past
+        if (bookingDate < today) {
+            return false;
+        }
+
+        const bookingDateStr = b.booking_date;
         const assetName = (b.asset_name || '').toLowerCase();
         const userId = b.user_id;
         const mission = (b.mission || '').toLowerCase();
 
-        const dateMatch = !dateFilter || bookingDate === dateFilter;
+        // Check against the filter inputs
+        const dateMatch = !dateFilter || bookingDateStr === dateFilter;
         const userMatch = !userFilter || userId == userFilter;
         const missionMatch = !missionFilter || mission.includes(missionFilter);
 
@@ -866,7 +879,7 @@ function renderIndividualBookingsTable() {
     // Clear the existing table body
     tableBody.innerHTML = '';
 
-    // If no bookings match the filter, display a message
+    // If no bookings match, display a message
     if (filtered.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation correspondante.</td></tr>';
         return;
