@@ -127,8 +127,8 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th><th>Statut</th><th>Action</th></tr>
-                        </thead>
+    <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th></tr>
+</thead>
                         <tbody id="individual-active-bookings-table"></tbody>
                     </table>
                 </div>
