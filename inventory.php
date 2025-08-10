@@ -157,18 +157,19 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="card">
                 <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
                 <div class="booking-filters">
-                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
-                    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="thead-dark">
-                            <tr><th>Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th><th>Statut</th></tr>
-                        </thead>
-                        <tbody id="usage-history-table"></tbody>
-                    </table>
-                </div>
+    <input type="text" id="historyFilterItem" class="form-control" placeholder="Filtrer par article..." style="max-width: 200px;">
+    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
+    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+</div>
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+            <tr><th>Pickedup Date</th><th>Submitted Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th></tr>
+        </thead>
+        <tbody id="usage-history-table"></tbody>
+    </table>
+</div>
             </div>
         </div>
     </div>
@@ -630,7 +631,7 @@ function setupEventListeners() {
     document.getElementById('startScanBtn').addEventListener('click', startScanning);
     document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
-    
+    document.getElementById('historyFilterItem').addEventListener('input', renderUsageHistoryTable);
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterUser').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterMission').addEventListener('input', renderIndividualBookingsTable);
@@ -870,16 +871,24 @@ function renderMissionBookingsTable() {
 
 function renderUsageHistoryTable() {
     const tableBody = document.getElementById('usage-history-table');
+    const itemFilter = document.getElementById('historyFilterItem').value.toLowerCase();
     const dateFilter = document.getElementById('historyFilterDate')._flatpickr.input.value;
     const userFilter = document.getElementById('historyFilterUser').value;
     const missionFilter = document.getElementById('historyFilterMission').value.toLowerCase();
-    const filtered = usageHistory.filter(h => (!dateFilter || h.booking_date === dateFilter) && (!userFilter || h.user_id == userFilter) && (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter))));
+    const filtered = usageHistory.filter(h =>
+        (!itemFilter || (h.asset_name && h.asset_name.toLowerCase().includes(itemFilter))) &&
+        (!dateFilter || h.booking_date === dateFilter) &&
+        (!userFilter || h.user_id == userFilter) &&
+        (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter)))
+    );
     tableBody.innerHTML = '';
     if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
-    const statusBadges = { completed: 'badge-secondary', cancelled: 'badge-danger' };
     filtered.forEach(h => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td><td><span class="badge badge-pill ${statusBadges[h.status] || 'badge-light'}">${h.status}</span></td>`;
+        const pickedupDate = h.booking_date ? new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR') : 'N/A';
+        const submittedDate = h.created_at ? new Date(h.created_at).toLocaleDateString('fr-FR') : 'N/A';
+
+        row.innerHTML = `<td>${pickedupDate}</td><td>${submittedDate}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td>`;
     });
 }
 
