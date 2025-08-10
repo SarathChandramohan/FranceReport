@@ -242,29 +242,40 @@ function getBookingHistory($conn) {
 }
 
 function getAllBookings($conn) {
-    // Fetch individual bookings
+    $today = date('Y-m-d');
+
+    // Auto-cancel past due bookings that were not picked up
+    // This runs each time the bookings are loaded, acting as a pseudo-cron
+    $sql_cancel_past = "UPDATE Bookings SET status = 'cancelled' WHERE status = 'booked' AND booking_date < ?";
+    $stmt_cancel_past = $conn->prepare($sql_cancel_past);
+    $stmt_cancel_past->execute([$today]);
+
+
+    // Fetch individual bookings for today and future that are still 'booked'
     $sql_individual = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode, u.prenom, u.nom, b.user_id 
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
         LEFT JOIN Users u ON b.user_id = u.user_id 
-        WHERE b.status IN ('booked', 'active') 
+        WHERE b.status = 'booked' -- Only show items waiting to be picked up
+        AND b.booking_date >= ? 
         AND b.user_id IS NOT NULL
         ORDER BY b.booking_date ASC, a.asset_name ASC";
     $stmt_individual = $conn->prepare($sql_individual);
-    $stmt_individual->execute();
+    $stmt_individual->execute([$today]);
     $individual_bookings = $stmt_individual->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch mission bookings
+    // Fetch mission bookings for today and future that are still 'booked'
     $sql_mission = "
         SELECT b.booking_id, b.booking_date, b.mission, b.status, a.asset_name, a.barcode
         FROM Bookings b 
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id 
-        WHERE b.status IN ('booked', 'active') 
+        WHERE b.status = 'booked' -- Only show items waiting to be picked up
+        AND b.booking_date >= ? 
         AND b.user_id IS NULL
         ORDER BY b.booking_date ASC, b.mission ASC, a.asset_name ASC";
     $stmt_mission = $conn->prepare($sql_mission);
-    $stmt_mission->execute();
+    $stmt_mission->execute([$today]);
     $mission_bookings = $stmt_mission->fetchAll(PDO::FETCH_ASSOC);
 
     $bookings = [
