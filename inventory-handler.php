@@ -233,6 +233,7 @@ function getBookingHistory($conn) {
         LEFT JOIN Inventory a ON b.asset_id = a.asset_id
         LEFT JOIN Users u ON b.user_id = u.user_id
         WHERE b.status IN ('completed', 'cancelled')
+        AND b.booking_date <= b.created_at
         ORDER BY b.booking_date DESC, b.booking_id DESC";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
