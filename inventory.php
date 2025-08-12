@@ -60,6 +60,34 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .booking-sub-nav .btn { font-weight: 600; }
         .booking-content-pane { display: none; }
         .booking-content-pane.active { display: block; }
+
+        /* ----- MODIFICATION START: CSS for the dropdown ----- */
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f1f1f1;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 5px;
+        }
+
+        .dropdown-content a {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            text-align: left;
+        }
+
+        .dropdown-content a:hover {
+            background-color: #ddd;
+        }
+
+        .tab.dropdown:hover .dropdown-content {
+            display: block;
+        }
+        /* ----- MODIFICATION END ----- */
     </style>
 </head>
 <body>
@@ -76,14 +104,23 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Materiel En Utilisationt</div>
                 <div class="tab" data-tab="reports"><i class="fas fa-flag"></i> Rapports</div>
             <?php endif; ?>
-            <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
+            
             <?php if ($isAdmin): ?>
-                <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
+                <div class="tab dropdown" data-tab="add_asset">
+                    <i class="fas fa-plus-circle"></i> Ajouter un Actif <i class="fas fa-caret-down"></i>
+                    <div class="dropdown-content">
+                        <a href="#" class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</a>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
+            <?php endif; ?>
+            <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
             <?php endif; ?>
         </div>
     </div>
-
+    
     <div id="inventory" class="tab-content active">
         <div class="card position-relative">
             <h3 class="mb-3">Liste des Actifs</h3>
@@ -370,7 +407,6 @@ $isAdmin = ($currentUser['role'] === 'admin');
 <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
-
 <script>
 const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo $isAdmin ? 'true' : 'false'; ?>;
