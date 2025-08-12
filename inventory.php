@@ -17,7 +17,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; }
         .container-fluid { padding-top: 20px; }
-        .card { background-color: #ffffff; border-radius: 15px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); border: none; margin-bottom: 25px; padding: 25px; }
+        .card { background-color: #ffffff; border-radius: 15px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); border: none; margin-bottom: 25px; padding: 25px; height: 100%; }
         .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e9ecef; }
         .tab { padding: 12px 25px; background: #e9ecef; color: #495057; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; text-align: center; }
         .tab.active { background: #6A0DAD; color: white; box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25); transform: translateY(-2px); }
@@ -60,34 +60,6 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .booking-sub-nav .btn { font-weight: 600; }
         .booking-content-pane { display: none; }
         .booking-content-pane.active { display: block; }
-
-        /* ----- MODIFICATION START: CSS for the dropdown ----- */
-        .dropdown-content {
-            display: none;
-            position: absolute;
-            background-color: #f1f1f1;
-            min-width: 160px;
-            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-            z-index: 1;
-            border-radius: 5px;
-        }
-
-        .dropdown-content a {
-            color: black;
-            padding: 12px 16px;
-            text-decoration: none;
-            display: block;
-            text-align: left;
-        }
-
-        .dropdown-content a:hover {
-            background-color: #ddd;
-        }
-
-        .tab.dropdown:hover .dropdown-content {
-            display: block;
-        }
-        /* ----- MODIFICATION END ----- */
     </style>
 </head>
 <body>
@@ -101,26 +73,14 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="tab" data-tab="booking"><i class="fas fa-book-open"></i> Booking</div>
             <?php if ($isAdmin): ?>
                 <div class="tab" data-tab="verify_return"><i class="fas fa-user-check"></i> Vérifier Retour</div>
-                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Materiel En Utilisationt</div>
+                <div class="tab" data-tab="missing_items"><i class="fas fa-exclamation-triangle"></i> Materiel En Utilisation</div>
                 <div class="tab" data-tab="reports"><i class="fas fa-flag"></i> Rapports</div>
-            <?php endif; ?>
-            
-            <?php if ($isAdmin): ?>
-                <div class="tab dropdown" data-tab="add_asset">
-                    <i class="fas fa-plus-circle"></i> Ajouter un Actif <i class="fas fa-caret-down"></i>
-                    <div class="dropdown-content">
-                        <a href="#" class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</a>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="tab" data-tab="scanner"><i class="fas fa-barcode"></i> Scanner</div>
-            <?php endif; ?>
-            <?php if ($isAdmin): ?>
+                <div class="tab" data-tab="add_asset"><i class="fas fa-plus-circle"></i> Ajouter un Actif</div>
                 <div class="tab" data-tab="manage_categories"><i class="fas fa-tags"></i> Gérer les Catégories</div>
             <?php endif; ?>
         </div>
     </div>
-    
+
     <div id="inventory" class="tab-content active">
         <div class="card position-relative">
             <h3 class="mb-3">Liste des Actifs</h3>
@@ -164,8 +124,8 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-    <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th></tr>
-</thead>
+                            <tr><th>Date</th><th>Actif</th><th>Réservé par</th><th>Mission</th></tr>
+                        </thead>
                         <tbody id="individual-active-bookings-table"></tbody>
                     </table>
                 </div>
@@ -194,34 +154,23 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="card">
                 <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
                 <div class="booking-filters">
-    <input type="text" id="historyFilterItem" class="form-control" placeholder="Filtrer par article..." style="max-width: 200px;">
-    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
-    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
-</div>
-<div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead class="thead-dark">
-            <tr><th>Pickedup Date</th><th>Submitted Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th></tr>
-        </thead>
-        <tbody id="usage-history-table"></tbody>
-    </table>
-</div>
+                    <input type="text" id="historyFilterItem" class="form-control" placeholder="Filtrer par article..." style="max-width: 200px;">
+                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
+                     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
+                    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr><th>Pickedup Date</th><th>Submitted Date</th><th>Actif</th><th>Utilisé par</th><th>Mission</th></tr>
+                        </thead>
+                        <tbody id="usage-history-table"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
     
-    <div id="scanner" class="tab-content">
-        <div class="card">
-             <h3 class="text-center mb-4">Scanner un Code-barres</h3>
-             <div class="scanner-container"><video id="video" autoplay playsinline></video></div>
-             <div class="text-center mt-3">
-                <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
-                <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
-            </div>
-        </div>
-    </div>
-
     <?php if ($isAdmin): ?>
     <div id="verify_return" class="tab-content">
         <div class="card">
@@ -280,12 +229,36 @@ $isAdmin = ($currentUser['role'] === 'admin');
     </div>
     
     <div id="add_asset" class="tab-content">
-         <div class="card">
-            <h3>Ajouter un Nouvel Actif</h3>
-            <form id="addAssetForm">
-            </form>
+        <div class="row">
+            <div class="col-lg-7">
+                <div class="card">
+                    <h3>Ajouter un Nouvel Actif</h3>
+                    <p class="text-muted small mt-2">
+                        Remplissez le formulaire ci-dessous pour ajouter manuellement un nouvel outil ou véhicule. 
+                        Vous pouvez également utiliser le scanner sur cette page pour rechercher un code-barres existant ou en pré-remplir un nouveau.
+                    </p>
+                    <form id="addAssetForm">
+                        </form>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card">
+                    <h3 class="text-center mb-4"><i class="fas fa-barcode mr-2"></i>Scanner un Actif</h3>
+                    <div class="scanner-container">
+                        <video id="video" autoplay playsinline></video>
+                    </div>
+                    <div class="text-center mt-3">
+                        <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
+                        <button id="stopScanBtn" class="btn btn-danger" style="display: none;"><i class="fas fa-stop"></i> Arrêter</button>
+                    </div>
+                    <div class="alert alert-info mt-3 small">
+                        <strong>Utilisation :</strong> Scannez un code-barres pour sortir/retourner un article, ou pour vérifier son statut. Si le code-barres n'est pas trouvé, il sera automatiquement inséré dans le champ "Code-barres" du formulaire de création.
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
 
     <div id="manage_categories" class="tab-content">
         <div class="row">
@@ -407,6 +380,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
 <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
+
 <script>
 const HANDLER_URL = 'inventory-handler.php';
 const IS_ADMIN = <?php echo $isAdmin ? 'true' : 'false'; ?>;
@@ -647,6 +621,8 @@ function setupEventListeners() {
         document.getElementById('edit_asset_type').addEventListener('change', () => toggleAssetFields('edit'));
         document.getElementById('addCategoryForm').addEventListener('submit', handleCreateCategory);
         document.getElementById('saveCategoryUpdateBtn').addEventListener('click', handleUpdateCategory);
+        document.getElementById('startScanBtn').addEventListener('click', startScanning);
+        document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     }
     
     document.querySelector('.booking-sub-nav').addEventListener('click', (e) => {
@@ -664,8 +640,6 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('startScanBtn').addEventListener('click', startScanning);
-    document.getElementById('stopScanBtn').addEventListener('click', stopScanning);
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
     document.getElementById('historyFilterItem').addEventListener('input', renderUsageHistoryTable);
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
@@ -700,7 +674,8 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`.tab[data-tab='${tabName}']`).classList.add('active');
     
-    if (tabName !== 'scanner' && codeReader) stopScanning();
+    // Stop the scanner if we navigate away from the tab that contains it.
+    if (tabName !== 'add_asset' && codeReader) stopScanning();
 
     const needsDataRefresh = ['inventory', 'booking', 'manage_categories', 'missing_items', 'verify_return', 'reports'].includes(tabName);
     
