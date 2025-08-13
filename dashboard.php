@@ -152,7 +152,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
         <div class="shortcut-buttons-grid">
             <button class="shortcut-btn" data-toggle="modal" data-target="#congesAdminModal"><i class="fas fa-user-shield"></i>Congés Admin</button>
             <a href="planning.php" class="shortcut-btn"><i class="fas fa-calendar-alt"></i>Planning Admin</a>
-            <button class="shortcut-btn" data-toggle="modal" data-target="#eventCreationModal"><i class="fas fa-plus-circle"></i>Créer Événement</button>
+            <a href="events.php" class="shortcut-btn"><i class="fas fa-plus-circle"></i>Créer Événement</a>
             <button class="shortcut-btn" data-toggle="modal" data-target="#feuilleDeTempsModal"><i class="fas fa-user-clock"></i>Feuille de Temps</button>
         </div>
 
@@ -231,27 +231,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
     
     <div class="modal fade" id="leaveDetailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Détails de la Demande</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div><div class="modal-body" id="leaveDetailsModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Fermer</button></div></div></div></div>
 
-    <div class="modal fade" id="eventCreationModal" tabindex="-1" aria-labelledby="eventCreationModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="eventCreationModalLabel">Créer un Nouvel Événement</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
-                <form id="eventCreationForm">
-                    <div class="modal-body">
-                        <div id="eventCreationAlert" class="modal-alert alert"></div>
-                        <div class="form-group"><label for="eventTitleModal">Titre <span class="text-danger">*</span></label><input type="text" class="form-control" id="eventTitleModal" name="title" required></div>
-                        <div class="form-group"><label for="eventDescriptionModal">Description</label><textarea class="form-control" id="eventDescriptionModal" name="description" rows="3"></textarea></div>
-                        <div class="form-row">
-                            <div class="col-md-6 form-group"><label for="eventStartModal">Début <span class="text-danger">*</span></label><input type="datetime-local" class="form-control" id="eventStartModal" name="start_datetime" required></div>
-                            <div class="col-md-6 form-group"><label for="eventEndModal">Fin <span class="text-danger">*</span></label><input type="datetime-local" class="form-control" id="eventEndModal" name="end_datetime" required></div>
-                        </div>
-                        <div class="form-group"><label for="eventAssignedUsersModal">Assigner à <span class="text-danger">*</span></label><select class="form-control" id="eventAssignedUsersModal" name="assigned_users[]" multiple required style="height: 150px;"><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select><small class="form-text text-muted">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small></div>
-                        <div class="form-group"><label for="eventColorModal">Couleur</label><input type="color" class="form-control" id="eventColorModal" name="color" value="#6A0DAD"></div>
-                    </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button><button type="submit" class="btn btn-primary">Enregistrer</button></div>
-                </form>
-            </div>
-        </div>
-    </div>
+   
 
     <div class="modal fade" id="feuilleDeTempsModal" tabindex="-1" aria-labelledby="feuilleDeTempsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
