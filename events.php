@@ -218,7 +218,6 @@ try {
         const isMobile = window.innerWidth <= 768;
 
         // --- Modal & Form Logic (Mostly Unchanged) ---
-        // (functions openModal, closeModal, formatLocalDateTimeInput, resetAndPrepareForm, showFormError)
         const openModal = () => { eventModal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
         const closeModal = () => { eventModal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
         [document.getElementById('close-modal-btn'), document.getElementById('cancel-modal-btn'), document.getElementById('modal-backdrop')].forEach(el => el.addEventListener('click', closeModal));
@@ -272,7 +271,8 @@ try {
             
             // --- DYNAMIC EVENT SOURCE ---
             events: function(fetchInfo, successCallback, failureCallback) {
-                const isListView = calendar.view.type === 'list';
+                // *** FIX: Use fetchInfo.view.type instead of the uninitialized 'calendar' object ***
+                const isListView = fetchInfo.view.type === 'list';
                 let start, end;
 
                 if (isListView) {
@@ -294,7 +294,6 @@ try {
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {
-                        // For past list view, sort events from newest to oldest
                         if (isListView && listMode === 'past') {
                             data.sort((a, b) => new Date(b.start) - new Date(a.start));
                         }
@@ -317,7 +316,8 @@ try {
             
             // --- CUSTOM EVENT RENDERING FOR LIST VIEW ---
             eventContent: function(arg) {
-                if (calendar.view.type !== 'list') return; // Apply only to list view
+                // Apply only to list view, not month view
+                if (arg.view.type !== 'list') return; 
 
                 const props = arg.event.extendedProps;
                 const assignedUsers = props.assigned_users || [];
@@ -329,7 +329,7 @@ try {
                 
                 let usersHtml = assignedUsers.slice(0, 5).map(user => {
                     const initials = (user.name || '').split(' ').map(n => n[0]).join('').toUpperCase();
-                    const colorValue = (user.user_id * 47) % 360; // Simple hash for color
+                    const colorValue = (user.user_id * 47) % 360;
                     return `<div title="${user.name}" class="user-avatar" style="background-color: hsl(${colorValue}, 60%, 85%); color: hsl(${colorValue}, 40%, 30%);">${initials}</div>`;
                 }).join('');
 
@@ -338,26 +338,28 @@ try {
                 }
 
                 let html = `
-                    <div class="event-card">
-                        <div class="event-card-color-bar" style="background-color: ${arg.event.backgroundColor};"></div>
-                        <div class="event-card-content">
-                            <div class="event-card-header">
-                                <h3 class="event-title">${arg.event.title}</h3>
-                            </div>
-                            <div class="event-date">
-                                <i data-lucide="calendar" class="w-4 h-4"></i>
-                                <span>${formatDate(start)}</span>
-                            </div>
-                            <div class="event-date">
-                                <i data-lucide="clock" class="w-4 h-4"></i>
-                                <span>${formatTime(start)} - ${formatTime(end)}</span>
-                            </div>
-                            ${props.description ? `<p class="event-description">${props.description}</p>` : ''}
-                            <div class="event-card-footer">
-                                <div class="user-avatars">${usersHtml}</div>
+                    <a href="javascript:void(0)" class="event-card-link w-full">
+                        <div class="event-card">
+                            <div class="event-card-color-bar" style="background-color: ${arg.event.backgroundColor};"></div>
+                            <div class="event-card-content">
+                                <div class="event-card-header">
+                                    <h3 class="event-title">${arg.event.title}</h3>
+                                </div>
+                                <div class="event-date">
+                                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                                    <span>${formatDate(start)}</span>
+                                </div>
+                                <div class="event-date">
+                                    <i data-lucide="clock" class="w-4 h-4"></i>
+                                    <span>${formatTime(start)} - ${formatTime(end)}</span>
+                                </div>
+                                ${props.description ? `<p class="event-description">${props.description}</p>` : ''}
+                                <div class="event-card-footer">
+                                    <div class="user-avatars">${usersHtml}</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 `;
                 return { domNodes: [new DOMParser().parseFromString(html, 'text/html').body.firstChild] };
             },
@@ -365,6 +367,7 @@ try {
             // --- INTERACTIONS ---
             select: function(info) { resetAndPrepareForm('create', info.start, info.end); openModal(); },
             eventClick: function(info) {
+                info.jsEvent.preventDefault(); // Prevent link navigation
                 resetAndPrepareForm('edit');
                 const event = info.event;
                 const props = event.extendedProps;
