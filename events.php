@@ -163,16 +163,15 @@ try {
                                     <textarea id="event-description" name="description" placeholder="Ajouter une description..." rows="4" class="form-input resize-none"></textarea>
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="event-assigned-users" class="block text-sm font-medium text-gray-700 mb-1">Assigner à <span class="text-red-500">*</span></label>
-                                    <select class="form-input" id="event-assigned-users" name="assigned_users[]" multiple required>
+                                <div class="form-group hidden">
+                                    <label for="event-assigned-users" class="block text-sm font-medium text-gray-700 mb-1">Assigner à</label>
+                                    <select class="form-input" id="event-assigned-users" name="assigned_users[]" multiple>
                                         <?php foreach ($usersList as $u): ?>
                                             <option value="<?php echo $u['user_id']; ?>">
                                                 <?php echo htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
-                                     <small class="text-xs text-gray-500 mt-1">Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs.</small>
                                 </div>
                                 <div>
                                     <label for="event-color" class="block text-sm font-medium text-gray-700 mb-1">Couleur de l'événement</label>
@@ -245,6 +244,12 @@ try {
                     document.getElementById('event-start').value = startDate ? formatLocalDateTimeInput(startDate) : '';
                     const defaultEndDate = endDate ? endDate : (startDate ? new Date(startDate.getTime() + 60 * 60 * 1000) : null);
                     document.getElementById('event-end').value = defaultEndDate ? formatLocalDateTimeInput(defaultEndDate) : '';
+
+                    // MODIFICATION: Automatically select all users in the hidden select list for new events.
+                    const selectUsers = document.getElementById('event-assigned-users');
+                    for (let i = 0; i < selectUsers.options.length; i++) {
+                        selectUsers.options[i].selected = true;
+                    }
 
                 } else { // view/edit mode
                     modalTitle.textContent = 'Détails de l\'événement';
@@ -333,19 +338,16 @@ try {
                 const startDt = new Date(formData.get('start_datetime'));
                 const endDt = new Date(formData.get('end_datetime'));
 
-                if (!eventForm.checkValidity() || !formData.get('title') || !formData.get('start_datetime') || !formData.get('end_datetime')) {
-                    showFormError("Veuillez remplir tous les champs obligatoires.");
+                // MODIFICATION: Simplified validation. Removed the check for 'assigned_users' as it's now automatic.
+                if (!formData.get('title') || !formData.get('start_datetime') || !formData.get('end_datetime')) {
+                    showFormError("Veuillez remplir le titre et les dates de début et de fin.");
                     return;
                 }
                 if (endDt <= startDt) {
                     showFormError("La date de fin doit être postérieure à la date de début.");
                     return;
                 }
-                if (formData.getAll('assigned_users[]').length === 0) {
-                    showFormError("Veuillez assigner l'événement à au moins un utilisateur.");
-                    return;
-                }
-
+                
                 formData.append('action', 'create_event'); // This should be dynamic based on create/update
                 loadingSpinner.style.display = 'flex';
 
