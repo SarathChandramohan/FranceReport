@@ -138,14 +138,12 @@ try {
 
         <div class="p-4 sm:p-6 lg:p-8">
             <main class="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-                
                 <div id="list-view-controls" class="hidden mb-4 flex items-center justify-between">
                      <div class="flex items-center gap-2">
                         <button id="btn-upcoming" class="btn btn-sm">À venir</button>
                         <button id="btn-past" class="btn btn-sm">Passés</button>
                     </div>
                 </div>
-
                 <div id='calendar'></div>
             </main>
         </div>
@@ -204,7 +202,6 @@ try {
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // --- Element References ---
         const calendarEl = document.getElementById('calendar');
         const eventModal = document.getElementById('event-modal');
         const eventForm = document.getElementById('event-form');
@@ -213,11 +210,10 @@ try {
         const btnUpcoming = document.getElementById('btn-upcoming');
         const btnPast = document.getElementById('btn-past');
 
-        // --- State ---
-        let listMode = 'upcoming'; // 'upcoming' or 'past'
+        let listMode = 'upcoming';
         const isMobile = window.innerWidth <= 768;
 
-        // --- Modal & Form Logic (Mostly Unchanged) ---
+        // Modal & Form Helper Functions
         const openModal = () => { eventModal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
         const closeModal = () => { eventModal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); };
         [document.getElementById('close-modal-btn'), document.getElementById('cancel-modal-btn'), document.getElementById('modal-backdrop')].forEach(el => el.addEventListener('click', closeModal));
@@ -256,7 +252,6 @@ try {
             formErrorMessage.classList.remove('hidden');
         }
 
-
         // --- Calendar Definition ---
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: isMobile ? 'list' : 'dayGridMonth',
@@ -268,43 +263,7 @@ try {
             locale: 'fr',
             buttonText: { today: "Aujourd'hui", month: 'Mois', list: 'Liste' },
             navLinks: true, editable: true, selectable: true, dayMaxEvents: true,
-            
-            // --- DYNAMIC EVENT SOURCE ---
-            events: function(fetchInfo, successCallback, failureCallback) {
-                // *** FIX: Use fetchInfo.view.type instead of the uninitialized 'calendar' object ***
-                const isListView = fetchInfo.view.type === 'list';
-                let start, end;
-
-                if (isListView) {
-                    const today = new Date();
-                    if (listMode === 'upcoming') {
-                        start = today;
-                        end = new Date(today.getFullYear() + 5, 11, 31); // 5 years future
-                    } else { // past
-                        start = new Date(today.getFullYear() - 5, 0, 1); // 5 years past
-                        end = today;
-                    }
-                } else {
-                    start = fetchInfo.start;
-                    end = fetchInfo.end;
-                }
-                
-                const url = `events_handler.php?action=get_events&start=${start.toISOString()}&end=${end.toISOString()}`;
-                
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (isListView && listMode === 'past') {
-                            data.sort((a, b) => new Date(b.start) - new Date(a.start));
-                        }
-                        successCallback(data);
-                    })
-                    .catch(error => failureCallback(error));
-            },
-
             loading: (isLoading) => { loadingSpinner.style.display = isLoading ? 'flex' : 'none'; },
-
-            // --- VIEW MANAGEMENT ---
             viewDidMount: function(info) {
                 if (info.view.type === 'list') {
                     controls.classList.remove('hidden');
@@ -313,61 +272,28 @@ try {
                     controls.classList.add('hidden');
                 }
             },
-            
-            // --- CUSTOM EVENT RENDERING FOR LIST VIEW ---
             eventContent: function(arg) {
-                // Apply only to list view, not month view
-                if (arg.view.type !== 'list') return; 
-
+                if (arg.view.type !== 'list') return;
                 const props = arg.event.extendedProps;
                 const assignedUsers = props.assigned_users || [];
                 const start = new Date(arg.event.start);
                 const end = new Date(arg.event.end);
-
                 const formatDate = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
                 const formatTime = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false });
-                
                 let usersHtml = assignedUsers.slice(0, 5).map(user => {
                     const initials = (user.name || '').split(' ').map(n => n[0]).join('').toUpperCase();
                     const colorValue = (user.user_id * 47) % 360;
                     return `<div title="${user.name}" class="user-avatar" style="background-color: hsl(${colorValue}, 60%, 85%); color: hsl(${colorValue}, 40%, 30%);">${initials}</div>`;
                 }).join('');
-
                 if(assignedUsers.length > 5) {
                     usersHtml += `<div class="user-avatar" style="background-color: #e2e8f0; color: #475569;">+${assignedUsers.length - 5}</div>`;
                 }
-
-                let html = `
-                    <a href="javascript:void(0)" class="event-card-link w-full">
-                        <div class="event-card">
-                            <div class="event-card-color-bar" style="background-color: ${arg.event.backgroundColor};"></div>
-                            <div class="event-card-content">
-                                <div class="event-card-header">
-                                    <h3 class="event-title">${arg.event.title}</h3>
-                                </div>
-                                <div class="event-date">
-                                    <i data-lucide="calendar" class="w-4 h-4"></i>
-                                    <span>${formatDate(start)}</span>
-                                </div>
-                                <div class="event-date">
-                                    <i data-lucide="clock" class="w-4 h-4"></i>
-                                    <span>${formatTime(start)} - ${formatTime(end)}</span>
-                                </div>
-                                ${props.description ? `<p class="event-description">${props.description}</p>` : ''}
-                                <div class="event-card-footer">
-                                    <div class="user-avatars">${usersHtml}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                `;
+                let html = `<a href="javascript:void(0)" class="event-card-link w-full"><div class="event-card"><div class="event-card-color-bar" style="background-color: ${arg.event.backgroundColor};"></div><div class="event-card-content"><div class="event-card-header"><h3 class="event-title">${arg.event.title}</h3></div><div class="event-date"><i data-lucide="calendar" class="w-4 h-4"></i><span>${formatDate(start)}</span></div><div class="event-date"><i data-lucide="clock" class="w-4 h-4"></i><span>${formatTime(start)} - ${formatTime(end)}</span></div>${props.description ? `<p class="event-description">${props.description}</p>` : ''}<div class="event-card-footer"><div class="user-avatars">${usersHtml}</div></div></div></div></a>`;
                 return { domNodes: [new DOMParser().parseFromString(html, 'text/html').body.firstChild] };
             },
-            
-            // --- INTERACTIONS ---
-            select: function(info) { resetAndPrepareForm('create', info.start, info.end); openModal(); },
+            select: (info) => { resetAndPrepareForm('create', info.start, info.end); openModal(); },
             eventClick: function(info) {
-                info.jsEvent.preventDefault(); // Prevent link navigation
+                info.jsEvent.preventDefault();
                 resetAndPrepareForm('edit');
                 const event = info.event;
                 const props = event.extendedProps;
@@ -386,10 +312,41 @@ try {
             }
         });
 
+        // *** THE FIX: Define the dynamic event source AFTER the calendar is initialized ***
+        calendar.setOption('events', function(fetchInfo, successCallback, failureCallback) {
+            const isListView = calendar.view.type === 'list';
+            let start, end;
+
+            if (isListView) {
+                const today = new Date();
+                if (listMode === 'upcoming') {
+                    start = today;
+                    end = new Date(today.getFullYear() + 5, 11, 31);
+                } else {
+                    start = new Date(today.getFullYear() - 5, 0, 1);
+                    end = today;
+                }
+            } else {
+                start = fetchInfo.start;
+                end = fetchInfo.end;
+            }
+            
+            const url = `events_handler.php?action=get_events&start=${start.toISOString()}&end=${end.toISOString()}`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (isListView && listMode === 'past') {
+                        data.sort((a, b) => new Date(b.start) - new Date(a.start));
+                    }
+                    successCallback(data);
+                })
+                .catch(error => failureCallback(error));
+        });
+
         calendar.render();
         lucide.createIcons();
 
-        // --- Event Form Submission ---
+        // Event Form Submission Logic
         eventForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(eventForm);
@@ -417,21 +374,16 @@ try {
                 .finally(() => { loadingSpinner.style.display = 'none'; });
         });
         
-        // --- List View Toggle Logic ---
+        // List View Toggle Logic
         function updateToggleButtons() {
             if (listMode === 'upcoming') {
-                btnUpcoming.classList.add('active-toggle', 'btn-primary');
-                btnUpcoming.classList.remove('btn-secondary');
-                btnPast.classList.remove('active-toggle', 'btn-primary');
-                btnPast.classList.add('btn-secondary');
+                btnUpcoming.classList.add('active-toggle', 'btn-primary'); btnUpcoming.classList.remove('btn-secondary');
+                btnPast.classList.remove('active-toggle', 'btn-primary'); btnPast.classList.add('btn-secondary');
             } else {
-                btnPast.classList.add('active-toggle', 'btn-primary');
-                btnPast.classList.remove('btn-secondary');
-                btnUpcoming.classList.remove('active-toggle', 'btn-primary');
-                btnUpcoming.classList.add('btn-secondary');
+                btnPast.classList.add('active-toggle', 'btn-primary'); btnPast.classList.remove('btn-secondary');
+                btnUpcoming.classList.remove('active-toggle', 'btn-primary'); btnUpcoming.classList.add('btn-secondary');
             }
         }
-
         btnUpcoming.addEventListener('click', () => {
             if (listMode !== 'upcoming') {
                 listMode = 'upcoming';
@@ -439,7 +391,6 @@ try {
                 calendar.refetchEvents();
             }
         });
-
         btnPast.addEventListener('click', () => {
             if (listMode !== 'past') {
                 listMode = 'past';
