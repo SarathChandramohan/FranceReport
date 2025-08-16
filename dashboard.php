@@ -248,7 +248,20 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     </div>
                     <div class="table-responsive">
                         <table id="timesheetTableModal" class="table table-striped table-sm">
-                            <thead><tr><th>Employé</th><th>Date</th><th>Mission</th><th>Entrée</th><th>Lieu (Entrée)</th><th>Sortie</th><th>Lieu (Sortie)</th><th>Pause</th><th>Durée</th><th>Commentaires</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Employé</th>
+                                    <th>Date</th>
+                                    <th>Mission</th>
+                                    <th>Entrée</th>
+                                    <th>Lieu (Entrée)</th>
+                                    <th>Sortie</th>
+                                    <th>Lieu (Sortie)</th>
+                                    <th>Pause</th>
+                                    <th>Durée</th>
+                                    <th>Commentaires</th>
+                                </tr>
+                            </thead>
                             <tbody id="timesheetTableBodyModal"></tbody>
                         </table>
                     </div>
@@ -327,7 +340,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
             const monthYear = $('#timesheetMonthFilterModal').val();
             const specificDay = $('#timesheetDayFilterModal').val();
             const tbody = $('#timesheetTableBodyModal');
-            const colspan = 10; // MODIFIED COLSPAN
+            const colspan = 10;
 
             tbody.html(`<tr><td colspan="${colspan}" class="loading-placeholder">Chargement...</td></tr>`);
 
@@ -350,7 +363,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     tbody.empty();
                     if (response.status === 'success' && response.data.timesheet && response.data.timesheet.length > 0) {
                         response.data.timesheet.forEach(function(entry) {
-                            // MODIFIED ROW HTML
                             let rowHTML = `<tr>
                                 <td>${escapeHtml(entry.employee_name)}</td>
                                 <td>${escapeHtml(entry.entry_date)}</td>
@@ -376,7 +388,6 @@ $initial_employee_list = getInitialEmployeeList($conn);
                 }
             });
         } catch (e) {
-            // MODIFIED COLSPAN IN CATCH BLOCK
             $('#timesheetTableBodyModal').html(`<tr><td colspan="10" class="error-placeholder">Erreur interne du script.</td></tr>`);
         }
     }
