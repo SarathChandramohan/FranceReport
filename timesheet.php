@@ -276,14 +276,16 @@ $user = getCurrentUser();
                 response.data.forEach(entry => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${entry.date}</td>
-                        <td>${entry.logon_time}</td>
-                        <td>${entry.logon_location_name}</td>
-                        <td>${entry.logoff_time}</td>
-                        <td>${entry.logoff_location_name}</td>
-                        <td>${entry.break_minutes > 0 ? entry.break_minutes + ' min' : '--'}</td>
-                        <td><strong>${entry.duration || '--'}</strong></td>
-                    `;
+    <td>${entry.date}</td>
+    <td>${entry.logon_time}</td>
+    <td>${entry.logon_location_name}</td>
+    <td>${entry.logoff_time}</td>
+    <td>${entry.logoff_location_name}</td>
+    <td>${entry.break_minutes > 0 ? entry.break_minutes + ' min' : '--'}</td>
+    <td><strong>${entry.duration || '--'}</strong></td>
+    <td>${entry.mission || '--'}</td>
+    <td>${entry.comment || '--'}</td>
+`;
                     tableBody.appendChild(row);
                 });
             }
