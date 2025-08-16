@@ -170,15 +170,16 @@ function getMonthlyTimesheetData() {
     }
 
     try {
+        // MODIFIED SQL QUERY
         $sql = "SELECT
-            t.entry_date, t.logon_time, t.logoff_time,
-            t.logon_location_name, t.logoff_location_name,
-            t.break_minutes, u.prenom + ' ' + u.nom AS employee_name,
-            p.mission, t.commentaire
-        FROM Timesheet t
-        JOIN Users u ON t.user_id = u.user_id
-        LEFT JOIN Planning p ON t.user_id = p.user_id AND t.entry_date = p.date_mission
-        WHERE 1=1";
+                    t.entry_date, t.logon_time, t.logoff_time,
+                    t.logon_location_name, t.logoff_location_name,
+                    t.break_minutes, u.prenom + ' ' + u.nom AS employee_name,
+                    p.mission, t.commentaire
+                FROM Timesheet t
+                JOIN Users u ON t.user_id = u.user_id
+                LEFT JOIN Planning p ON t.user_id = p.user_id AND t.entry_date = p.date_mission
+                WHERE 1=1";
         $params = [];
 
         if ($specificDay) {
@@ -216,19 +217,20 @@ function getMonthlyTimesheetData() {
                     $minutes = $effectiveMinutes % 60;
                     $durationDisplay = $hours . 'h' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
                 }
-
+                
+                // MODIFIED ARRAY
                 $formattedData[] = [
-    'employee_name' => $entry['employee_name'],
-    'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
-    'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
-    'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
-    'duration' => $durationDisplay,
-    'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
-    'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
-    'break_minutes' => $entry['break_minutes'],
-    'mission' => $entry['mission'] ?? 'N/A', // <-- ADD THIS LINE
-    'commentaire' => $entry['commentaire'] ?? '' // <-- ADD THIS LINE
-];
+                    'employee_name' => $entry['employee_name'],
+                    'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
+                    'logon_time' => $entry['logon_time'] ? date('H:i', strtotime($entry['logon_time'])) : null,
+                    'logoff_time' => $entry['logoff_time'] ? date('H:i', strtotime($entry['logoff_time'])) : null,
+                    'duration' => $durationDisplay,
+                    'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
+                    'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
+                    'break_minutes' => $entry['break_minutes'],
+                    'mission' => $entry['mission'] ?? 'N/A',
+                    'commentaire' => $entry['commentaire'] ?? ''
+                ];
             }
         }
         respondWithSuccess('Données de pointage récupérées.', ['timesheet' => $formattedData]);
