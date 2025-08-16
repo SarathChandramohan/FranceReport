@@ -216,13 +216,10 @@ $initial_employee_list = getInitialEmployeeList($conn);
                         <div class="tab-pane fade" id="listAllLeavesContent" role="tabpanel">
                             <h6 class="mt-2">Consulter la Liste des Congés</h6>
                             <div class="form-row align-items-center mb-3">
-    <div class="col-auto"><select id="timesheetEmployeeFilterModal" class="form-control form-control-sm"><option value="">Tous les employés</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
-    <div class="col-auto"><input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
-    <div class="col-auto"><input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm"></div>
-    <div class="col-auto ml-auto">
-        <button class="btn btn-sm btn-success" onclick="exportTableToCSV('timesheetTableModal', 'feuille-de-temps.csv')"><i class="fas fa-download"></i> Exporter en CSV</button>
-    </div>
-</div>
+                                <div class="col-auto"><select id="caLeaveEmployeeFilter" class="form-control form-control-sm"><option value="">Tous les employés</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
+                                <div class="col-auto"><input type="month" id="caLeaveMonthFilter" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
+                                <div class="col-auto"><input type="date" id="caLeaveDayFilter" class="form-control form-control-sm"></div>
+                            </div>
                             <div class="table-responsive"><table id="caListeCongesTable" class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Type</th><th>Début</th><th>Fin</th><th>Durée</th><th>Statut</th></tr></thead><tbody id="caListeCongesTableBody"></tbody></table></div>
                         </div>
                     </div>
@@ -245,6 +242,9 @@ $initial_employee_list = getInitialEmployeeList($conn);
                         <div class="col-auto"><select id="timesheetEmployeeFilterModal" class="form-control form-control-sm"><option value="">Tous les employés</option><?php foreach ($all_employees as $emp): ?><option value="<?= htmlspecialchars($emp['user_id']); ?>"><?= htmlspecialchars($emp['prenom'] . ' ' . $emp['nom']); ?></option><?php endforeach; ?></select></div>
                         <div class="col-auto"><input type="month" id="timesheetMonthFilterModal" class="form-control form-control-sm" value="<?= date('Y-m'); ?>"></div>
                         <div class="col-auto"><input type="date" id="timesheetDayFilterModal" class="form-control form-control-sm"></div>
+                        <div class="col-auto ml-auto">
+                            <button class="btn btn-sm btn-success" onclick="exportTableToCSV('timesheetTableModal', 'feuille-de-temps.csv')"><i class="fas fa-download"></i> Exporter en CSV</button>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table id="timesheetTableModal" class="table table-striped table-sm">
@@ -327,7 +327,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
             const monthYear = $('#timesheetMonthFilterModal').val();
             const specificDay = $('#timesheetDayFilterModal').val();
             const tbody = $('#timesheetTableBodyModal');
-            const colspan = 10; // Updated colspan
+            const colspan = 10; // MODIFIED COLSPAN
 
             tbody.html(`<tr><td colspan="${colspan}" class="loading-placeholder">Chargement...</td></tr>`);
 
@@ -350,18 +350,19 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     tbody.empty();
                     if (response.status === 'success' && response.data.timesheet && response.data.timesheet.length > 0) {
                         response.data.timesheet.forEach(function(entry) {
+                            // MODIFIED ROW HTML
                             let rowHTML = `<tr>
-    <td>${escapeHtml(entry.employee_name)}</td>
-    <td>${escapeHtml(entry.entry_date)}</td>
-    <td>${escapeHtml(entry.mission)}</td>
-    <td>${entry.logon_time || '--'}</td>
-    <td>${escapeHtml(entry.logon_location_name)}</td>
-    <td>${entry.logoff_time || '--'}</td>
-    <td>${escapeHtml(entry.logoff_location_name)}</td>
-    <td>${entry.break_minutes || '0'} min</td>
-    <td><strong>${entry.duration || '--'}</strong></td>
-    <td>${escapeHtml(entry.commentaire)}</td>
-</tr>`;
+                                <td>${escapeHtml(entry.employee_name)}</td>
+                                <td>${escapeHtml(entry.entry_date)}</td>
+                                <td>${escapeHtml(entry.mission)}</td>
+                                <td>${entry.logon_time || '--'}</td>
+                                <td>${escapeHtml(entry.logon_location_name)}</td>
+                                <td>${entry.logoff_time || '--'}</td>
+                                <td>${escapeHtml(entry.logoff_location_name)}</td>
+                                <td>${entry.break_minutes || '0'} min</td>
+                                <td><strong>${entry.duration || '--'}</strong></td>
+                                <td>${escapeHtml(entry.commentaire)}</td>
+                            </tr>`;
                             tbody.append(rowHTML);
                         });
                     } else if (response.status === 'success') {
@@ -375,6 +376,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
                 }
             });
         } catch (e) {
+            // MODIFIED COLSPAN IN CATCH BLOCK
             $('#timesheetTableBodyModal').html(`<tr><td colspan="10" class="error-placeholder">Erreur interne du script.</td></tr>`);
         }
     }
