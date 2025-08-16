@@ -45,7 +45,17 @@ try {
         }
         .fc .fc-toolbar.fc-header-toolbar {
             margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
+        @media (min-width: 768px) {
+            .fc .fc-toolbar.fc-header-toolbar {
+                flex-direction: row;
+                align-items: center;
+            }
+        }
+
         .fc .fc-toolbar-title {
             font-size: 1.25rem;
             font-weight: 600;
@@ -57,6 +67,17 @@ try {
         .fc .fc-daygrid-day.fc-day-today {
             background-color: var(--fc-today-bg-color);
         }
+         .fc-createEvent-button { /* Custom class for the new button */
+            background-color: #2563eb !important;
+            color: white !important;
+            border-color: #2563eb !important;
+            font-weight: 500 !important;
+        }
+        .fc-createEvent-button:hover {
+            background-color: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
+        }
+
 
         /* Modal Styles */
         .modal-backdrop {
@@ -120,8 +141,7 @@ try {
 
         <div class="p-4 sm:p-6 lg:p-8">
             <main class="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-                <div id='calendar'>
-                    </div>
+                <div id='calendar'></div>
             </main>
         </div>
 
@@ -245,7 +265,6 @@ try {
                     const defaultEndDate = endDate ? endDate : (startDate ? new Date(startDate.getTime() + 60 * 60 * 1000) : null);
                     document.getElementById('event-end').value = defaultEndDate ? formatLocalDateTimeInput(defaultEndDate) : '';
 
-                    // MODIFICATION: Automatically select all users in the hidden select list for new events.
                     const selectUsers = document.getElementById('event-assigned-users');
                     for (let i = 0; i < selectUsers.options.length; i++) {
                         selectUsers.options[i].selected = true;
@@ -263,16 +282,21 @@ try {
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: isMobile ? 'listWeek' : 'dayGridMonth',
-                headerToolbar: isMobile ? 
-                    {
-                        left: 'prev,next',
-                        center: 'title',
-                        right: 'today'
-                    } : {
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,listWeek'
-                    },
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'createEventButton dayGridMonth,listWeek'
+                },
+                customButtons: {
+                    createEventButton: {
+                        text: 'Créer un événement',
+                        click: function() {
+                            resetAndPrepareForm('create', new Date());
+                            openModal();
+                        },
+                        'class': 'fc-createEvent-button' // Add a class for styling
+                    }
+                },
                 locale: 'fr',
                 buttonText: {
                     today: "Aujourd'hui",
@@ -316,9 +340,7 @@ try {
                     openModal();
                 },
                 eventDrop: function(info) {
-                    // This function can be used to handle event updates via drag-and-drop
                     alert(info.event.title + " a été déplacé vers " + info.event.start.toISOString());
-                    // Here you would typically make an AJAX call to update the event in the database
                 }
             });
 
@@ -338,7 +360,6 @@ try {
                 const startDt = new Date(formData.get('start_datetime'));
                 const endDt = new Date(formData.get('end_datetime'));
 
-                // MODIFICATION: Simplified validation. Removed the check for 'assigned_users' as it's now automatic.
                 if (!formData.get('title') || !formData.get('start_datetime') || !formData.get('end_datetime')) {
                     showFormError("Veuillez remplir le titre et les dates de début et de fin.");
                     return;
@@ -348,7 +369,7 @@ try {
                     return;
                 }
                 
-                formData.append('action', 'create_event'); // This should be dynamic based on create/update
+                formData.append('action', 'create_event');
                 loadingSpinner.style.display = 'flex';
 
                 fetch('events_handler.php', { method: 'POST', body: formData })
