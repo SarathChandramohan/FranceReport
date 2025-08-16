@@ -95,16 +95,18 @@ $user = getCurrentUser();
                 <div class="table-container">
                     <table>
                         <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Entrée</th>
-                                <th>Lieu (Entrée)</th>
-                                <th>Sortie</th>
-                                <th>Lieu (Sortie)</th>
-                                <th>Pause</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
+    <tr>
+        <th>Date</th>
+        <th>Entrée</th>
+        <th>Lieu (Entrée)</th>
+        <th>Sortie</th>
+        <th>Lieu (Sortie)</th>
+        <th>Pause</th>
+        <th>Total</th>
+        <th>Mission</th>
+        <th>Commentaires</th>
+    </tr>
+</thead>
                         <tbody id="timesheet-history">
                             <tr><td colspan="7" style="text-align: center;">Chargement...</td></tr>
                         </tbody>
