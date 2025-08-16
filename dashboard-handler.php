@@ -170,15 +170,19 @@ function getMonthlyTimesheetData() {
     }
 
     try {
-        // MODIFIED SQL QUERY
         $sql = "SELECT
-                    t.entry_date, t.logon_time, t.logoff_time,
-                    t.logon_location_name, t.logoff_location_name,
-                    t.break_minutes, u.prenom + ' ' + u.nom AS employee_name,
-                    p.mission, t.commentaire
+                    t.entry_date,
+                    t.logon_time,
+                    t.logoff_time,
+                    t.logon_location_name,
+                    t.logoff_location_name,
+                    t.break_minutes,
+                    u.prenom + ' ' + u.nom AS employee_name,
+                    pa.mission_text,
+                    t.logon_comment
                 FROM Timesheet t
                 JOIN Users u ON t.user_id = u.user_id
-                LEFT JOIN Planning p ON t.user_id = p.user_id AND t.entry_date = p.date_mission
+                LEFT JOIN Planning_Assignments pa ON t.assignment_id = pa.assignment_id
                 WHERE 1=1";
         $params = [];
 
@@ -218,7 +222,6 @@ function getMonthlyTimesheetData() {
                     $durationDisplay = $hours . 'h' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
                 }
                 
-                // MODIFIED ARRAY
                 $formattedData[] = [
                     'employee_name' => $entry['employee_name'],
                     'entry_date' => date('d/m/Y', strtotime($entry['entry_date'])),
@@ -228,8 +231,8 @@ function getMonthlyTimesheetData() {
                     'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
                     'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
                     'break_minutes' => $entry['break_minutes'],
-                    'mission' => $entry['mission'] ?? 'N/A',
-                    'commentaire' => $entry['commentaire'] ?? ''
+                    'mission' => $entry['mission_text'] ?? 'N/A',
+                    'commentaire' => $entry['logon_comment'] ?? ''
                 ];
             }
         }
