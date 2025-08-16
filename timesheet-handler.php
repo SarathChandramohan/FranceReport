@@ -175,9 +175,13 @@ function getTimesheetHistory($user_id) {
     global $conn;
     try {
         $stmt = $conn->prepare("SELECT
-                                    timesheet_id, entry_date, logon_time, logon_location_name,
-                                    logoff_time, logoff_location_name, break_minutes
-                                FROM Timesheet WHERE user_id = ? ORDER BY entry_date DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
+                            t.timesheet_id, t.entry_date, t.logon_time, t.logon_location_name,
+                            t.logoff_time, t.logoff_location_name, t.break_minutes,
+                            t.logon_comment, pa.mission_text
+                        FROM Timesheet t
+                        LEFT JOIN Planning_Assignments pa ON t.assignment_id = pa.assignment_id
+                        WHERE t.user_id = ?
+                        ORDER BY t.entry_date DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY");
         $stmt->execute([$user_id]);
         $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -197,14 +201,16 @@ function getTimesheetHistory($user_id) {
             }
 
             $formatted_history[] = [
-                'date' => (new DateTime($entry['entry_date']))->format('d/m/Y'),
-                'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time']))->format('H:i') : '--:--',
-                'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
-                'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time']))->format('H:i') : '--:--',
-                'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
-                'break_minutes' => $entry['break_minutes'] ?? 0,
-                'duration' => $duration
-            ];
+    'date' => (new DateTime($entry['entry_date']))->format('d/m/Y'),
+    'logon_time' => $entry['logon_time'] ? (new DateTime($entry['logon_time']))->format('H:i') : '--:--',
+    'logon_location_name' => $entry['logon_location_name'] ?? 'N/A',
+    'logoff_time' => $entry['logoff_time'] ? (new DateTime($entry['logoff_time']))->format('H:i') : '--:--',
+    'logoff_location_name' => $entry['logoff_location_name'] ?? 'N/A',
+    'break_minutes' => $entry['break_minutes'] ?? 0,
+    'duration' => $duration,
+    'mission' => $entry['mission_text'] ?? null,
+    'comment' => $entry['logon_comment'] ?? null
+];
         }
         respondWithSuccess('History retrieved successfully', $formatted_history);
     } catch (Exception $e) {
