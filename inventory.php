@@ -55,7 +55,8 @@ $isAdmin = ($currentUser['role'] === 'admin');
         .category-actions button { margin-left: 5px; }
         #categoryFilterContainer { display: flex; flex-wrap: wrap; gap: 10px; }
         #categoryFilterContainer .btn { border-radius: 20px; padding: 5px 15px; font-size: 0.9em; }
-        .booking-filters { display: flex; gap: 15px; margin-top: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .booking-filters { display: flex; gap: 15px; margin-top: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .booking-filters .form-control, .booking-filters .form-select { max-width: 220px; }
         .booking-sub-nav { display: flex; gap: 10px; flex-wrap: wrap; }
         .booking-sub-nav .btn { font-weight: 600; }
         .booking-content-pane { display: none; }
@@ -117,10 +118,10 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="card">
                 <h3 class="mb-3"><i class="fas fa-user mr-2"></i>Réservations Individuelles (Actives/Futures)</h3>
                 <div class="booking-filters">
-                    <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                    <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
-                    <input type="text" id="individualFilterItem" class="form-control" placeholder="Filtrer par article..." style="max-width: 200px;">
-                    <input type="text" id="individualFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                    <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date...">
+                    <select id="individualFilterUser" class="form-control"></select>
+                    <input type="text" id="individualFilterItem" class="form-control" placeholder="Filtrer par article...">
+                    <input type="text" id="individualFilterMission" class="form-control" placeholder="Filtrer par mission...">
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
@@ -137,13 +138,15 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="card">
                 <h3 class="mb-3"><i class="fas fa-users mr-2"></i>Réservations par Mission (Actives/Futures)</h3>
                  <div class="booking-filters">
-                    <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                    <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                    <input type="text" id="missionFilterDate" class="form-control" placeholder="Filtrer par date...">
+                    <select id="missionFilterUser" class="form-control"></select>
+                    <input type="text" id="missionFilterItem" class="form-control" placeholder="Filtrer par article...">
+                    <input type="text" id="missionFilterMission" class="form-control" placeholder="Filtrer par mission...">
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
-                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Statut</th><th>Action</th></tr>
+                            <tr><th>Date</th><th>Mission</th><th>Actif</th><th>Réservé par</th><th>Statut</th><th>Action</th></tr>
                         </thead>
                         <tbody id="mission-active-bookings-table"></tbody>
                     </table>
@@ -155,10 +158,10 @@ $isAdmin = ($currentUser['role'] === 'admin');
             <div class="card">
                 <h3 class="mb-3"><i class="fas fa-history mr-2"></i>Historique d'Utilisation</h3>
                 <div class="booking-filters">
-                    <input type="text" id="historyFilterItem" class="form-control" placeholder="Filtrer par article..." style="max-width: 200px;">
-                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
-                     <select id="historyFilterUser" class="form-control" style="max-width: 200px;"></select>
-                    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
+                    <input type="text" id="historyFilterDate" class="form-control" placeholder="Filtrer par date...">
+                    <select id="historyFilterUser" class="form-control"></select>
+                    <input type="text" id="historyFilterItem" class="form-control" placeholder="Filtrer par article...">
+                    <input type="text" id="historyFilterMission" class="form-control" placeholder="Filtrer par mission...">
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
@@ -642,30 +645,39 @@ function setupEventListeners() {
     });
 
     document.getElementById('saveBookingBtn').addEventListener('click', handleSaveBooking);
-    document.getElementById('historyFilterItem').addEventListener('input', renderUsageHistoryTable);
+    
+    // Event Listeners for Individual Bookings Filters
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterUser').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterItem').addEventListener('input', renderIndividualBookingsTable);
     document.getElementById('individualFilterMission').addEventListener('input', renderIndividualBookingsTable);
+
+    // Event Listeners for Mission Bookings Filters
     document.getElementById('missionFilterDate').addEventListener('change', renderMissionBookingsTable);
+    document.getElementById('missionFilterUser').addEventListener('change', renderMissionBookingsTable);
+    document.getElementById('missionFilterItem').addEventListener('input', renderMissionBookingsTable);
     document.getElementById('missionFilterMission').addEventListener('input', renderMissionBookingsTable);
+
+    // Event Listeners for History Filters
     document.getElementById('historyFilterDate').addEventListener('change', renderUsageHistoryTable);
     document.getElementById('historyFilterUser').addEventListener('change', renderUsageHistoryTable);
+    document.getElementById('historyFilterItem').addEventListener('input', renderUsageHistoryTable);
     document.getElementById('historyFilterMission').addEventListener('input', renderUsageHistoryTable);
 }
 
+
 function initializeBookingTabFilters() {
-    const commonConfig = { locale: "fr", dateFormat: "Y-m-d", allowInput: true };
+    const commonConfig = { locale: "fr", dateFormat: "Y-m-d", allowInput: true, enableTime: false };
     flatpickr("#individualFilterDate", commonConfig);
     flatpickr("#missionFilterDate", commonConfig);
     flatpickr("#historyFilterDate", commonConfig);
 }
 
 function populateUserFilters() {
-    const userFilters = ['individualFilterUser', 'historyFilterUser'];
+    const userFilters = ['individualFilterUser', 'missionFilterUser', 'historyFilterUser'];
     userFilters.forEach(filterId => {
         const select = document.getElementById(filterId);
-        if (select.options.length > 1) return;
+        if (select.options.length > 1) return; // Already populated
         select.innerHTML = '<option value="">Tous les utilisateurs</option>';
         allUsers.forEach(user => select.add(new Option(`${user.prenom} ${user.nom}`, user.user_id)));
     });
@@ -836,8 +848,7 @@ function createAssetCard(asset) {
     buttons += `<button class="btn btn-info btn-small" onclick="openHistoryModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-history"></i> Voir l'historique</button>`;
     
     if (asset.status === 'available' || asset.status === 'pending_verification') {
-        // As requested, 'Réserver' button functionality is kept but commented out
-        // buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
+        buttons += `<button class="btn btn-success btn-small" onclick="openBookingModal(${asset.asset_id})"><i class="fas fa-calendar-plus"></i> Réserver</button>`;
         if (IS_ADMIN) {
              buttons += ` <button class="btn btn-warning btn-small" onclick="openMaintenanceModal(${asset.asset_id}, '${escapeSingleQuotes(asset.asset_name)}')"><i class="fas fa-tools"></i> Maint.</button>`;
         }
@@ -860,13 +871,15 @@ function renderIndividualBookingsTable() {
     const userFilter = document.getElementById('individualFilterUser').value;
     const itemFilter = document.getElementById('individualFilterItem').value.toLowerCase();
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
+    const tableBody = document.getElementById('individual-active-bookings-table');
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const tableBody = document.getElementById('individual-active-bookings-table');
     const filtered = allBookings.individual.filter(b => {
         const bookingDate = new Date(b.booking_date + 'T00:00:00');
         if (bookingDate < today) return false;
+
         const dateMatch = !dateFilter || b.booking_date === dateFilter;
         const userMatch = !userFilter || b.user_id == userFilter;
         const itemMatch = !itemFilter || (b.asset_name && b.asset_name.toLowerCase().includes(itemFilter));
@@ -886,40 +899,76 @@ function renderIndividualBookingsTable() {
 }
 
 function renderMissionBookingsTable() {
-    const tableBody = document.getElementById('mission-active-bookings-table');
-    const dateFilter = document.getElementById('missionFilterDate')._flatpickr.input.value;
+    const dateFilter = document.getElementById('missionFilterDate').value;
+    const userFilter = document.getElementById('missionFilterUser').value;
+    const itemFilter = document.getElementById('missionFilterItem').value.toLowerCase();
     const missionFilter = document.getElementById('missionFilterMission').value.toLowerCase();
-    const filtered = allBookings.mission.filter(b => (!dateFilter || b.booking_date === dateFilter) && (!missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter))));
+    const tableBody = document.getElementById('mission-active-bookings-table');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filtered = allBookings.mission.filter(b => {
+        const bookingDate = new Date(b.booking_date + 'T00:00:00');
+        if (bookingDate < today) return false;
+        
+        const dateMatch = !dateFilter || b.booking_date === dateFilter;
+        const userMatch = !userFilter || b.user_id == userFilter;
+        const itemMatch = !itemFilter || (b.asset_name && b.asset_name.toLowerCase().includes(itemFilter));
+        const missionMatch = !missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter));
+        return dateMatch && userMatch && itemMatch && missionMatch;
+    });
+    
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucune réservation correspondante.</td></tr>'; return; }
+    if (filtered.length === 0) { 
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Aucune réservation correspondante.</td></tr>'; 
+        return; 
+    }
     filtered.forEach(b => {
         const row = tableBody.insertRow();
-        row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.mission || 'N/A'}</td><td>${b.asset_name || '(Supprimé)'}</td><td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td><td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
+        row.innerHTML = `
+            <td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+            <td>${b.mission || 'N/A'}</td>
+            <td>${b.asset_name || '(Supprimé)'}</td>
+            <td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td>
+            <td><span class="badge badge-pill badge-${b.status === 'booked' ? 'info' : 'success'}">${b.status}</span></td>
+            <td>${(b.status === 'booked' && IS_ADMIN) ? `<button class="btn btn-danger btn-sm" onclick="handleCancelBooking(${b.booking_id})">Annuler</button>` : ''}</td>`;
     });
 }
 
 function renderUsageHistoryTable() {
-    const tableBody = document.getElementById('usage-history-table');
-    const itemFilter = document.getElementById('historyFilterItem').value.toLowerCase();
-    const dateFilter = document.getElementById('historyFilterDate')._flatpickr.input.value;
+    const dateFilter = document.getElementById('historyFilterDate').value;
     const userFilter = document.getElementById('historyFilterUser').value;
+    const itemFilter = document.getElementById('historyFilterItem').value.toLowerCase();
     const missionFilter = document.getElementById('historyFilterMission').value.toLowerCase();
+    const tableBody = document.getElementById('usage-history-table');
+
     const filtered = usageHistory.filter(h =>
-        (!itemFilter || (h.asset_name && h.asset_name.toLowerCase().includes(itemFilter))) &&
         (!dateFilter || h.booking_date === dateFilter) &&
         (!userFilter || h.user_id == userFilter) &&
+        (!itemFilter || (h.asset_name && h.asset_name.toLowerCase().includes(itemFilter))) &&
         (!missionFilter || (h.mission && h.mission.toLowerCase().includes(missionFilter)))
     );
+
     tableBody.innerHTML = '';
-    if (filtered.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; return; }
+    if (filtered.length === 0) { 
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun historique correspondant.</td></tr>'; 
+        return; 
+    }
     filtered.forEach(h => {
         const row = tableBody.insertRow();
         const pickedupDate = h.booking_date ? new Date(h.booking_date + 'T00:00:00').toLocaleDateString('fr-FR') : 'N/A';
         const submittedDate = h.created_at ? new Date(h.created_at).toLocaleDateString('fr-FR') : 'N/A';
 
-        row.innerHTML = `<td>${pickedupDate}</td><td>${submittedDate}</td><td>${h.asset_name || '(Supprimé)'}</td><td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td><td>${h.mission || 'N/A'}</td>`;
+        row.innerHTML = `
+            <td>${pickedupDate}</td>
+            <td>${submittedDate}</td>
+            <td>${h.asset_name || '(Supprimé)'}</td>
+            <td>${(h.prenom && h.nom) ? `${h.prenom} ${h.nom}` : 'N/A'}</td>
+            <td>${h.mission || 'N/A'}</td>`;
     });
 }
+
 
 async function handleCancelBooking(bookingId) {
     if (!confirm("Voulez-vous vraiment annuler cette réservation ?")) return;
@@ -990,14 +1039,11 @@ async function openHistoryModal(assetId, assetName) {
             modalBody.html('<p class="text-muted text-center">Aucun historique d\'utilisation.</p>');
             return;
         }
-        // Removed 'Statut' from the table header here
         let tableHtml = '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Date de sortie</th><th>Date de retour</th><th>Utilisateur</th><th>Mission</th></tr></thead><tbody>';
         data.history.forEach(rec => {
             const checkoutTime = rec.checkout_time ? new Date(rec.checkout_time).toLocaleString('fr-FR') : 'N/A';
-            // Simplified the checkinTime logic as the backend now only sends 'completed' records
             const checkinTime = rec.checkin_time ? new Date(rec.checkin_time).toLocaleString('fr-FR') : 'Non retourné';
             
-            // Removed the table cell for 'status' from the row below
             tableHtml += `<tr>
                             <td>${checkoutTime}</td>
                             <td>${checkinTime}</td>
