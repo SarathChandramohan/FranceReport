@@ -119,6 +119,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                 <div class="booking-filters">
                     <input type="text" id="individualFilterDate" class="form-control" placeholder="Filtrer par date..." style="max-width: 200px;">
                     <select id="individualFilterUser" class="form-control" style="max-width: 200px;"></select>
+                    <input type="text" id="individualFilterItem" class="form-control" placeholder="Filtrer par article..." style="max-width: 200px;">
                     <input type="text" id="individualFilterMission" class="form-control" placeholder="Filtrer par mission..." style="max-width: 250px;">
                 </div>
                 <div class="table-responsive">
@@ -644,6 +645,7 @@ function setupEventListeners() {
     document.getElementById('historyFilterItem').addEventListener('input', renderUsageHistoryTable);
     document.getElementById('individualFilterDate').addEventListener('change', renderIndividualBookingsTable);
     document.getElementById('individualFilterUser').addEventListener('change', renderIndividualBookingsTable);
+    document.getElementById('individualFilterItem').addEventListener('input', renderIndividualBookingsTable);
     document.getElementById('individualFilterMission').addEventListener('input', renderIndividualBookingsTable);
     document.getElementById('missionFilterDate').addEventListener('change', renderMissionBookingsTable);
     document.getElementById('missionFilterMission').addEventListener('input', renderMissionBookingsTable);
@@ -856,47 +858,27 @@ function escapeSingleQuotes(str) { return typeof str === 'string' ? str.replace(
 function renderIndividualBookingsTable() {
     const dateFilter = document.getElementById('individualFilterDate').value;
     const userFilter = document.getElementById('individualFilterUser').value;
+    const itemFilter = document.getElementById('individualFilterItem').value.toLowerCase();
     const missionFilter = document.getElementById('individualFilterMission').value.toLowerCase();
-
-    // Get today's date and set the time to the beginning of the day
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const tableBody = document.getElementById('individual-active-bookings-table');
-
-    // Filter bookings
     const filtered = allBookings.individual.filter(b => {
-        // Create a Date object from the booking_date string
         const bookingDate = new Date(b.booking_date + 'T00:00:00');
-
-        // **New check**: Return false for any bookings in the past
-        if (bookingDate < today) {
-            return false;
-        }
-
-        const bookingDateStr = b.booking_date;
-        const assetName = (b.asset_name || '').toLowerCase();
-        const userId = b.user_id;
-        const mission = (b.mission || '').toLowerCase();
-
-        // Check against the filter inputs
-        const dateMatch = !dateFilter || bookingDateStr === dateFilter;
-        const userMatch = !userFilter || userId == userFilter;
-        const missionMatch = !missionFilter || mission.includes(missionFilter);
-
-        return dateMatch && userMatch && missionMatch;
+        if (bookingDate < today) return false;
+        const dateMatch = !dateFilter || b.booking_date === dateFilter;
+        const userMatch = !userFilter || b.user_id == userFilter;
+        const itemMatch = !itemFilter || (b.asset_name && b.asset_name.toLowerCase().includes(itemFilter));
+        const missionMatch = !missionFilter || (b.mission && b.mission.toLowerCase().includes(missionFilter));
+        return dateMatch && userMatch && itemMatch && missionMatch;
     });
 
-    // Clear the existing table body
     tableBody.innerHTML = '';
-
-    // If no bookings match, display a message
     if (filtered.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation correspondante.</td></tr>';
         return;
     }
-
-    // Populate the table with the filtered bookings
     filtered.forEach(b => {
         const row = tableBody.insertRow();
         row.innerHTML = `<td>${new Date(b.booking_date + 'T00:00:00').toLocaleDateString('fr-FR')}</td><td>${b.asset_name || '(Supprimé)'}</td><td>${(b.prenom && b.nom) ? `${b.prenom} ${b.nom}` : '(Supprimé)'}</td><td>${b.mission || 'N/A'}</td>`;
