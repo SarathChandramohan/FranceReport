@@ -471,7 +471,7 @@ function renderReportsTab() {
             <td>${report.asset_name}</td>
             <td>${report.prenom} ${report.nom}</td>
             <td>${report.report_type}</td>
-            <td>${report.comments || 'N/A'}</td>
+            <td style="white-space: normal; word-break: break-word;">${report.comments || 'N/A'}</td>
             <td><span class="badge badge-pill badge-${report.status === 'pending' ? 'warning' : 'success'}">${report.status}</span></td>
             <td>
                 ${report.status === 'pending' ? `<button class="btn btn-success btn-sm" onclick="updateReportStatus(${report.report_id}, 'resolved')">Résoudre</button>` : ''}
