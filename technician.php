@@ -442,8 +442,8 @@ $user = getCurrentUser();
                         <label for="report-type">Type de problème *</label>
                         <select id="report-type" class="form-control" required>
                             <option value="">Sélectionner...</option>
-                            <option value="missing">Outil manquant</option>
-                            <option value="repair">Outil à réparer</option>
+                            <option value="missing">manquant</option>
+                            <option value="repair">à réparer</option>
                         </select>
                     </div>
                     <div class="form-group">
