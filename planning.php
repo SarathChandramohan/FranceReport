@@ -193,6 +193,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let state = { staff: [], missions: [], inventory: [], bookings: [], currentWeekStart: getMonday(new Date()), draggedWorker: null, shouldRefreshOnModalClose: false, selectedDate: null };
     let assignedWorkersInModal = [];
     let assignedAssetsInModal = [];
+    // --- BUG FIX 2: State variable to track asset selections while modal is open
+    let tempSelectedAssetIds = new Set();
+
 
     // --- DOM ELEMENTS ---
     const $loading = $('#loadingOverlay');
@@ -440,25 +443,11 @@ document.addEventListener('DOMContentLoaded', function() {
         $hiddenInput.val(assignedAssetsInModal.map(a => a.id).join(','));
     }
     
-    //
-    // BUG FIX 2: PRESERVE SELECTIONS ON SEARCH
-    //
     function populateAssetAssignmentModal() {
         const $list = $('#asset_assignment_list');
         const $searchInput = $('#asset_assignment_search');
         const searchTerm = $searchInput.val().toLowerCase();
-    
-        // Temporarily store the state of all checkboxes before clearing the list
-        const checkboxStates = new Map();
-        $list.find('input[type="checkbox"]').each(function() {
-            checkboxStates.set($(this).val(), this.checked);
-        });
-    
-        // Merge with already assigned assets
-        assignedAssetsInModal.forEach(asset => {
-            checkboxStates.set(String(asset.id), true);
-        });
-    
+        
         $list.empty();
     
         const missionDates = getDatesFromModal();
@@ -473,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const bookedAssetIds = new Set();
         state.bookings.forEach(b => {
             if (missionDates.includes(b.booking_date)) {
-                if (currentMission && b.mission_group_id === currentMission.mission_group_id) return; // Allow assets from the same mission group
+                if (currentMission && b.mission_group_id === currentMission.mission_group_id) return;
                 bookedAssetIds.add(String(b.asset_id));
             }
         });
@@ -483,10 +472,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .forEach(asset => {
                 const assetIdStr = String(asset.asset_id);
                 const isBooked = bookedAssetIds.has(assetIdStr);
-                const isChecked = checkboxStates.get(assetIdStr) || false; // Restore checked state
+                // --- BUG FIX 2: Check against the persistent temp set, not the DOM
+                const isChecked = tempSelectedAssetIds.has(assetIdStr);
                 const serialText = asset.serial_or_plate || '';
                 const itemHtml = `<label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isBooked && !isChecked ? 'disabled' : ''}">
-                    <span><input type="checkbox" class="mr-3" value="${asset.asset_id}" data-asset-name="${asset.asset_name}" data-asset-serial="${serialText}" ${isChecked ? 'checked' : ''} ${isBooked && !isChecked ? 'disabled' : ''}>
+                    <span><input type="checkbox" class="mr-3 asset-checkbox" value="${asset.asset_id}" ${isChecked ? 'checked' : ''} ${isBooked && !isChecked ? 'disabled' : ''}>
                     ${asset.asset_name} <small class="text-muted ml-2">${serialText}</small></span>
                     ${isBooked ? `<span class="badge badge-danger">Réservé</span>` : ''}</label>`;
                 $list.append(itemHtml);
@@ -627,25 +617,51 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#mission_color_swatches').on('click', '.color-swatch', function(){ $(this).addClass('selected').siblings().removeClass('selected'); $('input[name="color"]').val($(this).data('color')); });
     $('#modal_available_workers').on('click', '.list-group-item', function(e) { e.preventDefault(); assignedWorkersInModal.push({ id: $(this).data('worker-id'), name: $(this).data('worker-name') }); renderAssignedWorkersInModal(); $(this).remove(); });
     $('#assigned_workers_pills').on('click', '.remove-assigned-worker', function() { const id = $(this).data('worker-id'); assignedWorkersInModal = assignedWorkersInModal.filter(w => String(w.id) !== String(id)); renderAssignedWorkersInModal(); renderAvailableWorkersInModal(); });
+    
     $('#manageAssetsBtn').on('click', function() {
+        // --- BUG FIX 2: Initialize the temp set from the current assignments
+        tempSelectedAssetIds = new Set(assignedAssetsInModal.map(a => String(a.id)));
         populateAssetAssignmentModal();
         $assetAssignmentModal.modal('show');
     });
+
     $('#asset_assignment_search').on('keyup', populateAssetAssignmentModal);
+    
+    // --- BUG FIX 2: Update the temp set whenever a checkbox changes
+    $('#asset_assignment_list').on('change', '.asset-checkbox', function() {
+        const assetId = $(this).val();
+        if (this.checked) {
+            tempSelectedAssetIds.add(assetId);
+        } else {
+            tempSelectedAssetIds.delete(assetId);
+        }
+    });
+
     $('#confirmAssetAssignmentBtn').on('click', function() {
+        // --- BUG FIX 2: Rebuild the main assignment array from the temp set
         assignedAssetsInModal = [];
-        $('#asset_assignment_list input[type="checkbox"]:checked').each(function() {
-            assignedAssetsInModal.push({ id: $(this).val(), name: $(this).data('asset-name'), serial: $(this).data('asset-serial') });
+        tempSelectedAssetIds.forEach(assetId => {
+            const asset = state.inventory.find(a => String(a.asset_id) === assetId);
+            if (asset) {
+                assignedAssetsInModal.push({ 
+                    id: asset.asset_id, 
+                    name: asset.asset_name, 
+                    serial: asset.serial_or_plate 
+                });
+            }
         });
         updateAssignedAssetsDisplay();
         $assetAssignmentModal.modal('hide');
     });
 
-    //
-    // BUG FIX 1: FIX UNSCROLLABLE MODAL
-    //
+    // --- BUG FIX 1: Add this event handler to fix the scrolling issue
     $assetAssignmentModal.on('hidden.bs.modal', function () {
-        $('body').css('overflow', 'auto');
+        // When the asset modal is hidden, check if the main mission modal is still visible.
+        // If it is, Bootstrap might have incorrectly removed the 'modal-open' class from the body,
+        // which disables scrolling. This line adds it back, restoring the scrollbar.
+        if ($missionModal.is(':visible')) {
+            $('body').addClass('modal-open');
+        }
     });
 
     $('#missionForm').on('submit', async function(e) {
