@@ -97,7 +97,7 @@ $default_color = $predefined_colors[0];
     </div>
 
     <div class="modal fade" id="missionFormModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form id="missionForm">
                     <div class="modal-header bg-secondary text-white">
@@ -108,29 +108,39 @@ $default_color = $predefined_colors[0];
                         <input type="hidden" id="mission_id_form" name="mission_id">
                         <input type="hidden" id="assignment_date_form" name="assignment_date">
                         <div class="alert alert-info" id="modalDateDisplay"></div>
-                        <div class="form-row" id="multi_day_fields" style="display: none;">
-                            <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date"></div>
-                            <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date"></div>
-                        </div>
-                        <div class="form-group"><label>Titre de la mission *</label><input type="text" class="form-control" name="mission_text" required></div>
-                        <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="3"></textarea></div>
+                        
                         <div class="form-row">
-                            <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control" name="start_time" id="mission_start_time"></div>
-                            <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control" name="end_time" id="mission_end_time"></div>
+                            <div class="form-group col-md-6">
+                                <div id="multi_day_fields" style="display: none;">
+                                    <div class="form-row">
+                                        <div class="form-group col-md-6"><label>Date de début *</label><input type="date" class="form-control" name="start_date"></div>
+                                        <div class="form-group col-md-6"><label>Date de fin *</label><input type="date" class="form-control" name="end_date"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group"><label>Titre de la mission *</label><input type="text" class="form-control" name="mission_text" required></div>
+                                <div class="form-row">
+                                    <div class="form-group col-md-6"><label>Heure début</label><input type="time" class="form-control" name="start_time" id="mission_start_time"></div>
+                                    <div class="form-group col-md-6"><label>Heure fin</label><input type="time" class="form-control" name="end_time" id="mission_end_time"></div>
+                                </div>
+                                <div class="form-group"><label>Lieu</label><input type="text" class="form-control" name="location"></div>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <div class="form-group"><label>Commentaires</label><textarea class="form-control" name="comments" rows="5"></textarea></div>
+                                <div class="form-group">
+                                    <label>Type</label>
+                                    <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
+                                </div>
+                                <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
+                            </div>
                         </div>
-                        <div class="form-group"><label>Lieu</label><input type="text" class="form-control" name="location"></div>
-                        <div class="form-group">
-                            <label>Type</label>
-                            <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons" id="shift_type_buttons"></div>
-                        </div>
-                        <div class="form-group"><label>Couleur</label><div id="mission_color_swatches"></div><input type="hidden" name="color" value="<?= htmlspecialchars($default_color); ?>"></div>
+
                         <div id="assign-users-group" style="display:none;">
                              <hr>
                             <input type="hidden" name="assigned_user_ids" id="assigned_user_ids_hidden">
                             <label>Ouvriers assignés *</label>
                             <div id="assigned_workers_pills" class="d-flex flex-wrap align-items-center border rounded p-2 mb-3 bg-light" style="min-height: 50px;"><span class="text-muted small p-2" id="no_workers_assigned_text">Aucun ouvrier assigné.</span></div>
                             <label>Cliquer pour assigner un ouvrier :</label>
-                            <div id="modal_available_workers" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+                            <div id="modal_available_workers" class="list-group" style="max-height: 150px; overflow-y: auto;"></div>
                         </div>
                         <div id="asset-management-container" style="display: none;">
                             <hr>
