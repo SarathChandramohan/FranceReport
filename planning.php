@@ -97,7 +97,7 @@ $default_color = $predefined_colors[0];
     </div>
 
     <div class="modal fade" id="missionFormModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <form id="missionForm">
                     <div class="modal-header bg-secondary text-white">
