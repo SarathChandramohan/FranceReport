@@ -102,8 +102,22 @@ function getEvents($conn) {
     echo json_encode($events);
 }
 
+function assignEventToAllActiveUsers($conn, $eventId) {
+    // Fetch all active user IDs
+    $stmtUsers = $conn->query("SELECT user_id FROM Users WHERE status = 'Active'");
+    $activeUserIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN);
+
+    // Assign the event to each active user
+    $sqlAssign = "INSERT INTO Event_AssignedUsers (event_id, user_id) VALUES (:event_id, :user_id)";
+    $stmtAssign = $conn->prepare($sqlAssign);
+    foreach ($activeUserIds as $userId) {
+        $stmtAssign->execute([':event_id' => $eventId, ':user_id' => $userId]);
+    }
+}
+
+
 function createEvent($conn, $creatorUserId) {
-    if (empty($_POST['title']) || empty($_POST['start_datetime']) || empty($_POST['end_datetime']) || empty($_POST['assigned_users'])) {
+    if (empty($_POST['title']) || empty($_POST['start_datetime']) || empty($_POST['end_datetime'])) {
         echo json_encode(['status' => 'error', 'message' => 'Veuillez remplir tous les champs requis.']);
         return;
     }
@@ -130,11 +144,9 @@ function createEvent($conn, $creatorUserId) {
     ]);
     $eventId = $conn->lastInsertId();
 
-    $sqlAssign = "INSERT INTO Event_AssignedUsers (event_id, user_id) VALUES (:event_id, :user_id)";
-    $stmtAssign = $conn->prepare($sqlAssign);
-    foreach ($_POST['assigned_users'] as $userId) {
-        $stmtAssign->execute([':event_id' => $eventId, ':user_id' => $userId]);
-    }
+    // New: Assign the event to all active users
+    assignEventToAllActiveUsers($conn, $eventId);
+
     $conn->commit();
     echo json_encode(['status' => 'success', 'message' => 'Événement créé avec succès', 'event_id' => $eventId]);
 }
@@ -145,6 +157,8 @@ function updateEvent($conn) {
         return;
     }
     
+    $eventId = $_POST['event_id'];
+
     $conn->beginTransaction();
     $sqlEvent = "UPDATE Events SET title = :title, description = :description, start_datetime = :start, end_datetime = :end, color = :color WHERE event_id = :event_id";
     $stmtEvent = $conn->prepare($sqlEvent);
@@ -154,19 +168,16 @@ function updateEvent($conn) {
         ':start' => (new DateTime($_POST['start_datetime']))->format('Y-m-d H:i:s'),
         ':end' => (new DateTime($_POST['end_datetime']))->format('Y-m-d H:i:s'),
         ':color' => $_POST['color'] ?: '#4f46e5',
-        ':event_id' => $_POST['event_id']
+        ':event_id' => $eventId
     ]);
 
+    // First, remove all existing assignments for this event
     $stmtDelete = $conn->prepare("DELETE FROM Event_AssignedUsers WHERE event_id = :event_id");
-    $stmtDelete->execute([':event_id' => $_POST['event_id']]);
+    $stmtDelete->execute([':event_id' => $eventId]);
 
-    $sqlAssign = "INSERT INTO Event_AssignedUsers (event_id, user_id) VALUES (:event_id, :user_id)";
-    $stmtAssign = $conn->prepare($sqlAssign);
-    if (!empty($_POST['assigned_users'])) {
-        foreach ($_POST['assigned_users'] as $userId) {
-            $stmtAssign->execute([':event_id' => $_POST['event_id'], ':user_id' => $userId]);
-        }
-    }
+    // New: Re-assign the event to all active users
+    assignEventToAllActiveUsers($conn, $eventId);
+    
     $conn->commit();
     echo json_encode(['status' => 'success', 'message' => 'Événement mis à jour avec succès']);
 }
