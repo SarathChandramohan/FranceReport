@@ -4,10 +4,9 @@ require_once 'session-management.php';
 requireLogin();
 $user = getCurrentUser();
 
-// 2. DB Connection
+// NOTE: The user list query is no longer needed for the modal,
+// but it might be useful elsewhere. It can be removed if not.
 require_once 'db-connection.php';
-
-// 3. Fetch users for the modal dropdown
 $usersList = [];
 try {
     $stmt = $conn->query("SELECT user_id, nom, prenom FROM Users WHERE status = 'Active' ORDER BY nom, prenom");
@@ -20,7 +19,7 @@ try {
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF--8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calendrier - Gestion des Ouvriers</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -106,14 +105,35 @@ try {
         .calendar-grid-wrapper { border-radius: var(--border-radius); overflow: hidden; border: 1px solid var(--border-color); }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
         .day-header { text-align: center; padding: 0.75rem 0; font-weight: 500; font-size: 0.75rem; color: var(--text-muted); background-color: var(--bg-light); border-bottom: 1px solid var(--border-color); }
-        .day-cell { position: relative; min-height: 8rem; padding: 0.5rem; border-top: 1px solid var(--border-color); border-left: 1px solid var(--border-color); transition: background-color var(--transition-speed) ease; cursor: pointer; }
+        .day-cell { 
+            position: relative;
+            /* CHANGE: Use aspect-ratio for a square shape and remove min-height */
+            aspect-ratio: 1 / 1;
+            padding: 0.25rem;
+            border-top: 1px solid var(--border-color);
+            border-left: 1px solid var(--border-color);
+            transition: background-color var(--transition-speed) ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
         .day-cell:hover { background-color: var(--bg-light); }
         .day-cell.other-month { background-color: var(--bg-light); color: #9ca3af; cursor: default; }
         .day-number { font-weight: 500; font-size: 0.875rem; display: flex; justify-content: flex-end; }
         .day-number span { width: 1.75rem; height: 1.75rem; display: flex; align-items: center; justify-content: center; border-radius: 9999px; transition: all var(--transition-speed) ease; }
         .day-number.is-today span { background-color: var(--primary-brand-color); color: white; font-weight: 700; }
-        .event-wrapper { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 4px; }
-        .event-pill { font-size: 0.75rem; color: white; padding: 0.2rem 0.5rem; border-radius: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .event-wrapper {
+            margin-top: 0.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            /* Allow scrolling if events overflow the cell */
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        .event-pill { font-size: 0.75rem; color: white; padding: 0.1rem 0.4rem; border-radius: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
         /* --- Sidebar --- */
         .sidebar-pane { width: 100%; padding: 1.5rem; background-color: var(--bg-light); }
@@ -139,13 +159,45 @@ try {
         .form-group > label { display: block; font-weight: 500; font-size: 0.875rem; margin-bottom: 0.5rem; }
         .form-input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background-color: var(--bg-base); transition: all var(--transition-speed) ease; }
         .form-input:focus { outline: none; border-color: var(--primary-brand-color); box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2); }
-        select[multiple] { height: 120px; }
         .form-error { display: none; background-color: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 1rem; border-radius: 0.5rem; }
         .btn-modal { padding: 0.6rem 1.25rem; }
         .btn-modal-danger { background-color: var(--danger-color); color: white; border-color: var(--danger-color); }
         .btn-modal-danger:hover { background-color: var(--danger-hover-color); }
         .btn-modal-delete { margin-right: auto; }
         .hidden { display: none; }
+
+        /* --- MOBILE OPTIMIZATION --- */
+        @media (max-width: 768px) {
+            .page-wrapper { padding: 0.5rem; }
+            .calendar-main { padding: 0.75rem; }
+            .calendar-header { flex-direction: column; align-items: stretch; gap: 0.75rem; margin-bottom: 1rem; }
+            .calendar-nav { justify-content: space-between; }
+            .create-btn { width: 100%; }
+            .month-year-display { font-size: 1.25rem; }
+            .day-header { font-size: 0.65rem; padding: 0.5rem 0; }
+            .day-number { font-size: 0.75rem; }
+            .day-number span { width: 1.5rem; height: 1.5rem; }
+            .event-pill { font-size: 0.6rem; padding: 0 0.2rem; }
+            .nav-btn, .today-btn, .create-btn { padding: 0.5rem; font-size: 0.8rem; }
+            .sidebar-pane { padding: 1rem; }
+            .sidebar-header { font-size: 1.1rem; }
+        }
+
+        @media (max-width: 480px) {
+            .day-header {
+                /* Abbreviate to first letter on very small screens */
+                font-size: 0.7rem;
+            }
+            /* Shorten day names if needed */
+            .day-header:nth-child(1)::before { content: "D"; }
+            .day-header:nth-child(2)::before { content: "L"; }
+            .day-header:nth-child(3)::before { content: "M"; }
+            .day-header:nth-child(4)::before { content: "M"; }
+            .day-header:nth-child(5)::before { content: "J"; }
+            .day-header:nth-child(6)::before { content: "V"; }
+            .day-header:nth-child(7)::before { content: "S"; }
+            .day-header { font-size: 0; } /* Hide original text */
+        }
     </style>
 </head>
 <body>
@@ -191,9 +243,6 @@ try {
                     <div class="form-group"><label for="event-title">Titre</label><input type="text" id="event-title" name="title" class="form-input" required /></div>
                     <div class="form-group"><label>Début et Fin</label><input type="datetime-local" id="event-start" name="start_datetime" class="form-input" required/><input type="datetime-local" id="event-end" name="end_datetime" class="form-input" style="margin-top: 0.5rem;" required /></div>
                     <div class="form-group"><label for="event-description">Description</label><textarea id="event-description" name="description" rows="3" class="form-input"></textarea></div>
-                    <div class="form-group"><label for="event-assigned-users">Assigner à</label><select class="form-input" id="event-assigned-users" name="assigned_users[]" multiple required>
-                        <?php foreach ($usersList as $u): ?><option value="<?php echo htmlspecialchars($u['user_id']); ?>"><?php echo htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?></option><?php endforeach; ?>
-                    </select></div>
                     <div class="form-group"><label for="event-color">Couleur</label><input type="color" class="form-input" id="event-color" name="color" value="#4f46e5"></div>
                 </div>
                 <div class="modal-footer">
@@ -243,8 +292,6 @@ try {
                 const end = data.end || new Date(start.getTime() + 60 * 60 * 1000);
                 form.querySelector('#event-start').value = formatLocalDateTime(start);
                 form.querySelector('#event-end').value = formatLocalDateTime(end);
-                const selectUsers = form.querySelector('#event-assigned-users');
-                for (let option of selectUsers.options) option.selected = true;
             } else {
                 document.getElementById('eventModalLabel').textContent = 'Détails de l\'événement';
                 saveBtn.classList.add('hidden'); updateBtn.classList.remove('hidden'); deleteBtn.classList.remove('hidden');
@@ -255,9 +302,6 @@ try {
                 form.querySelector('#event-color').value = data.color || '#4f46e5';
                 form.querySelector('#event-start').value = formatLocalDateTime(data.start);
                 form.querySelector('#event-end').value = formatLocalDateTime(data.end);
-                const assignedIds = data.extendedProps.assigned_user_ids || [];
-                const select = form.querySelector('#event-assigned-users');
-                for (let option of select.options) { option.selected = assignedIds.includes(parseInt(option.value)); }
             }
             openModal();
         };
@@ -275,20 +319,16 @@ try {
                         alert("An error occurred while loading events: " + (data.message || 'Please try again.'));
                         allEvents = [];
                     } else {
-                        // ### BUG FIX ###
-                        // Defensively parse dates and filter out any events with invalid date objects.
-                        // This prevents the entire script from crashing.
                         allEvents = data.map(evt => {
                             const start = new Date(evt.start);
                             const end = new Date(evt.end);
                             if (isNaN(start.getTime()) || isNaN(end.getTime())) {
                                 console.error('Invalid date received for event, skipping:', evt);
-                                return null; // Mark as invalid
+                                return null;
                             }
                             return { ...evt, start, end };
-                        }).filter(Boolean); // Filter out the null (invalid) events
+                        }).filter(Boolean);
                     }
-
                     renderCalendar();
                     renderSidebarEvents();
                 })
@@ -323,7 +363,7 @@ try {
             for (let i = 1; i <= lastDateOfMonth; i++) {
                 const dayDate = new Date(year, month, i);
                 const dayString = dayDate.toISOString().split('T')[0];
-                const dayEvents = allEvents.filter(e => e.start.toISOString().split('T')[0] === dayString);
+                const dayEvents = allEvents.filter(e => e.start.toISOString().split('T')[0] <= dayString && e.end.toISOString().split('T')[0] >= dayString).sort((a,b) => a.start - b.start);
                 const isToday = dayString === today.toISOString().split('T')[0];
                 
                 calendarHtml += `<div class="day-cell" data-date="${dayString}">
@@ -350,7 +390,7 @@ try {
             } else {
                 upcomingEvents.forEach(event => {
                     const timeStr = `${event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})} - ${event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
-                    sidebarHtml += `<div class="event-list-card"><p class="event-list-card-title">${event.title}</p><p class="event-list-card-date">${event.start.toLocaleDateString('fr-FR', { weekday: 'long', month: 'long', day: 'numeric' })} | ${timeStr}</p></div>`;
+                    sidebarHtml += `<div class="event-list-card" data-event-id="${event.id}"><p class="event-list-card-title">${event.title}</p><p class="event-list-card-date">${event.start.toLocaleDateString('fr-FR', { weekday: 'long', month: 'long', day: 'numeric' })} | ${timeStr}</p></div>`;
                 });
             }
             eventListEl.innerHTML = sidebarHtml;
