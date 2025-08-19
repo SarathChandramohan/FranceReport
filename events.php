@@ -3,23 +3,16 @@
 require_once 'session-management.php';
 requireLogin();
 $user = getCurrentUser();
+// Ensure role is set, default to 'user' if not present
+$userRole = isset($user['role']) ? $user['role'] : 'user';
 
-// NOTE: The user list query is no longer needed for the modal,
-// but it might be useful elsewhere. It can be removed if not.
+// 2. DB Connection
 require_once 'db-connection.php';
-$usersList = [];
-try {
-    $stmt = $conn->query("SELECT user_id, nom, prenom FROM Users WHERE status = 'Active' ORDER BY nom, prenom");
-    $usersList = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Error fetching users for events page: " . $e->getMessage());
-}
-
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF--8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calendrier - Gestion des Ouvriers</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -57,7 +50,6 @@ try {
             -webkit-font-smoothing: antialiased;
         }
 
-        /* --- Main Layout --- */
         .page-wrapper { padding: 1rem; }
         .calendar-layout {
             max-width: 90rem;
@@ -74,7 +66,6 @@ try {
             .calendar-layout { flex-direction: row; }
         }
 
-        /* --- Calendar Pane --- */
         .calendar-main { flex-grow: 1; padding: 1.5rem; }
         .calendar-header {
             display: flex;
@@ -101,13 +92,11 @@ try {
         .create-btn { background-color: var(--primary-brand-color); color: white; border-color: var(--primary-brand-color); gap: 0.5rem; }
         .create-btn:hover { background-color: var(--primary-brand-hover); box-shadow: var(--shadow-md); }
         
-        /* --- Calendar Grid --- */
         .calendar-grid-wrapper { border-radius: var(--border-radius); overflow: hidden; border: 1px solid var(--border-color); }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
         .day-header { text-align: center; padding: 0.75rem 0; font-weight: 500; font-size: 0.75rem; color: var(--text-muted); background-color: var(--bg-light); border-bottom: 1px solid var(--border-color); }
         .day-cell { 
             position: relative;
-            /* CHANGE: Use aspect-ratio for a square shape and remove min-height */
             aspect-ratio: 1 / 1;
             padding: 0.25rem;
             border-top: 1px solid var(--border-color);
@@ -129,13 +118,11 @@ try {
             display: flex;
             flex-direction: column;
             gap: 2px;
-            /* Allow scrolling if events overflow the cell */
             overflow-y: auto;
             flex-grow: 1;
         }
         .event-pill { font-size: 0.75rem; color: white; padding: 0.1rem 0.4rem; border-radius: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* --- Sidebar --- */
         .sidebar-pane { width: 100%; padding: 1.5rem; background-color: var(--bg-light); }
         @media (min-width: 1024px) { .sidebar-pane { width: 25rem; border-left: 1px solid var(--border-color); } }
         .sidebar-header { font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-heading); }
@@ -145,17 +132,35 @@ try {
         .event-list-card-date { font-size: 0.875rem; color: var(--text-muted); margin: 0.25rem 0; }
         
         /* --- Modal --- */
-        .modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; visibility: hidden; opacity: 0; transition: visibility 0s var(--transition-speed), opacity var(--transition-speed) ease; }
+        /* CHANGE: Modal container is now scrollable for mobile */
+        .modal { 
+            position: fixed; inset: 0; z-index: 100;
+            display: flex; 
+            /* CHANGE: Align to top on small screens, allow scrolling */
+            align-items: flex-start; 
+            justify-content: center; 
+            padding: 1rem;
+            visibility: hidden; opacity: 0; transition: visibility 0s var(--transition-speed), opacity var(--transition-speed) ease;
+            overflow-y: auto;
+        }
         .modal.is-visible { visibility: visible; opacity: 1; transition-delay: 0s; }
         .modal-backdrop { position: fixed; inset: 0; background-color: rgba(30, 41, 59, 0.5); }
-        .modal-content { background-color: var(--bg-base); border-radius: var(--border-radius); box-shadow: var(--shadow-lg); width: 100%; max-width: 36rem; transform: scale(0.95); transition: transform var(--transition-speed) ease; }
+        .modal-content { 
+            background-color: var(--bg-base); 
+            border-radius: var(--border-radius); 
+            box-shadow: var(--shadow-lg); 
+            width: 100%; max-width: 36rem; 
+            transform: scale(0.95); transition: transform var(--transition-speed) ease;
+            /* CHANGE: Add margin top for spacing */
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
         .modal.is-visible .modal-content { transform: scale(1); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
         .modal-title { font-size: 1.25rem; font-weight: 600; margin: 0; color: var(--text-heading); }
         .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
         .modal-footer { background-color: var(--bg-light); padding: 1rem 1.5rem; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; border-bottom-left-radius: var(--border-radius); border-bottom-right-radius: var(--border-radius); }
 
-        /* --- Forms & Utilities --- */
         .form-group > label { display: block; font-weight: 500; font-size: 0.875rem; margin-bottom: 0.5rem; }
         .form-input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background-color: var(--bg-base); transition: all var(--transition-speed) ease; }
         .form-input:focus { outline: none; border-color: var(--primary-brand-color); box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2); }
@@ -166,7 +171,17 @@ try {
         .btn-modal-delete { margin-right: auto; }
         .hidden { display: none; }
 
-        /* --- MOBILE OPTIMIZATION --- */
+        @media (min-width: 768px) {
+             .modal {
+                /* Center vertically on larger screens */
+                align-items: center;
+             }
+             .modal-content {
+                margin-top: 0;
+                margin-bottom: 0;
+             }
+        }
+        
         @media (max-width: 768px) {
             .page-wrapper { padding: 0.5rem; }
             .calendar-main { padding: 0.75rem; }
@@ -184,11 +199,6 @@ try {
         }
 
         @media (max-width: 480px) {
-            .day-header {
-                /* Abbreviate to first letter on very small screens */
-                font-size: 0.7rem;
-            }
-            /* Shorten day names if needed */
             .day-header:nth-child(1)::before { content: "D"; }
             .day-header:nth-child(2)::before { content: "L"; }
             .day-header:nth-child(3)::before { content: "M"; }
@@ -196,11 +206,11 @@ try {
             .day-header:nth-child(5)::before { content: "J"; }
             .day-header:nth-child(6)::before { content: "V"; }
             .day-header:nth-child(7)::before { content: "S"; }
-            .day-header { font-size: 0; } /* Hide original text */
+            .day-header { font-size: 0; }
         }
     </style>
 </head>
-<body>
+<body data-user-role="<?php echo htmlspecialchars($userRole); ?>">
 
     <?php include 'navbar.php'; ?>
 
@@ -245,7 +255,7 @@ try {
                     <div class="form-group"><label for="event-description">Description</label><textarea id="event-description" name="description" rows="3" class="form-input"></textarea></div>
                     <div class="form-group"><label for="event-color">Couleur</label><input type="color" class="form-input" id="event-color" name="color" value="#4f46e5"></div>
                 </div>
-                <div class="modal-footer">
+                <div id="modal-footer" class="modal-footer">
                     <button type="button" id="delete-event-btn" class="today-btn btn-modal btn-modal-danger btn-modal-delete hidden">Supprimer</button>
                     <button type="button" id="cancel-modal-btn" class="today-btn btn-modal">Annuler</button>
                     <input type="hidden" id="event-id" name="event_id">
@@ -258,6 +268,10 @@ try {
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- Role-based access control ---
+        const userRole = document.body.dataset.userRole;
+        const isAdmin = userRole === 'admin';
+
         // --- DOM Elements ---
         const modal = document.getElementById('event-modal');
         const form = document.getElementById('event-form');
@@ -268,6 +282,12 @@ try {
         let currentDate = new Date();
         let allEvents = [];
 
+        // Hide create button if not an admin
+        if (!isAdmin) {
+            const createBtn = document.getElementById('create-event-btn');
+            if(createBtn) createBtn.style.display = 'none';
+        }
+        
         const openModal = () => modal.classList.add('is-visible');
         const closeModal = () => modal.classList.remove('is-visible');
         
@@ -283,6 +303,17 @@ try {
             const saveBtn = document.getElementById('save-event-btn');
             const updateBtn = document.getElementById('update-event-btn');
             const deleteBtn = document.getElementById('delete-event-btn');
+            const modalFooter = document.getElementById('modal-footer');
+
+            // Handle UI based on admin status
+            if (isAdmin) {
+                modalFooter.classList.remove('hidden');
+                form.querySelectorAll('input, textarea').forEach(el => el.disabled = false);
+            } else {
+                // For non-admins, show footer with only a close button or hide it entirely
+                modalFooter.classList.add('hidden'); 
+                form.querySelectorAll('input, textarea').forEach(el => el.disabled = true);
+            }
 
             if (mode === 'create') {
                 document.getElementById('eventModalLabel').textContent = 'Créer un nouvel événement';
@@ -292,7 +323,7 @@ try {
                 const end = data.end || new Date(start.getTime() + 60 * 60 * 1000);
                 form.querySelector('#event-start').value = formatLocalDateTime(start);
                 form.querySelector('#event-end').value = formatLocalDateTime(end);
-            } else {
+            } else { // 'edit' or 'view' mode
                 document.getElementById('eventModalLabel').textContent = 'Détails de l\'événement';
                 saveBtn.classList.add('hidden'); updateBtn.classList.remove('hidden'); deleteBtn.classList.remove('hidden');
                 form.dataset.action = 'update_event';
@@ -316,26 +347,14 @@ try {
                 .then(data => {
                     if (!Array.isArray(data)) {
                         console.error("Server returned an error:", data.message || 'Unknown error');
-                        alert("An error occurred while loading events: " + (data.message || 'Please try again.'));
                         allEvents = [];
                     } else {
-                        allEvents = data.map(evt => {
-                            const start = new Date(evt.start);
-                            const end = new Date(evt.end);
-                            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                                console.error('Invalid date received for event, skipping:', evt);
-                                return null;
-                            }
-                            return { ...evt, start, end };
-                        }).filter(Boolean);
+                        allEvents = data.map(evt => ({...evt, start: new Date(evt.start), end: new Date(evt.end) })).filter(Boolean);
                     }
                     renderCalendar();
                     renderSidebarEvents();
                 })
-                .catch(error => {
-                    console.error('Error fetching events:', error);
-                    alert('A critical error occurred. Please check the console and refresh the page.');
-                });
+                .catch(error => console.error('Error fetching events:', error));
         };
         
         const updateCalendarData = () => {
@@ -384,20 +403,17 @@ try {
             today.setHours(0, 0, 0, 0);
             const upcomingEvents = allEvents.filter(e => e.end >= today).sort((a, b) => a.start - b.start);
 
-            let sidebarHtml = '';
-            if (upcomingEvents.length === 0) {
-                sidebarHtml = '<p>Aucun événement à venir.</p>';
-            } else {
-                upcomingEvents.forEach(event => {
+            eventListEl.innerHTML = upcomingEvents.length === 0 
+                ? '<p>Aucun événement à venir.</p>' 
+                : upcomingEvents.map(event => {
                     const timeStr = `${event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})} - ${event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
-                    sidebarHtml += `<div class="event-list-card" data-event-id="${event.id}"><p class="event-list-card-title">${event.title}</p><p class="event-list-card-date">${event.start.toLocaleDateString('fr-FR', { weekday: 'long', month: 'long', day: 'numeric' })} | ${timeStr}</p></div>`;
-                });
-            }
-            eventListEl.innerHTML = sidebarHtml;
+                    return `<div class="event-list-card" data-event-id="${event.id}"><p class="event-list-card-title">${event.title}</p><p class="event-list-card-date">${event.start.toLocaleDateString('fr-FR', { weekday: 'long', month: 'long', day: 'numeric' })} | ${timeStr}</p></div>`;
+                }).join('');
         };
         
         const handleFormSubmit = e => {
             e.preventDefault();
+            if (!isAdmin) return; // Extra security
             const action = form.dataset.action; if (!action) return;
             const formError = document.getElementById('form-error-message');
             formError.style.display = 'none';
@@ -418,7 +434,10 @@ try {
         document.getElementById('prev-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); updateCalendarData(); });
         document.getElementById('next-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); updateCalendarData(); });
         document.getElementById('today-btn').addEventListener('click', () => { currentDate = new Date(); updateCalendarData(); });
-        document.getElementById('create-event-btn').addEventListener('click', () => prepareForm('create'));
+        
+        if(isAdmin) {
+             document.getElementById('create-event-btn').addEventListener('click', () => prepareForm('create'));
+        }
 
         calendarDaysEl.addEventListener('click', e => {
             const eventPill = e.target.closest('.event-pill');
@@ -427,8 +446,9 @@ try {
                 e.stopPropagation();
                 const eventId = eventPill.dataset.eventId;
                 const eventData = allEvents.find(ev => ev.id == eventId);
-                if (eventData) prepareForm('edit', eventData);
-            } else if (dayCell && !dayCell.classList.contains('other-month')) {
+                if (eventData) prepareForm('edit', eventData); // Opens in view/edit mode
+            } else if (isAdmin && dayCell && !dayCell.classList.contains('other-month')) {
+                // Only admins can create by clicking a day cell
                 const dateStr = dayCell.dataset.date;
                 if (dateStr) { const startDate = new Date(dateStr); startDate.setHours(new Date().getHours() + 1, 0, 0); prepareForm('create', { start: startDate }); }
             }
@@ -437,7 +457,7 @@ try {
         form.addEventListener('submit', handleFormSubmit);
 
         document.getElementById('delete-event-btn').addEventListener('click', () => {
-            if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) return;
+            if (!isAdmin || !confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) return;
             const eventId = form.querySelector('#event-id').value; if (!eventId) return;
             
             const formData = new FormData();
