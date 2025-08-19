@@ -134,27 +134,24 @@ require_once 'db-connection.php';
         /* --- Modal --- */
         /* CHANGE: Modal container is now scrollable for mobile */
         .modal { 
-            position: fixed; inset: 0; z-index: 100;
-            display: flex; 
-            /* CHANGE: Align to top on small screens, allow scrolling */
-            align-items: flex-start; 
-            justify-content: center; 
-            padding: 1rem;
-            visibility: hidden; opacity: 0; transition: visibility 0s var(--transition-speed), opacity var(--transition-speed) ease;
-            overflow-y: auto;
-        }
+    position: fixed; inset: 0; z-index: 1000; /* Increased z-index */
+    display: flex; 
+    /* CHANGE: Align to bottom on small screens */
+    align-items: flex-end; /* Changed from flex-start to flex-end */
+    justify-content: center; 
+    padding: 1rem;
+    visibility: hidden; opacity: 0; transition: visibility 0s var(--transition-speed), opacity var(--transition-speed) ease;
+    overflow-y: auto;
+}
         .modal.is-visible { visibility: visible; opacity: 1; transition-delay: 0s; }
         .modal-backdrop { position: fixed; inset: 0; background-color: rgba(30, 41, 59, 0.5); }
         .modal-content { 
-            background-color: var(--bg-base); 
-            border-radius: var(--border-radius); 
-            box-shadow: var(--shadow-lg); 
-            width: 100%; max-width: 36rem; 
-            transform: scale(0.95); transition: transform var(--transition-speed) ease;
-            /* CHANGE: Add margin top for spacing */
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-        }
+    background-color: var(--bg-base); 
+    border-radius: var(--border-radius); 
+    box-shadow: var(--shadow-lg); 
+    width: 100%; max-width: 36rem; 
+    transform: scale(0.95); transition: transform var(--transition-speed) ease;
+}
         .modal.is-visible .modal-content { transform: scale(1); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
         .modal-title { font-size: 1.25rem; font-weight: 600; margin: 0; color: var(--text-heading); }
@@ -477,3 +474,4 @@ require_once 'db-connection.php';
     </script>
 </body>
 </html>
+
