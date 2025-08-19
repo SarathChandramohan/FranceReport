@@ -300,7 +300,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         <?php else: ?>
             <a href="seeplanning.php" class="<?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
         <?php endif; ?>
-        <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">Technicien</a>
+        <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">véhicules / outillage</a>
         <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
         <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
         <hr>
@@ -341,3 +341,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
