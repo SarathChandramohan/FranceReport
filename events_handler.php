@@ -347,5 +347,3 @@ function getUsers($conn) {
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['status' => 'success', 'data' => $users]);
 }
-
-?>
