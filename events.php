@@ -24,115 +24,183 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Événements - Gestion des Ouvriers</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.js'></script>
     <style>
         :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger-color: #dc2626;
+            --danger-hover: #b91c1c;
+            --light-gray: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-dark: #111827;
+            --text-light: #374151;
+            --white: #ffffff;
             --fc-border-color: #e2e8f0;
             --fc-daygrid-day-number-color: #374151;
             --fc-today-bg-color: rgba(37, 99, 235, 0.05);
-            --fc-button-bg-color: #ffffff;
-            --fc-button-text-color: #374151;
-            --fc-button-border-color: #e2e8f0;
-            --fc-button-hover-bg-color: #f1f5f9;
-            --fc-button-active-bg-color: #e2e8f0;
-            --fc-button-active-border-color: #d1d5db;
         }
 
         body {
-            background-color: #f8fafc;
+            background-color: var(--light-gray);
+            font-family: sans-serif;
+            margin: 0;
         }
+
+        .container {
+            padding: 1.5rem;
+        }
+
+        #calendar-container {
+            background-color: var(--white);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        /* FullCalendar Customizations */
         .fc .fc-toolbar.fc-header-toolbar {
             margin-bottom: 1.5rem;
             display: flex;
-            flex-direction: column;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
             gap: 1rem;
         }
-        @media (min-width: 768px) {
-            .fc .fc-toolbar.fc-header-toolbar {
-                flex-direction: row;
-                align-items: center;
-            }
-            #event-list-view {
-                display: none;
-            }
-        }
-         @media (max-width: 767px) {
-            #calendar {
-                display: none;
-            }
-        }
-
 
         .fc .fc-toolbar-title {
             font-size: 1.25rem;
             font-weight: 600;
-            color: #111827;
+            color: var(--text-dark);
         }
+
         .fc .fc-button {
+            background-color: var(--white);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
             transition: all 0.2s ease-in-out;
         }
-        .fc .fc-daygrid-day.fc-day-today {
-            background-color: var(--fc-today-bg-color);
+
+        .fc .fc-button:hover {
+            background-color: #f1f5f9;
         }
-         .fc-createEvent-button { /* Custom class for the new button */
-            background-color: #2563eb !important;
+
+        .fc .fc-button-primary:not(:disabled).fc-button-active,
+        .fc .fc-button-primary:not(:disabled):active {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .fc-createEvent-button {
+            background-color: var(--primary-color) !important;
             color: white !important;
-            border-color: #2563eb !important;
+            border-color: var(--primary-color) !important;
             font-weight: 500 !important;
         }
         .fc-createEvent-button:hover {
-            background-color: #1d4ed8 !important;
-            border-color: #1d4ed8 !important;
+            background-color: var(--primary-hover) !important;
+            border-color: var(--primary-hover) !important;
         }
 
 
         /* Modal Styles */
-        .modal-backdrop {
-            transition: opacity 0.3s ease;
-        }
-        .modal-content {
-            transition: transform 0.3s ease;
-        }
-        .hidden {
+        .modal {
             display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
         }
+
+        .modal-content {
+            background-color: var(--white);
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .close-button {
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #9ca3af;
+        }
+        .close-button:hover {
+            color: var(--text-dark);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-light);
+        }
+
         .form-input {
             width: 100%;
             padding: 0.75rem;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--border-color);
             border-radius: 0.5rem;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .form-input:focus {
             outline: none;
-            border-color: #2563eb;
+            border-color: var(--primary-color);
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
         }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
         .btn {
             padding: 0.65rem 1rem;
+            border: none;
             border-radius: 0.5rem;
             font-weight: 500;
-            transition: all 0.2s ease-in-out;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+            cursor: pointer;
         }
+
         .btn-primary {
-            background-color: #2563eb;
-            color: white;
+            background-color: var(--primary-color);
+            color: var(--white);
         }
         .btn-primary:hover {
-            background-color: #1d4ed8;
+            background-color: var(--primary-hover);
         }
+        
         .btn-danger {
-            background-color: #dc2626;
-            color: white;
+            background-color: var(--danger-color);
+            color: var(--white);
         }
         .btn-danger:hover {
-            background-color: #b91c1c;
+            background-color: var(--danger-hover);
         }
+
         .btn-secondary {
             background-color: #f1f5f9;
             color: #334155;
@@ -141,88 +209,131 @@ try {
         .btn-secondary:hover {
             background-color: #e2e8f0;
         }
+
+        #form-error-message {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        #loading-spinner {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background-color: rgba(255, 255, 255, 0.75);
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .spinner {
+            width: 3rem;
+            height: 3rem;
+            border: 4px solid var(--primary-color);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        #event-list-view {
+            display: none;
+        }
+        
+        @media (max-width: 767px) {
+            #calendar {
+                display: none;
+            }
+            #event-list-view {
+                display: block;
+            }
+            .modal-content {
+                margin: 10% auto;
+            }
+        }
+
+
     </style>
 </head>
-<body class="font-sans">
+<body>
 
-    <div id="calendar-app" class="bg-gray-50 min-h-screen">
-        <?php include 'navbar.php'; // Include the navigation bar ?>
+    <div id="calendar-app">
+        <?php include 'navbar.php'; ?>
 
-        <div class="p-4 sm:p-6 lg:p-8">
-            <main class="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
+        <div class="container">
+            <div id="calendar-container">
                 <div id='calendar'></div>
                 <div id='event-list-view'></div>
-            </main>
+            </div>
         </div>
 
-        <div id="event-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                
-                <div id="modal-backdrop" class="fixed inset-0 bg-gray-900 bg-opacity-50 modal-backdrop" aria-hidden="true"></div>
+        <div id="event-modal" class="modal">
+            <div class="modal-content">
+                <form id="event-form">
+                    <div class="modal-header">
+                        <h3 id="eventModalLabel" class="modal-title">Nouvel événement</h3>
+                        <span id="close-modal-btn" class="close-button">&times;</span>
+                    </div>
+                    
+                    <div id="form-error-message"></div>
 
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform modal-content my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <form id="event-form" novalidate>
-                        <div class="px-4 pt-5 pb-4 sm:p-6">
-                            <div class="flex items-start justify-between">
-                                <h3 id="eventModalLabel" class="text-xl font-semibold text-gray-900">Nouvel événement</h3>
-                                <button type="button" id="close-modal-btn" class="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                                    <i data-lucide="x" class="w-5 h-5"></i>
-                                </button>
-                            </div>
-                            
-                            <div class="mt-6 space-y-5">
-                                <input type="hidden" id="event-id" name="event_id">
+                    <input type="hidden" id="event-id" name="event_id">
 
-                                <div id="form-error-message" class="hidden bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm" role="alert"></div>
+                    <div class="form-group">
+                        <label for="event-title" class="form-label">Titre</label>
+                        <input type="text" id="event-title" name="title" class="form-input" required />
+                    </div>
+                   
+                    <div class="form-group">
+                        <label for="event-start" class="form-label">Début</label>
+                        <input type="datetime-local" id="event-start" name="start_datetime" class="form-input" required/>
+                    </div>
 
-                                <div>
-                                    <input type="text" id="event-title" name="title" placeholder="Ajouter un titre" class="form-input" required />
-                                </div>
-                               
-                                <div class="space-y-4">
-                                    <div class="flex items-center space-x-3">
-                                        <i data-lucide="clock-4" class="w-5 h-5 text-gray-500"></i>
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-                                            <input type="datetime-local" id="event-start" name="start_datetime" class="form-input text-sm" required/>
-                                            <input type="datetime-local" id="event-end" name="end_datetime" class="form-input text-sm" required />
-                                        </div>
-                                    </div>
-                                </div>
-                               
-                                <div>
-                                    <textarea id="event-description" name="description" placeholder="Ajouter une description..." rows="4" class="form-input resize-none"></textarea>
-                                </div>
+                    <div class="form-group">
+                        <label for="event-end" class="form-label">Fin</label>
+                        <input type="datetime-local" id="event-end" name="end_datetime" class="form-input" required />
+                    </div>
+                   
+                    <div class="form-group">
+                        <label for="event-description" class="form-label">Description</label>
+                        <textarea id="event-description" name="description" rows="4" class="form-input"></textarea>
+                    </div>
 
-                                <div class="form-group">
-                                    <label for="event-assigned-users" class="block text-sm font-medium text-gray-700 mb-1">Assigner à</label>
-                                    <select class="form-input" id="event-assigned-users" name="assigned_users[]" multiple>
-                                        <?php foreach ($usersList as $u): ?>
-                                            <option value="<?php echo $u['user_id']; ?>">
-                                                <?php echo htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="event-color" class="block text-sm font-medium text-gray-700 mb-1">Couleur de l'événement</label>
-                                    <input type="color" class="h-10 w-full p-1 border border-gray-300 rounded-md" id="event-color" name="color" value="#2563eb">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 px-4 py-4 sm:px-6 sm:flex sm:flex-row-reverse items-center gap-3">
-                            <button type="submit" id="save-event-btn" class="btn btn-primary w-full sm:w-auto">Enregistrer</button>
-                            <button type="button" id="update-event-btn" class="hidden btn btn-primary w-full sm:w-auto">Mettre à jour</button>
-                            <button type="button" id="delete-event-btn" class="hidden btn btn-danger w-full sm:w-auto mr-auto">Supprimer</button>
-                            <button type="button" id="cancel-modal-btn" class="btn btn-secondary w-full sm:w-auto mt-2 sm:mt-0">Annuler</button>
-                        </div>
-                    </form>
-                </div>
+                    <div class="form-group">
+                        <label for="event-assigned-users" class="form-label">Assigner à</label>
+                        <select class="form-input" id="event-assigned-users" name="assigned_users[]" multiple>
+                            <?php foreach ($usersList as $u): ?>
+                                <option value="<?php echo $u['user_id']; ?>">
+                                    <?php echo htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="event-color" class="form-label">Couleur de l'événement</label>
+                        <input type="color" class="form-input" id="event-color" name="color" value="#2563eb">
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="delete-event-btn" class="btn btn-danger" style="display:none; margin-right: auto;">Supprimer</button>
+                        <button type="button" id="cancel-modal-btn" class="btn btn-secondary">Annuler</button>
+                        <button type="submit" id="save-event-btn" class="btn btn-primary">Enregistrer</button>
+                        <button type="button" id="update-event-btn" class="btn btn-primary" style="display:none;">Mettre à jour</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
     
-    <div id="loading-spinner" class="hidden fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-[100]">
-        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div id="loading-spinner">
+        <div class="spinner"></div>
     </div>
 
     <script>
@@ -239,16 +350,10 @@ try {
             const updateButton = document.getElementById('update-event-btn');
             const deleteButton = document.getElementById('delete-event-btn');
 
-            const openModal = () => {
-                eventModal.classList.remove('hidden');
-                document.body.classList.add('overflow-hidden');
-            }
-            const closeModal = () => {
-                eventModal.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-            };
+            const openModal = () => eventModal.style.display = 'block';
+            const closeModal = () => eventModal.style.display = 'none';
 
-            [document.getElementById('close-modal-btn'), document.getElementById('cancel-modal-btn'), document.getElementById('modal-backdrop')].forEach(el => {
+            [document.getElementById('close-modal-btn'), document.getElementById('cancel-modal-btn')].forEach(el => {
                 el.addEventListener('click', closeModal);
             });
             
@@ -261,16 +366,16 @@ try {
 
             function resetAndPrepareForm(mode = 'create', startDate = null, endDate = null) {
                 eventForm.reset();
-                formErrorMessage.classList.add('hidden');
+                formErrorMessage.style.display = 'none';
                 formErrorMessage.textContent = '';
                 document.getElementById('event-color').value = '#2563eb';
                 document.getElementById('event-id').value = '';
 
                 if (mode === 'create') {
                     modalTitle.textContent = 'Créer un nouvel événement';
-                    saveButton.classList.remove('hidden');
-                    updateButton.classList.add('hidden');
-                    deleteButton.classList.add('hidden');
+                    saveButton.style.display = 'inline-flex';
+                    updateButton.style.display = 'none';
+                    deleteButton.style.display = 'none';
 
                     document.getElementById('event-start').value = startDate ? formatLocalDateTimeInput(startDate) : '';
                     const defaultEndDate = endDate ? endDate : (startDate ? new Date(startDate.getTime() + 60 * 60 * 1000) : null);
@@ -283,13 +388,13 @@ try {
 
                 } else { // view/edit mode
                     modalTitle.textContent = 'Détails de l\'événement';
-                    saveButton.classList.add('hidden');
-                    updateButton.classList.remove('hidden');
-                    deleteButton.classList.remove('hidden');
+                    saveButton.style.display = 'none';
+                    updateButton.style.display = 'inline-flex';
+                    deleteButton.style.display = 'inline-flex';
                 }
             }
             
-            const isMobile = window.innerWidth <= 768;
+            const isMobile = window.innerWidth <= 767;
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
@@ -351,16 +456,16 @@ try {
                     openModal();
                 },
                 eventDrop: function(info) {
-                   
+                   // Handle event drop if needed
                 },
                  eventDidMount: function(info) {
                     if (isMobile) {
                         const eventEl = document.createElement('div');
+                        eventEl.style.padding = '1rem';
+                        eventEl.style.borderBottom = '1px solid var(--border-color)';
                         eventEl.innerHTML = `
-                            <div class="p-4 border-b">
-                                <h3 class="font-bold">${info.event.title}</h3>
-                                <p>${info.event.start.toLocaleString()} - ${info.event.end.toLocaleString()}</p>
-                            </div>
+                            <h3 style="font-weight: bold;">${info.event.title}</h3>
+                            <p>${info.event.start.toLocaleString()} - ${info.event.end.toLocaleString()}</p>
                         `;
                         eventListViewEl.appendChild(eventEl);
                     }
@@ -368,11 +473,10 @@ try {
             });
 
             calendar.render();
-            lucide.createIcons();
 
             function showFormError(message) {
                 formErrorMessage.textContent = message;
-                formErrorMessage.classList.remove('hidden');
+                formErrorMessage.style.display = 'block';
             }
 
             eventForm.addEventListener('submit', function(e) {
@@ -390,9 +494,8 @@ try {
                 }
             });
 
-
             function handleFormSubmit(action) {
-                 formErrorMessage.classList.add('hidden');
+                formErrorMessage.style.display = 'none';
                 const formData = new FormData(eventForm);
                 const startDt = new Date(formData.get('start_datetime'));
                 const endDt = new Date(formData.get('end_datetime'));
