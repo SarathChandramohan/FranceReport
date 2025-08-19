@@ -331,13 +331,19 @@ try {
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- DOM Elements ---
         const modal = document.getElementById('event-modal');
         const form = document.getElementById('event-form');
         const loadingSpinner = document.getElementById('loading-spinner');
+        const calendarDaysEl = document.getElementById('calendar-days');
+        const eventListEl = document.getElementById('event-list');
+        const monthYearEl = document.getElementById('month-year');
+        
+        // --- State ---
         let currentDate = new Date();
         let allEvents = [];
 
-        // --- Robust Modal Management ---
+        // --- Robust Modal & Form Management ---
         const openModal = () => modal.classList.add('is-visible');
         const closeModal = () => modal.classList.remove('is-visible');
         
@@ -346,9 +352,9 @@ try {
             document.getElementById('cancel-modal-btn'),
             document.getElementById('modal-backdrop')
         ];
-        // This robust check prevents the error you saw.
+        
         closeModalTriggers.forEach(trigger => {
-            if (trigger) {
+            if (trigger) { // This check prevents the "cannot read properties of null" error
                 trigger.addEventListener('click', closeModal);
             }
         });
@@ -369,29 +375,24 @@ try {
                 updateBtn.classList.add('hidden');
                 deleteBtn.classList.add('hidden');
                 form.dataset.action = 'create_event';
-
                 const start = data.start || new Date();
                 const end = data.end || new Date(start.getTime() + 60 * 60 * 1000);
                 form.querySelector('#event-start').value = formatLocalDateTime(start);
                 form.querySelector('#event-end').value = formatLocalDateTime(end);
-                
                 const selectUsers = form.querySelector('#event-assigned-users');
                 for (let option of selectUsers.options) option.selected = true;
-
-            } else { // Edit mode
+            } else {
                 document.getElementById('eventModalLabel').textContent = 'Détails de l\'événement';
                 saveBtn.classList.add('hidden');
                 updateBtn.classList.remove('hidden');
                 deleteBtn.classList.remove('hidden');
                 form.dataset.action = 'update_event';
-
                 form.querySelector('#event-id').value = data.id;
                 form.querySelector('#event-title').value = data.title;
                 form.querySelector('#event-description').value = data.extendedProps.description || '';
                 form.querySelector('#event-color').value = data.color || '#4f46e5';
                 form.querySelector('#event-start').value = formatLocalDateTime(data.start);
                 form.querySelector('#event-end').value = formatLocalDateTime(data.end);
-
                 const assignedIds = data.extendedProps.assigned_user_ids || [];
                 const select = form.querySelector('#event-assigned-users');
                 for (let option of select.options) {
@@ -401,11 +402,15 @@ try {
             openModal();
         };
 
+        // --- Data Fetching ---
         const fetchEvents = (startDate, endDate) => {
             loadingSpinner.classList.remove('hidden');
             const url = `events_handler.php?action=get_events&start=${startDate.toISOString()}&end=${endDate.toISOString()}`;
             fetch(url)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
                 .then(data => {
                     allEvents = data.map(evt => ({ ...evt, start: new Date(evt.start), end: new Date(evt.end) }));
                     renderCalendar();
@@ -420,27 +425,25 @@ try {
             const month = currentDate.getMonth();
             const firstDay = new Date(year, month, 1);
             const calendarStart = new Date(new Date(firstDay).setDate(firstDay.getDate() - firstDay.getDay()));
-            const calendarEnd = new Date(year, month + 2, 0); // Fetch a bit extra to be safe
+            const calendarEnd = new Date(year, month + 2, 0);
             fetchEvents(calendarStart, calendarEnd);
         };
 
+        // --- UI Rendering ---
         const renderCalendar = () => {
-            const calendarDaysEl = document.getElementById('calendar-days');
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
-            document.getElementById('month-year').textContent = `${currentDate.toLocaleString('fr-FR', { month: 'long' })} ${year}`;
+            monthYearEl.textContent = `${currentDate.toLocaleString('fr-FR', { month: 'long' })} ${year}`;
             
             const firstDayOfMonth = new Date(year, month, 1).getDay();
             const lastDateOfMonth = new Date(year, month + 1, 0).getDate();
             const lastDateOfPrevMonth = new Date(year, month, 0).getDate();
 
-            calendarDaysEl.innerHTML = '';
-            // Previous month
+            let calendarHtml = '';
             for (let i = firstDayOfMonth; i > 0; i--) {
-                calendarDaysEl.innerHTML += `<div class="day-cell other-month"><div class="day-number"><span>${lastDateOfPrevMonth - i + 1}</span></div></div>`;
+                calendarHtml += `<div class="day-cell other-month"><div class="day-number"><span>${lastDateOfPrevMonth - i + 1}</span></div></div>`;
             }
 
-            // Current month
             const today = new Date();
             for (let i = 1; i <= lastDateOfMonth; i++) {
                 const dayDate = new Date(year, month, i);
@@ -448,42 +451,46 @@ try {
                 const dayEvents = allEvents.filter(e => e.start.toISOString().split('T')[0] === dayString);
                 const isToday = dayString === today.toISOString().split('T')[0];
                 
-                let dayHtml = `<div class="day-cell" data-date="${dayString}">
+                calendarHtml += `<div class="day-cell" data-date="${dayString}">
                                 <div class="day-number ${isToday ? 'is-today' : ''}"><span>${i}</span></div>
                                 <div class="event-wrapper">`;
-
                 dayEvents.forEach(event => {
-                    dayHtml += `<div class="event-pill" data-event-id="${event.id}" style="background-color: ${event.color};" title="${event.title}">${event.title}</div>`;
+                    calendarHtml += `<div class="event-pill" data-event-id="${event.id}" style="background-color: ${event.color};" title="${event.title}">${event.title}</div>`;
                 });
-
-                dayHtml += `</div></div>`;
-                calendarDaysEl.innerHTML += dayHtml;
+                calendarHtml += `</div></div>`;
             }
-            // Next month
+            
             const totalCells = firstDayOfMonth + lastDateOfMonth;
             const remainingCells = totalCells > 35 ? 42 - totalCells : 35 - totalCells;
             for (let i = 1; i <= remainingCells; i++) {
-                calendarDaysEl.innerHTML += `<div class="day-cell other-month"><div class="day-number"><span>${i}</span></div></div>`;
+                calendarHtml += `<div class="day-cell other-month"><div class="day-number"><span>${i}</span></div></div>`;
             }
+            calendarDaysEl.innerHTML = calendarHtml;
         };
 
         const renderSidebarEvents = () => {
-            const eventListEl = document.getElementById('event-list');
-            eventListEl.innerHTML = '';
             const today = new Date();
-            today.setHours(0,0,0,0); 
-            const upcomingEvents = allEvents.filter(e => e.start >= today).sort((a, b) => a.start - b.start);
+            today.setHours(0, 0, 0, 0); // Set to the very beginning of today
 
+            // ### BUG FIX ### The original filter was unreliable. This is the correct, robust way.
+            const upcomingEvents = allEvents
+                .filter(e => e.end >= today) // Filter events that are happening today or in the future
+                .sort((a, b) => a.start - b.start);
+
+            // Use string building for better performance
+            let sidebarHtml = '';
             if (upcomingEvents.length === 0) {
-                eventListEl.innerHTML = '<p>Aucun événement à venir.</p>'; return;
+                sidebarHtml = '<p>Aucun événement à venir.</p>';
+            } else {
+                upcomingEvents.forEach(event => {
+                    const timeStr = `${event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})} - ${event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
+                    sidebarHtml += `<div class="event-list-card">
+                        <p class="event-list-card-title">${event.title}</p>
+                        <p class="event-list-card-date">${event.start.toLocaleDateString('fr-FR', { weekday: 'long', month: 'long', day: 'numeric' })} | ${timeStr}</p>
+                        </div>`;
+                });
             }
-            upcomingEvents.forEach(event => {
-                const timeStr = `${event.start.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})} - ${event.end.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
-                eventListEl.innerHTML += `<div class="event-list-card">
-                    <p class="event-list-card-title">${event.title}</p>
-                    <p class="event-list-card-date">${event.start.toLocaleDateString('fr-FR', { weekday: 'long', month: 'long', day: 'numeric' })} | ${timeStr}</p>
-                    </div>`;
-            });
+            eventListEl.innerHTML = sidebarHtml;
         };
         
         const handleFormSubmit = e => {
@@ -522,7 +529,7 @@ try {
         document.getElementById('today-btn').addEventListener('click', () => { currentDate = new Date(); updateCalendarData(); });
         document.getElementById('create-event-btn').addEventListener('click', () => prepareForm('create'));
 
-        document.getElementById('calendar-days').addEventListener('click', e => {
+        calendarDaysEl.addEventListener('click', e => {
             const eventPill = e.target.closest('.event-pill');
             const dayCell = e.target.closest('.day-cell');
 
