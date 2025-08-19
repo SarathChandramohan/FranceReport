@@ -146,9 +146,6 @@ try {
         .btn-modal-danger:hover { background-color: var(--danger-hover-color); }
         .btn-modal-delete { margin-right: auto; }
         .hidden { display: none; }
-        .loader-wrapper { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.8); }
-        .loader { width: 3rem; height: 3rem; border: 4px solid var(--primary-brand-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -210,14 +207,11 @@ try {
         </div>
     </div>
 
-    <div id="loading-spinner" class="loader-wrapper hidden"><div class="loader"></div></div>
-
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         // --- DOM Elements ---
         const modal = document.getElementById('event-modal');
         const form = document.getElementById('event-form');
-        const loadingSpinner = document.getElementById('loading-spinner');
         const calendarDaysEl = document.getElementById('calendar-days');
         const eventListEl = document.getElementById('event-list');
         const monthYearEl = document.getElementById('month-year');
@@ -269,7 +263,6 @@ try {
         };
 
         const fetchEvents = (startDate, endDate) => {
-            loadingSpinner.classList.remove('hidden');
             const url = `events_handler.php?action=get_events&start=${startDate.toISOString()}&end=${endDate.toISOString()}`;
             fetch(url)
                 .then(response => {
@@ -277,26 +270,31 @@ try {
                     return response.json();
                 })
                 .then(data => {
-                    // ### CRITICAL BUG FIX ###
-                    // Check if the server returned an error object instead of an array of events.
-                    // This prevents the ".map is not a function" crash.
                     if (!Array.isArray(data)) {
                         console.error("Server returned an error:", data.message || 'Unknown error');
                         alert("An error occurred while loading events: " + (data.message || 'Please try again.'));
-                        allEvents = []; // Clear events to avoid showing stale data
+                        allEvents = [];
                     } else {
-                        allEvents = data.map(evt => ({ ...evt, start: new Date(evt.start), end: new Date(evt.end) }));
+                        // ### BUG FIX ###
+                        // Defensively parse dates and filter out any events with invalid date objects.
+                        // This prevents the entire script from crashing.
+                        allEvents = data.map(evt => {
+                            const start = new Date(evt.start);
+                            const end = new Date(evt.end);
+                            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                                console.error('Invalid date received for event, skipping:', evt);
+                                return null; // Mark as invalid
+                            }
+                            return { ...evt, start, end };
+                        }).filter(Boolean); // Filter out the null (invalid) events
                     }
 
                     renderCalendar();
                     renderSidebarEvents();
                 })
                 .catch(error => {
-                    console.error('Error fetching events:', error)
+                    console.error('Error fetching events:', error);
                     alert('A critical error occurred. Please check the console and refresh the page.');
-                })
-                .finally(() => {
-                    loadingSpinner.classList.add('hidden');
                 });
         };
         
@@ -363,7 +361,7 @@ try {
             const action = form.dataset.action; if (!action) return;
             const formError = document.getElementById('form-error-message');
             formError.style.display = 'none';
-            loadingSpinner.classList.remove('hidden');
+            
             const formData = new FormData(form);
             formData.append('action', action);
 
@@ -373,8 +371,7 @@ try {
                     if (data.status === 'success') { closeModal(); updateCalendarData(); }
                     else { formError.textContent = data.message || 'Une erreur est survenue.'; formError.style.display = 'block'; }
                 })
-                .catch(err => { formError.textContent = 'Erreur de communication avec le serveur.'; formError.style.display = 'block'; })
-                .finally(() => loadingSpinner.classList.add('hidden'));
+                .catch(err => { formError.textContent = 'Erreur de communication avec le serveur.'; formError.style.display = 'block'; });
         };
 
         // --- Event Listeners ---
@@ -402,14 +399,13 @@ try {
         document.getElementById('delete-event-btn').addEventListener('click', () => {
             if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) return;
             const eventId = form.querySelector('#event-id').value; if (!eventId) return;
-            loadingSpinner.classList.remove('hidden');
+            
             const formData = new FormData();
             formData.append('action', 'delete_event');
             formData.append('event_id', eventId);
             fetch('events_handler.php', { method: 'POST', body: formData })
                 .then(res => res.json())
-                .then(data => { if (data.status === 'success') { closeModal(); updateCalendarData(); } else { alert('Erreur : ' + data.message); } })
-                .finally(() => loadingSpinner.classList.add('hidden'));
+                .then(data => { if (data.status === 'success') { closeModal(); updateCalendarData(); } else { alert('Erreur : ' + data.message); } });
         });
         
         const formatLocalDateTime = date => {
