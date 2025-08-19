@@ -13,13 +13,22 @@ $currentUserId = $currentUser['user_id'];
 // 4. Set the content type to JSON
 header('Content-Type: application/json');
 
-// 5. Check if action is set
+// 5. Helper function for role check
+function requireAdmin($user) {
+    if (!isset($user['role']) || $user['role'] !== 'admin') {
+        http_response_code(403); // Forbidden
+        echo json_encode(['status' => 'error', 'message' => 'Accès non autorisé. Seuls les administrateurs peuvent effectuer cette action.']);
+        exit;
+    }
+}
+
+// 6. Check if action is set
 if (!isset($_REQUEST['action'])) {
     echo json_encode(['status' => 'error', 'message' => 'Aucune action spécifiée']);
     exit;
 }
 
-// 6. Handle different actions
+// 7. Handle different actions
 $action = $_REQUEST['action'];
 
 try {
@@ -28,12 +37,15 @@ try {
             getEvents($conn);
             break;
         case 'create_event':
+            requireAdmin($currentUser);
             createEvent($conn, $currentUserId);
             break;
         case 'update_event':
+            requireAdmin($currentUser);
             updateEvent($conn);
             break;
         case 'delete_event':
+            requireAdmin($currentUser);
             deleteEvent($conn);
             break;
         default:
@@ -103,11 +115,9 @@ function getEvents($conn) {
 }
 
 function assignEventToAllActiveUsers($conn, $eventId) {
-    // Fetch all active user IDs
     $stmtUsers = $conn->query("SELECT user_id FROM Users WHERE status = 'Active'");
     $activeUserIds = $stmtUsers->fetchAll(PDO::FETCH_COLUMN);
 
-    // Assign the event to each active user
     $sqlAssign = "INSERT INTO Event_AssignedUsers (event_id, user_id) VALUES (:event_id, :user_id)";
     $stmtAssign = $conn->prepare($sqlAssign);
     foreach ($activeUserIds as $userId) {
@@ -144,7 +154,6 @@ function createEvent($conn, $creatorUserId) {
     ]);
     $eventId = $conn->lastInsertId();
 
-    // New: Assign the event to all active users
     assignEventToAllActiveUsers($conn, $eventId);
 
     $conn->commit();
@@ -171,11 +180,9 @@ function updateEvent($conn) {
         ':event_id' => $eventId
     ]);
 
-    // First, remove all existing assignments for this event
     $stmtDelete = $conn->prepare("DELETE FROM Event_AssignedUsers WHERE event_id = :event_id");
     $stmtDelete->execute([':event_id' => $eventId]);
 
-    // New: Re-assign the event to all active users
     assignEventToAllActiveUsers($conn, $eventId);
     
     $conn->commit();
