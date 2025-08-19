@@ -54,7 +54,16 @@ try {
                 flex-direction: row;
                 align-items: center;
             }
+            #event-list-view {
+                display: none;
+            }
         }
+         @media (max-width: 767px) {
+            #calendar {
+                display: none;
+            }
+        }
+
 
         .fc .fc-toolbar-title {
             font-size: 1.25rem;
@@ -142,6 +151,7 @@ try {
         <div class="p-4 sm:p-6 lg:p-8">
             <main class="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
                 <div id='calendar'></div>
+                <div id='event-list-view'></div>
             </main>
         </div>
 
@@ -183,7 +193,7 @@ try {
                                     <textarea id="event-description" name="description" placeholder="Ajouter une description..." rows="4" class="form-input resize-none"></textarea>
                                 </div>
 
-                                <div class="form-group hidden">
+                                <div class="form-group">
                                     <label for="event-assigned-users" class="block text-sm font-medium text-gray-700 mb-1">Assigner à</label>
                                     <select class="form-input" id="event-assigned-users" name="assigned_users[]" multiple>
                                         <?php foreach ($usersList as $u): ?>
@@ -218,6 +228,7 @@ try {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const calendarEl = document.getElementById('calendar');
+            const eventListViewEl = document.getElementById('event-list-view');
             const eventModal = document.getElementById('event-modal');
             const eventForm = document.getElementById('event-form');
             const modalTitle = document.getElementById('eventModalLabel');
@@ -267,7 +278,7 @@ try {
 
                     const selectUsers = document.getElementById('event-assigned-users');
                     for (let i = 0; i < selectUsers.options.length; i++) {
-                        selectUsers.options[i].selected = true;
+                        selectUsers.options[i].selected = false;
                     }
 
                 } else { // view/edit mode
@@ -281,7 +292,7 @@ try {
             const isMobile = window.innerWidth <= 768;
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                initialView: 'dayGridMonth',
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
@@ -294,7 +305,7 @@ try {
                             resetAndPrepareForm('create', new Date());
                             openModal();
                         },
-                        'class': 'fc-createEvent-button' // Add a class for styling
+                        'class': 'fc-createEvent-button' 
                     }
                 },
                 locale: 'fr',
@@ -306,7 +317,7 @@ try {
                 navLinks: true,
                 editable: true,
                 selectable: true,
-                dayMaxEvents: true,
+                dayMaxEvents: true, 
                 events: {
                     url: 'events_handler.php?action=get_events',
                     failure: function() {
@@ -340,7 +351,19 @@ try {
                     openModal();
                 },
                 eventDrop: function(info) {
-                    alert(info.event.title + " a été déplacé vers " + info.event.start.toISOString());
+                   
+                },
+                 eventDidMount: function(info) {
+                    if (isMobile) {
+                        const eventEl = document.createElement('div');
+                        eventEl.innerHTML = `
+                            <div class="p-4 border-b">
+                                <h3 class="font-bold">${info.event.title}</h3>
+                                <p>${info.event.start.toLocaleString()} - ${info.event.end.toLocaleString()}</p>
+                            </div>
+                        `;
+                        eventListViewEl.appendChild(eventEl);
+                    }
                 }
             });
 
@@ -354,8 +377,22 @@ try {
 
             eventForm.addEventListener('submit', function(e) {
                 e.preventDefault();
+                handleFormSubmit('create_event');
+            });
+            updateButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleFormSubmit('update_event');
+            });
+             deleteButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                if(confirm("Are you sure you want to delete this event?")) {
+                  handleFormSubmit('delete_event');
+                }
+            });
 
-                formErrorMessage.classList.add('hidden');
+
+            function handleFormSubmit(action) {
+                 formErrorMessage.classList.add('hidden');
                 const formData = new FormData(eventForm);
                 const startDt = new Date(formData.get('start_datetime'));
                 const endDt = new Date(formData.get('end_datetime'));
@@ -369,7 +406,7 @@ try {
                     return;
                 }
                 
-                formData.append('action', 'create_event');
+                formData.append('action', action);
                 loadingSpinner.style.display = 'flex';
 
                 fetch('events_handler.php', { method: 'POST', body: formData })
@@ -389,7 +426,8 @@ try {
                 .finally(() => {
                     loadingSpinner.style.display = 'none';
                 });
-            });
+
+            }
 
         });
     </script>
