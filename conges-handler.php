@@ -197,7 +197,7 @@ function approveLeaveRequest() {
         $stmt = $conn->prepare("
             UPDATE Conges
             SET status = 'approved',
-                date_reponse = NOW(),
+                date_reponse = GETDATE(),
                 reponse_commentaire = ?
             WHERE conge_id = ?
         ");
@@ -253,7 +253,7 @@ function rejectLeaveRequest() {
         $stmt = $conn->prepare("
             UPDATE Conges
             SET status = 'rejected',
-                date_reponse = NOW(),
+                date_reponse = GETDATE(),
                 reponse_commentaire = ?
             WHERE conge_id = ?
         ");
@@ -311,7 +311,7 @@ function submitLeaveRequest($user_id) {
         $stmt = $conn->prepare("
             INSERT INTO Conges
                 (user_id, date_debut, date_fin, type_conge, duree, commentaire, status, date_demande)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', GETDATE())
         ");
         $stmt->execute([$user_id, $date_debut, $date_fin, $type_conge, $duration, $commentaire]);
 
@@ -354,7 +354,7 @@ function cancelLeaveRequest($user_id) {
         // Update status to 'cancelled'
         $stmt = $conn->prepare("
             UPDATE Conges
-            SET status = 'cancelled', date_reponse = NOW()
+            SET status = 'cancelled', date_reponse = GETDATE()
             WHERE conge_id = ?
         ");
         $stmt->execute([$leave_id]);
