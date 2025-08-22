@@ -84,13 +84,13 @@ function getAssetHistory($conn) {
                 u.prenom, 
                 u.nom, 
                 b.created_at as checkout_time,
-                LEAD(b.created_at, 1, NULL) OVER (ORDER BY b.created_at) as checkin_time
+                b.return_date as checkin_time
             FROM 
                 Bookings b 
             LEFT JOIN 
                 Users u ON b.user_id = u.user_id
             WHERE 
-                b.asset_id = ? 
+                b.asset_id = ? AND b.status = 'completed' AND b.return_date IS NOT NULL
             ORDER BY 
                 b.booking_date DESC";
 
@@ -98,12 +98,7 @@ function getAssetHistory($conn) {
     $stmt->execute([$asset_id]);
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Filter out the currently active booking
-    $filtered_history = array_filter($history, function($row) {
-        return $row['checkin_time'] !== null;
-    });
-
-    respondWithSuccess(['history' => array_values($filtered_history)]);
+    respondWithSuccess(['history' => $history]);
 }
 
 function reportItem($conn, $user) {
@@ -349,17 +344,20 @@ function processScan($conn, $user) {
 
     // CASE 1: Item is currently IN-USE (must be a return)
     if ($asset['status'] === 'in-use') {
-        if ($asset['assigned_to_user_id'] == $current_user_id) {
-            $conn->beginTransaction();
-            // Complete the active booking
-            $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status = 'active'");
-            $stmt_update_booking->execute([$asset['asset_id'], $current_user_id]);
-            // Set inventory to PENDING VERIFICATION, keeping assigned_to_user_id for tracking
-            $stmt_update_inventory = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
-            $stmt_update_inventory->execute([$asset['asset_id']]);
-            $conn->commit();
-            respondWithSuccess(['scan_code' => 'return_success'], "Actif retourné. En attente de vérification.");
-        } else {
+       if ($asset['assigned_to_user_id'] == $current_user_id) {
+        $conn->beginTransaction();
+        
+        // Complete the active booking and set the return_date
+        $stmt_update_booking = $conn->prepare("UPDATE Bookings SET status = 'completed', return_date = GETDATE() WHERE asset_id = ? AND user_id = ? AND status = 'active'");
+        $stmt_update_booking->execute([$asset['asset_id'], $current_user_id]);
+        
+        // Set inventory to PENDING VERIFICATION, keeping assigned_to_user_id for tracking
+        $stmt_update_inventory = $conn->prepare("UPDATE Inventory SET status = 'pending_verification', last_modified = GETDATE() WHERE asset_id = ?");
+        $stmt_update_inventory->execute([$asset['asset_id']]);
+        
+        $conn->commit();
+        respondWithSuccess(['scan_code' => 'return_success'], "Actif retourné. En attente de vérification.");
+    } else {
             $stmt_user = $conn->prepare("SELECT prenom, nom FROM Users WHERE user_id = ?");
             $stmt_user->execute([$asset['assigned_to_user_id']]);
             $assigned_user = $stmt_user->fetch(PDO::FETCH_ASSOC);
