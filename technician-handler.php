@@ -210,10 +210,10 @@ function getTechnicianEquipment($conn, $userId) {
         WHERE b.booking_date = :today_b
           AND b.status = 'booked'
           AND (
-               b.user_id = :user_id_booked 
-               OR 
-               (pa.assigned_user_id = :user_id_pa AND pa.assignment_date = :today_pa)
-              )
+                 b.user_id = :user_id_booked 
+                 OR 
+                 (pa.assigned_user_id = :user_id_pa AND pa.assignment_date = :today_pa)
+               )
           AND (pa.is_validated = 1 OR pa.is_validated IS NULL)
     ";
 
@@ -336,9 +336,9 @@ function returnItem($conn, $userId, $assetId) {
 
         if ($mission_group_id) {
     // Mark the current day's booking as 'completed'
-$stmt_complete_mission = $conn->prepare(
-    "UPDATE Bookings SET status = 'completed', return_date = GETDATE(), user_id = ? WHERE asset_id = ? AND mission_group_id = ? AND booking_date = ?"
-);
+    $stmt_complete_mission = $conn->prepare(
+        "UPDATE Bookings SET status = 'completed', return_date = GETDATE(), user_id = ? WHERE asset_id = ? AND mission_group_id = ? AND booking_date = ?" // <-- CHANGED LINE
+    );
     $stmt_complete_mission->execute([$userId, $assetId, $mission_group_id, $today]);
 
             // Cancel any future bookings for this mission group
@@ -348,11 +348,9 @@ $stmt_complete_mission = $conn->prepare(
             $stmt_cancel_future_mission->execute([$assetId, $mission_group_id, $today]);
         } else {
             // Mark the current active booking as 'completed'
-           } else {
-    // Mark the current active booking as 'completed'
-    $stmt_complete_individual = $conn->prepare(
-        "UPDATE Bookings SET status = 'completed', return_date = GETDATE() WHERE asset_id = ? AND user_id = ? AND status = 'active' AND booking_date = ?"
-    );
+            $stmt_complete_individual = $conn->prepare(
+                "UPDATE Bookings SET status = 'completed', return_date = GETDATE() WHERE asset_id = ? AND user_id = ? AND status = 'active' AND booking_date = ?" // <-- CHANGED LINE
+            );
             $stmt_complete_individual->execute([$assetId, $assignedUserId, $today]);
 
             // Cancel any future bookings for this individual user
