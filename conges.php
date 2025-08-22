@@ -21,7 +21,6 @@ $user = getCurrentUser();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Congés - Gestion des Ouvriers</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
-    <!-- Original CSS styles from timesheet.html -->
     <style>
         /* Basic Reset and Font */
         * {
@@ -391,25 +390,19 @@ $user = getCurrentUser();
         <div id="conges">
             <h2>Congés</h2>
             
-            <!-- Status messages area -->
             <div id="status-message" style="display: none;"></div>
 
-            <!-- Tabs for Leave Management -->
             <div class="tabs-container">
                 <div class="tabs-nav">
-                    <!-- <?php if ($user['role'] == 'admin'): ?>
-        <button class="tab-button" onclick="openTab('admin-approvals')">Administration</button>
-        <?php endif; ?> -->
-        <button class="tab-button active" onclick="openTab('new-leave')">Nouvelle Demande</button>
+                    <button class="tab-button active" onclick="openTab('new-leave')">Nouvelle Demande</button>
         <button class="tab-button" onclick="openTab('leave-history')">Historique des Demandes</button>
         
     </div>
                 
-                <!-- New Leave Request Tab -->
                 <div id="new-leave" class="tab-content active">
                     <div class="card">
                         <h3>Nouvelle Demande de Congé</h3>
-                        <form id="conge-form" method="POST" enctype="multipart/form-data">
+                        <form id="conge-form" method="POST">
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label for="date-debut">Date de début</label>
@@ -445,7 +438,6 @@ $user = getCurrentUser();
                     </div>
                 </div>
                 
-                <!-- Leave History Tab -->
                 <div id="leave-history" class="tab-content">
                     <div class="card">
                         <h3>Historique des Demandes de Congés</h3>
@@ -461,7 +453,6 @@ $user = getCurrentUser();
                                     </tr>
                                 </thead>
                                 <tbody id="conges-history">
-                                    <!-- Leave history data will be loaded here via JavaScript -->
                                     <tr>
                                         <td colspan="6" style="text-align: center;">Chargement des données...</td>
                                     </tr>
@@ -471,7 +462,6 @@ $user = getCurrentUser();
                     </div>
                 </div>
                 <?php if ($user['role'] == 'admin'): ?>
-    <!-- Admin Approvals Tab (Only visible to admins) -->
     <div id="admin-approvals" class="tab-content">
         <div class="card">
             <h3>Demandes en Attente</h3>
@@ -483,12 +473,10 @@ $user = getCurrentUser();
                             <th>Dates</th>
                             <th>Type de Congé</th>
                             <th>Durée</th>
-                            <th>Document</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="pending-requests">
-                        <!-- Pending requests will be loaded here via JavaScript -->
                         <tr>
                             <td colspan="6" style="text-align: center;">Chargement des données...</td>
                         </tr>
@@ -499,7 +487,6 @@ $user = getCurrentUser();
     </div>
     <?php endif; ?>
 </div>
-                <!-- Leave Stats Tab -->
                 <div id="leave-stats" class="tab-content">
                     <div class="card">
                         <h3>Solde de Congés</h3>
@@ -515,7 +502,6 @@ $user = getCurrentUser();
                                     </tr>
                                 </thead>
                                 <tbody id="conges-stats">
-                                    <!-- Leave stats data will be loaded here via JavaScript -->
                                     <tr>
                                         <td colspan="5" style="text-align: center;">Chargement des données...</td>
                                     </tr>
@@ -526,14 +512,12 @@ $user = getCurrentUser();
                 </div>
             </div>
             
-            <!-- Details Modal -->
             <div id="details-modal" class="modal">
                 <div class="modal-content">
                     <span class="close" onclick="document.getElementById('details-modal').style.display='none'">&times;</span>
                     <h3 id="modal-title">Détails de la Demande</h3>
                     <div id="modal-content-details">
-                        <!-- Details will be inserted here -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </div>
@@ -834,13 +818,6 @@ $user = getCurrentUser();
                             status = '<span class="status-tag status-pending">En attente</span>';
                     }
                     
-                    // Format document link if exists
-                    let documentLink = 'Aucun document joint';
-                    if (response.data.document && response.data.document !== 'null' && response.data.document !== null) {
-                        documentLink = `<a href="${response.data.document}" class="document-preview" target="_blank">
-                            <span class="document-icon">📄</span> Voir le document
-                        </a>`;
-                    }
                     
                     // Format the content
                     modalContent.innerHTML = `
@@ -851,7 +828,6 @@ $user = getCurrentUser();
                         <p><strong>Statut:</strong> ${status}</p>
                         <p><strong>Date de demande:</strong> ${response.data.date_demande}</p>
                         <p><strong>Commentaire:</strong> ${response.data.commentaire || 'Aucun commentaire'}</p>
-                        <p><strong>Document:</strong> ${documentLink}</p>
                     `;
                     
                     if (response.data.reponse_commentaire) {
@@ -896,14 +872,6 @@ function loadPendingRequests() {
             response.data.forEach(function(entry) {
                 const row = document.createElement('tr');
                 
-                // Format the document link if exists
-                let documentLink = 'Aucun';
-                if (entry.document && entry.document !== 'null' && entry.document !== null) {
-                    documentLink = `<a href="${entry.document}" class="document-preview" target="_blank">
-                        <span class="document-icon">📄</span> Voir
-                    </a>`;
-                }
-                
                 // Format the type of leave
                 let typeConge = '';
                 switch(entry.type_conge) {
@@ -932,7 +900,6 @@ function loadPendingRequests() {
                     <td>${entry.date_debut} au ${entry.date_fin}</td>
                     <td>${typeConge}</td>
                     <td>${entry.duree} jour(s)</td>
-                    <td>${documentLink}</td>
                     <td>
                         <button class="btn-success" onclick="approveRequest(${entry.id})">Approuver</button>
                         <button class="btn-danger" onclick="rejectRequest(${entry.id})">Refuser</button>
@@ -1036,7 +1003,6 @@ function showAdminDetails(leaveId) {
             const dateFin = document.getElementById('date-fin').value;
             const typeConge = document.getElementById('type-conge').value;
             const commentaire = document.getElementById('commentaire').value;
-            const documentFile = document.getElementById('document').files[0];
             
             // Validate dates (make sure end date is not before start date)
             if (new Date(dateFin) < new Date(dateDebut)) {
@@ -1051,10 +1017,6 @@ function showAdminDetails(leaveId) {
             formData.append('date_fin', dateFin);
             formData.append('type_conge', typeConge);
             formData.append('commentaire', commentaire);
-            
-            if (documentFile) {
-                formData.append('document', documentFile);
-            }
             
             // Show loading state
             document.querySelector('#conge-form button[type="submit"]').disabled = true;
@@ -1076,7 +1038,6 @@ function showAdminDetails(leaveId) {
                                 showStatusMessage(response.message, 'success');
                                 // Reset the form
                                 document.getElementById('conge-form').reset();
-                                document.getElementById('file-name').textContent = '';
                                 // Switch to history tab
                                 openTab('leave-history');
                             } else {
@@ -1093,11 +1054,6 @@ function showAdminDetails(leaveId) {
             xhr.send(formData);
         });
         
-        // Update file name display when file is selected
-        document.getElementById('document').addEventListener('change', function() {
-            const fileName = this.files[0] ? this.files[0].name : '';
-            document.getElementById('file-name').textContent = fileName;
-        });
         
         // Close modal when clicking outside of it
         window.onclick = function(event) {
