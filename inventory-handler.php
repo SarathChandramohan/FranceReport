@@ -74,18 +74,36 @@ try {
 
 function getAssetHistory($conn) {
     $asset_id = isset($_GET['asset_id']) ? intval($_GET['asset_id']) : 0;
-    if (!$asset_id) throw new Exception("ID de l'actif manquant.");
+    if (!$asset_id) {
+        throw new Exception("ID de l'actif manquant.");
+    }
 
-    // The 'b.status' column has been removed from this SQL query.
-    $sql = "SELECT b.booking_date, b.mission, u.prenom, u.nom, b.created_at as checkout_time,
-            (SELECT i.last_modified FROM Inventory i WHERE i.asset_id = b.asset_id) as checkin_time
-            FROM Bookings b LEFT JOIN Users u ON b.user_id = u.user_id
-            WHERE b.asset_id = ? AND b.status = 'completed'
-            ORDER BY b.booking_date DESC";
+    $sql = "SELECT 
+                b.booking_date, 
+                b.mission, 
+                u.prenom, 
+                u.nom, 
+                b.created_at as checkout_time,
+                LEAD(b.created_at, 1, NULL) OVER (ORDER BY b.created_at) as checkin_time
+            FROM 
+                Bookings b 
+            LEFT JOIN 
+                Users u ON b.user_id = u.user_id
+            WHERE 
+                b.asset_id = ? 
+            ORDER BY 
+                b.booking_date DESC";
+
     $stmt = $conn->prepare($sql);
     $stmt->execute([$asset_id]);
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    respondWithSuccess(['history' => $history]);
+
+    // Filter out the currently active booking
+    $filtered_history = array_filter($history, function($row) {
+        return $row['checkin_time'] !== null;
+    });
+
+    respondWithSuccess(['history' => array_values($filtered_history)]);
 }
 
 function reportItem($conn, $user) {
