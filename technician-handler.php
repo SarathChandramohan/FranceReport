@@ -336,9 +336,9 @@ function returnItem($conn, $userId, $assetId) {
 
         if ($mission_group_id) {
     // Mark the current day's booking as 'completed'
-    $stmt_complete_mission = $conn->prepare(
-        "UPDATE Bookings SET status = 'completed', user_id = ? WHERE asset_id = ? AND mission_group_id = ? AND booking_date = ?"
-    );
+$stmt_complete_mission = $conn->prepare(
+    "UPDATE Bookings SET status = 'completed', return_date = GETDATE(), user_id = ? WHERE asset_id = ? AND mission_group_id = ? AND booking_date = ?"
+);
     $stmt_complete_mission->execute([$userId, $assetId, $mission_group_id, $today]);
 
             // Cancel any future bookings for this mission group
@@ -348,9 +348,11 @@ function returnItem($conn, $userId, $assetId) {
             $stmt_cancel_future_mission->execute([$assetId, $mission_group_id, $today]);
         } else {
             // Mark the current active booking as 'completed'
-            $stmt_complete_individual = $conn->prepare(
-                "UPDATE Bookings SET status = 'completed' WHERE asset_id = ? AND user_id = ? AND status = 'active' AND booking_date = ?"
-            );
+           } else {
+    // Mark the current active booking as 'completed'
+    $stmt_complete_individual = $conn->prepare(
+        "UPDATE Bookings SET status = 'completed', return_date = GETDATE() WHERE asset_id = ? AND user_id = ? AND status = 'active' AND booking_date = ?"
+    );
             $stmt_complete_individual->execute([$assetId, $assignedUserId, $today]);
 
             // Cancel any future bookings for this individual user
