@@ -70,7 +70,6 @@ function getLeaveDetailsForAdmin() {
 
     try {
         // Prepare the SQL statement to get leave details along with employee information
-        // REMOVED: c.document from the SELECT clause
         $stmt = $conn->prepare("
             SELECT
                 c.conge_id as id,
@@ -126,7 +125,6 @@ function getPendingRequests() {
     }
 
     try {
-        // REMOVED: c.document from the SELECT clause
         $stmt = $conn->prepare("
             SELECT
                 c.conge_id as id,
@@ -310,7 +308,6 @@ function submitLeaveRequest($user_id) {
     }
 
     try {
-        // REMOVED: document column from INSERT statement
         $stmt = $conn->prepare("
             INSERT INTO Conges
                 (user_id, date_debut, date_fin, type_conge, duree, commentaire, status, date_demande)
@@ -377,7 +374,6 @@ function getLeaveHistory($user_id) {
     global $conn;
 
     try {
-        // REMOVED: document column from SELECT statement
         $stmt = $conn->prepare("
             SELECT
                 conge_id as id,
@@ -480,7 +476,6 @@ function getLeaveDetails($user_id) {
     }
 
     try {
-        // REMOVED: document column from SELECT statement
         $stmt = $conn->prepare("
             SELECT
                 conge_id as id,
