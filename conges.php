@@ -438,14 +438,7 @@ $user = getCurrentUser();
                                 <textarea id="commentaire" name="commentaire" placeholder="Ajouter un commentaire..."></textarea>
                             </div>
 
-                            <div class="form-group">
-    <label for="document">Joindre un document (optionnel)</label>
-    <div class="file-input-wrapper">
-        <button type="button" class="btn-success">Choisir un fichier</button>
-        <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png">
-    </div>
-    <div id="file-name" class="file-name"></div>
-</div>
+                            
 
                             <button type="submit" class="btn-primary">Soumettre la Demande</button>
                         </form>
@@ -464,7 +457,6 @@ $user = getCurrentUser();
                                         <th>Type de Congé</th>
                                         <th>Durée</th>
                                         <th>Statut</th>
-                                        <th>Document</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -659,12 +651,7 @@ $user = getCurrentUser();
                         const row = document.createElement('tr');
                         
                         // Format the document link if exists
-                        let documentLink = 'Aucun';
-                        if (entry.document && entry.document !== 'null' && entry.document !== null) {
-                            documentLink = `<a href="${entry.document}" class="document-preview" target="_blank">
-                                <span class="document-icon">📄</span> Voir
-                            </a>`;
-                        }
+                        
                         
                         // Format the status tag
                         let statusTag = '';
@@ -713,7 +700,6 @@ $user = getCurrentUser();
                             <td>${typeConge}</td>
                             <td>${entry.duree} jour(s)</td>
                             <td>${statusTag}</td>
-                            <td>${documentLink}</td>
                             <td>
                                 <button class="btn-primary" onclick="showDetails(${entry.id})">Détails</button>
                                 ${entry.status === 'pending' ? `<button class="btn-danger" onclick="cancelRequest(${entry.id})">Annuler</button>` : ''}
