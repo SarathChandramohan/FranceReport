@@ -211,7 +211,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
                     <div class="tab-content pt-3" id="congesAdminTabsContent">
                         <div class="tab-pane fade show active" id="leaveApprovalContent" role="tabpanel">
                             <h6 class="mt-2">Demandes en Attente</h6><div id="congesAdminAlert" class="modal-alert" role="alert"></div>
-                            <div class="table-responsive"><table class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Dates</th><th>Type</th><th>Durée</th><th>Doc.</th><th>Demandé le</th><th>Actions</th></tr></thead><tbody id="congesAdminTableBody"></tbody></table></div>
+                            <div class="table-responsive"><table class="table table-striped table-sm"><thead><tr><th>Employé</th><th>Dates</th><th>Type</th><th>Durée</th><th>Demandé le</th><th>Actions</th></tr></thead><tbody id="congesAdminTableBody"></tbody></table></div>
                         </div>
                         <div class="tab-pane fade" id="listAllLeavesContent" role="tabpanel">
                             <h6 class="mt-2">Consulter la Liste des Congés</h6>
@@ -416,8 +416,8 @@ $initial_employee_list = getInitialEmployeeList($conn);
                 tbody.empty();
                 if (response.status === 'success' && response.data && response.data.length > 0) {
                     response.data.forEach(function(req) {
-                        let docLink = req.document ? `<a href="${escapeHtml(req.document)}" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1">Voir</a>` : 'Aucun';
-                        tbody.append(`<tr><td>${escapeHtml(req.employee_name)}</td><td>${escapeHtml(req.date_debut)} - ${escapeHtml(req.date_fin)}</td><td>${escapeHtml(getLeaveTypeName(req.type_conge))}</td><td>${escapeHtml(req.duree)}j</td><td>${docLink}</td><td>${escapeHtml(req.date_demande)}</td><td><button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(${req.id})">Approuver</button><button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(${req.id})">Refuser</button><button class="btn btn-info btn-sm ml-1 py-0 px-1 action-button" onclick="showLeaveDetailsModal(${req.id})">Détails</button></td></tr>`);
+                        
+                        tbody.append(`<tr><td>${escapeHtml(req.employee_name)}</td><td>${escapeHtml(req.date_debut)} - ${escapeHtml(req.date_fin)}</td><td>${escapeHtml(getLeaveTypeName(req.type_conge))}</td><td>${escapeHtml(req.duree)}j</td><td>${escapeHtml(req.date_demande)}</td><td><button class="btn btn-success btn-sm py-0 px-1 action-button" onclick="approveLeaveFromModal(${req.id})">Approuver</button><button class="btn btn-danger btn-sm ml-1 py-0 px-1 action-button" onclick="rejectLeaveFromModal(${req.id})">Refuser</button><button class="btn btn-info btn-sm ml-1 py-0 px-1 action-button" onclick="showLeaveDetailsModal(${req.id})">Détails</button></td></tr>`);
                     });
                 } else {
                     tbody.html('<tr><td colspan="7" class="info-placeholder">Aucune demande en attente.</td></tr>');
