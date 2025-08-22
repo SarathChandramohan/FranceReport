@@ -495,11 +495,11 @@ function updateMaintenanceStatus($conn, $user) {
     $asset_id = $data['asset_id'];
     $status = $data['status'];
     if (!in_array($status, ['maintenance', 'available'])) throw new Exception("Statut non valide.");
-    if ($status === 'maintenance') {
+    /*if ($status === 'maintenance') {
         $stmt_check = $conn->prepare("SELECT COUNT(*) FROM Bookings WHERE asset_id = ? AND booking_date >= CAST(GETDATE() AS DATE) AND status IN ('booked', 'active')");
         $stmt_check->execute([$asset_id]);
         if ($stmt_check->fetchColumn() > 0) throw new Exception("Impossible de mettre en maintenance. L'actif a des réservations futures. Veuillez les annuler d'abord.");
-    }
+    } */
     $sql = "UPDATE Inventory SET status = ?, last_modified = GETDATE() WHERE asset_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->execute([$status, $asset_id]);
