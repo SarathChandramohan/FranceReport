@@ -1,7 +1,7 @@
 <?php
 // db-connection.php - Handles database connection to Azure SQL
 try {
-    $conn = new PDO("sqlsrv:server = tcp:francerecord.database.windows.net,1433; Database = Francerecord_2", "francerecordloki", "Hesoyam@2025");
+    $conn = new PDO("sqlsrv:server = tcp:francerecord.database.windows.net,1433; Database = Francerecord", "francerecordloki", "Hesoyam@2025");
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 }
 catch(PDOException $e) {
