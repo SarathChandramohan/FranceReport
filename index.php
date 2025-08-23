@@ -1,5 +1,5 @@
 <?php
-session_start(); // <-- Move session_start to the top before anything else (no space above this line)
+session_start(); // <-- Move session_start to the top before anything else (no space above this line) 
 function connectDB() {
             $connectionInfo = array(
                 "UID" => "francerecordloki",
