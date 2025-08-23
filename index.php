@@ -4,7 +4,7 @@ function connectDB() {
             $connectionInfo = array(
                 "UID" => "francerecordloki",
                 "pwd" => "Hesoyam@2025",
-                "Database" => "Francerecord_2",
+                "Database" => "Francerecord",
                 "LoginTimeout" => 30,
                 "Encrypt" => 1,
                 "TrustServerCertificate" => 0
