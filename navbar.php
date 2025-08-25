@@ -244,7 +244,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         }
     }
 </style>
-
+<?php if (isUserLoggedIn()): ?>
+    <script src="/push-client.js"></script>
+<?php endif; ?>
 <nav class="site-header">
     <div class="header-left">
         <a href="<?php echo $home_page; ?>">
@@ -341,4 +343,5 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
 
