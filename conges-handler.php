@@ -4,7 +4,7 @@
 // Include database connection and session management
 require_once 'db-connection.php';
 require_once 'session-management.php';
-require_once 'send-notification.php';
+require_once 'notification-manager.php';
 
 // Ensure user is logged in
 requireLogin();
