@@ -7,27 +7,17 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
 ?>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-    /*
-     * CSS for the new site header.
-     * All rules are prefixed with '.site-header' to prevent conflicts with other page styles.
-     */
-    
-    /* Define violet theme color */
     :root {
-        --theme-color-violet: #6A0DAD; /* Premium Violet */
+        --theme-color-violet: #6A0DAD;
     }
-
     body {
-        /* Apply font to the whole page for consistency */
         font-family: 'Inter', sans-serif;
     }
-
     .site-header {
         background-color: #ffffff;
         padding: 1rem 1.5rem;
@@ -35,27 +25,22 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid #e5e7eb;
-        border-top: 3px solid #374151; /* Dark grey top border */
+        border-top: 3px solid #374151;
         width: 100%;
         position: sticky;
         top: 0;
         z-index: 1020;
     }
-
-    /* Left Side: Logo */
     .site-header .header-left .company-logo {
         height: 55px;
         width: auto;
         display: block;
     }
-
-    /* Center: Navigation Links */
     .site-header .header-center {
         display: flex;
         align-items: center;
         gap: 2rem;
     }
-
     .site-header .header-center a {
         font-family: 'Inter', sans-serif;
         text-decoration: none;
@@ -66,7 +51,6 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         transition: color 0.2s ease-in-out;
         position: relative;
     }
-
     .site-header .header-center a:after {
         content: '';
         position: absolute;
@@ -74,43 +58,35 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         height: 2px;
         bottom: 0;
         left: 50%;
-        background-color: var(--theme-color-violet); /* Violet underline */
+        background-color: var(--theme-color-violet);
         transition: all 0.3s ease-in-out;
         transform: translateX(-50%);
     }
-
     .site-header .header-center a:hover,
     .site-header .header-center a.active {
-        color: var(--theme-color-violet); /* Violet for hover and active states */
+        color: var(--theme-color-violet);
     }
-
     .site-header .header-center a.active:after {
         width: 100%;
     }
-
-    /* Right Side: User Info & Actions */
     .site-header .header-right {
         display: flex;
         align-items: center;
         gap: 1.5rem;
     }
-    
-    /* NEW: Container for the user menu hover effect */
     .site-header .user-menu-container {
-        position: relative; /* Needed for positioning the logout button */
+        position: relative;
     }
-
     .site-header .user-info {
         display: flex;
         align-items: center;
         gap: 0.75rem;
         color: #374151;
         font-weight: 500;
-        cursor: pointer; /* Indicates it's interactive */
+        cursor: pointer;
     }
-
     .site-header .user-avatar {
-        background-color: var(--theme-color-violet); /* Violet avatar background */
+        background-color: var(--theme-color-violet);
         color: white;
         border-radius: 50%;
         width: 36px;
@@ -121,11 +97,10 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         font-weight: 600;
         font-size: 0.9rem;
     }
-
     .site-header .logout-button {
-        display: none; /* Hide logout button by default */
+        display: none;
         position: absolute;
-        top: 110%; /* Position below the user info */
+        top: 110%;
         right: 0;
         background-color: #ffffff;
         border: 1px solid #e5e7eb;
@@ -136,22 +111,17 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         font-size: 0.9rem;
         color: #374151;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        white-space: nowrap; /* Prevent "Déconnexion" from wrapping */
+        white-space: nowrap;
         transition: all 0.2s ease-in-out;
     }
-    
     .site-header .logout-button:hover {
         border-color: #374151;
         color: #111827;
         background-color: #f9fafb;
     }
-    
-    /* NEW: Show logout button on hover of the container */
     .site-header .user-menu-container:hover .logout-button {
         display: block;
     }
-
-    /* Mobile Hamburger Toggler */
     .site-header .navbar-toggler {
         background: none;
         border: none;
@@ -159,8 +129,6 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         color: #374151;
         cursor: pointer;
     }
-
-    /* Mobile Navigation Panel */
     .mobile-nav-panel {
         position: fixed;
         top: 0;
@@ -175,11 +143,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         flex-direction: column;
         padding: 1.5rem;
     }
-
     .mobile-nav-panel.show {
         left: 0;
     }
-    
     .mobile-nav-panel .close-btn {
         background: none;
         border: none;
@@ -190,14 +156,12 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         right: 1.5rem;
         cursor: pointer;
     }
-
     .mobile-nav-panel .mobile-nav-links {
         display: flex;
         flex-direction: column;
         gap: 1rem;
         margin-top: 3rem;
     }
-
     .mobile-nav-panel .mobile-nav-links a {
         text-decoration: none;
         color: #374151;
@@ -207,14 +171,11 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         border-radius: 8px;
         transition: background-color 0.2s;
     }
-    
     .mobile-nav-panel .mobile-nav-links a:hover,
     .mobile-nav-panel .mobile-nav-links a.active {
         background-color: #f3f4f6;
-        color: var(--theme-color-violet); /* Violet for mobile active state */
+        color: var(--theme-color-violet);
     }
-    
-    /* Overlay for when mobile menu is open */
     .mobile-nav-overlay {
         position: fixed;
         top: 0;
@@ -225,19 +186,15 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         z-index: 1025;
         display: none;
     }
-    
     .mobile-nav-overlay.show {
         display: block;
     }
-
-    /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
         .site-header .header-center,
-        .site-header .user-menu-container { /* Hide the new container on mobile */
+        .site-header .user-menu-container {
             display: none;
         }
     }
-    
     @media (min-width: 992px) {
         .site-header .navbar-toggler {
             display: none;
@@ -284,13 +241,6 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
             <i class="fas fa-bars"></i>
         </button>
     </div>
-    <a class="nav-link" href="logout.php">
-        <i class="fas fa-sign-out-alt"></i> </a>
-</nav>
-
-<?php if (isUserLoggedIn()): ?>
-    <script src="/push-client.js"></script>
-<?php endif; ?>
 </nav>
 
 <div class="mobile-nav-panel" id="mobileNavPanel">
@@ -311,10 +261,15 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
         <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
         <hr>
-        <a href="logout.php">Déconnexion</a> </div>
+        <a href="logout.php">Déconnexion</a>
+    </div>
 </div>
 
 <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
+
+<?php if (isUserLoggedIn()): ?>
+    <script src="/push-client.js"></script>
+<?php endif; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -348,6 +303,3 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-
-
-
