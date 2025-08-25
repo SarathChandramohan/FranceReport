@@ -391,3 +391,16 @@ CREATE TABLE [dbo].[Event_AssignedUsers] (
 
 
 GO
+
+CREATE TABLE WebPushSubscriptions (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT NOT NULL,
+    subscription_endpoint VARCHAR(512) NOT NULL,
+    subscription_p256dh VARCHAR(255) NOT NULL,
+    subscription_auth VARCHAR(255) NOT NULL,
+    created_at DATETIME DEFAULT GETDATE(),
+    -- A user can have subscriptions on multiple devices/browsers
+    UNIQUE (user_id, subscription_endpoint), 
+    CONSTRAINT FK_WebPushSubscriptions_Users FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+GO
