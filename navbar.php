@@ -7,7 +7,6 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
 ?>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -93,6 +92,29 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         display: flex;
         align-items: center;
         gap: 1.5rem;
+    }
+    
+    /* NEW: Styles for Notification Bell */
+    .site-header .notification-bell {
+        position: relative;
+        cursor: pointer;
+        color: #4b5563;
+        font-size: 1.2rem;
+    }
+    .site-header .notification-bell:hover {
+        color: var(--theme-color-violet);
+    }
+    .site-header .notification-badge {
+        position: absolute;
+        top: -5px;
+        right: -8px;
+        background-color: red;
+        color: white;
+        border-radius: 50%;
+        padding: 0.15em 0.45em;
+        font-size: 0.7rem;
+        font-weight: bold;
+        display: none; /* Hidden by default */
     }
     
     /* NEW: Container for the user menu hover effect */
@@ -230,10 +252,49 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         display: block;
     }
 
+    /* NEW: Notification Popup Styles */
+    #notification-popup {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        z-index: 1050;
+        max-width: 350px;
+    }
+    #notification-popup h5 {
+        margin-top: 0;
+        font-weight: 600;
+    }
+    #notification-popup .popup-buttons {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
+    #notification-popup button {
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    #notification-popup #enable-notifications {
+        background-color: var(--theme-color-violet);
+        color: white;
+    }
+    #notification-popup #disable-notifications {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+
     /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
         .site-header .header-center,
-        .site-header .user-menu-container { /* Hide the new container on mobile */
+        .site-header .user-menu-container,
+        .site-header .notification-bell { /* Hide new elements on mobile too */
             display: none;
         }
     }
@@ -244,9 +305,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         }
     }
 </style>
-<?php if (isUserLoggedIn()): ?>
-    <script src="/push-client.js"></script>
-<?php endif; ?>
+
 <nav class="site-header">
     <div class="header-left">
         <a href="<?php echo $home_page; ?>">
@@ -272,6 +331,11 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     </div>
 
     <div class="header-right">
+        <div id="notification-bell" class="notification-bell">
+            <i class="fas fa-bell"></i>
+            <span class="notification-badge"></span>
+        </div>
+        
         <div class="user-menu-container">
             <div class="user-info">
                 <span class="user-name"><?php echo isset($user) ? htmlspecialchars($user['prenom'] . ' ' . $user['nom']) : ''; ?></span>
@@ -306,10 +370,20 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
         <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
         <hr>
-        <a href="logout.php">Déconnexion</a> </div>
+        <a href="logout.php">Déconnexion</a>
+    </div>
 </div>
 
 <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
+
+<div id="notification-popup">
+    <h5>Activer les notifications</h5>
+    <p>Souhaitez-vous recevoir des notifications pour les nouvelles demandes ?</p>
+    <div class="popup-buttons">
+        <button id="enable-notifications">Oui, activer</button>
+        <button id="disable-notifications">Non, merci</button>
+    </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -344,4 +418,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-
+<?php if (isset($user)): ?>
+    <script src="push-client.js"></script>
+<?php endif; ?>
