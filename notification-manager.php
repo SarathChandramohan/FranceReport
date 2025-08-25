@@ -18,8 +18,8 @@ function sendNotificationByRole(string $role, string $title, string $body, strin
     global $conn;
 
     // --- IMPORTANT: PASTE YOUR VAPID KEYS HERE ---
-    $vapidPublicKey = 'REPLACE_WITH_YOUR_PUBLIC_KEY';
-    $vapidPrivateKey = 'REPLACE_WITH_YOUR_PRIVATE_KEY';
+    $vapidPublicKey = 'BAoBqkEtJlTETgmJptadY56XGZpwxxlvf1R9N1ZYsy8em8FJkriA1HDmqGrpQTwg7OaVY51n7szFW1wv0zcoKjM';
+    $vapidPrivateKey = 'rbM28iK7lxqbHouimk8ck3yourM-guMFjWs2RzMb7-k';
     // ---------------------------------------------
 
     if (empty($vapidPublicKey) || strpos($vapidPublicKey, 'REPLACE') !== false) {
