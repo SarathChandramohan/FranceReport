@@ -4,6 +4,7 @@
 // Include database connection and session management
 require_once 'db-connection.php';
 require_once 'session-management.php';
+require_once 'send-notification.php';
 
 // Ensure user is logged in
 requireLogin();
@@ -272,6 +273,7 @@ function rejectLeaveRequest() {
  */
 function submitLeaveRequest($user_id) {
     global $conn;
+    $user = getCurrentUser(); // <-- ADD THIS LINE to get the current user's details for the message.
 
     $date_debut = $_POST['date_debut'] ?? null;
     $date_fin = $_POST['date_fin'] ?? null;
@@ -316,6 +318,17 @@ function submitLeaveRequest($user_id) {
         $stmt->execute([$user_id, $date_debut, $date_fin, $type_conge, $duration, $commentaire]);
 
         $conge_id = $conn->lastInsertId();
+
+        // ---- 👇 ADD THESE LINES HERE 👇 ----
+        // This is the perfect spot: right after the request is saved, and before you respond to the user.
+
+        $notification_title = "Nouvelle demande de congé";
+        $notification_body = $user['prenom'] . ' ' . $user['nom'] . " a demandé un congé du " . date('d/m/Y', strtotime($date_debut)) . " au " . date('d/m/Y', strtotime($date_fin)) . ".";
+        sendNotificationByRole('admin', $notification_title, $notification_body);
+        
+        // ---- 👆 END OF NEW LINES 👆 ----
+
+
         respondWithSuccess('Demande de congé soumise avec succès.', ['conge_id' => $conge_id]);
 
     } catch(PDOException $e) {
