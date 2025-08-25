@@ -2,7 +2,12 @@ server name francerecord
 francerecordloki
 Hesoyam@2025
 
-
+-------------------------
+{ Vapid key
+"subject": "mailto: <sarath90941@gmail.com>",
+"publicKey": "BAoBqkEtJlTETgmJptadY56XGZpwxxlvf1R9N1ZYsy8em8FJkriA1HDmqGrpQTwg7OaVY51n7szFW1wv0zcoKjM",
+"privateKey": "rbM28iK7lxqbHouimk8ck3yourM-guMFjWs2RzMb7-k"
+}
 
 ---------------------------
 CREATE TABLE Users (
@@ -327,4 +332,5 @@ ALTER TABLE [dbo].[Bookings] DROP CONSTRAINT [UQ_Booking_Asset_Date];
 CREATE UNIQUE NONCLUSTERED INDEX [IX_UQ_ActiveBooking_Asset_Date]
 ON [dbo].[Bookings] ([asset_id], [booking_date])
 WHERE [status] IN ('booked', 'active');
+
 
