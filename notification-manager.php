@@ -29,7 +29,7 @@ function sendNotificationByRole(string $role, string $title, string $body, strin
 
     $auth = [
         'VAPID' => [
-            'subject' => 'mailto:your-email@yourdomain.com', // Replace with your admin email
+            'subject' => 'sarath90941@gmail.com', // Replace with your admin email
             'publicKey' => $vapidPublicKey,
             'privateKey' => $vapidPrivateKey,
         ],
