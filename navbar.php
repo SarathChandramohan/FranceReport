@@ -284,6 +284,13 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
             <i class="fas fa-bars"></i>
         </button>
     </div>
+    <a class="nav-link" href="logout.php">
+        <i class="fas fa-sign-out-alt"></i> </a>
+</nav>
+
+<?php if (isUserLoggedIn()): ?>
+    <script src="/push-client.js"></script>
+<?php endif; ?>
 </nav>
 
 <div class="mobile-nav-panel" id="mobileNavPanel">
@@ -341,5 +348,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
 
 
