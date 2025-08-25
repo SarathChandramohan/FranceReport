@@ -1,7 +1,7 @@
 // push-client.js
 
 // --- IMPORTANT: PASTE YOUR VAPID PUBLIC KEY HERE ---
-const VAPID_PUBLIC_KEY = 'REPLACE_WITH_YOUR_PUBLIC_KEY';
+const VAPID_PUBLIC_KEY = 'BAoBqkEtJlTETgmJptadY56XGZpwxxlvf1R9N1ZYsy8em8FJkriA1HDmqGrpQTwg7OaVY51n7szFW1wv0zcoKjM';
 // -------------------------------------------------
 
 /**
