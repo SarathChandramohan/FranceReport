@@ -415,11 +415,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Function to fetch and display notifications
     function fetchNotifications() {
-        fetch('get-notifications.php')
-            .then(response => response.json())
+        fetch('get-notifications.php') // <-- CORRECTED PATH
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.error) {
-                    historyContainer.innerHTML = `<div class="notification-item no-notifications">Erreur de chargement.</div>`;
+                    historyContainer.innerHTML = `<div class="notification-item no-notifications">Erreur: ${data.error}</div>`;
                     return;
                 }
 
@@ -446,13 +451,18 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(error => {
                 console.error('Error fetching notifications:', error);
-                historyContainer.innerHTML = `<div class="notification-item no-notifications">Erreur de chargement.</div>`;
+                historyContainer.innerHTML = `<div class="notification-item no-notifications">Erreur de chargement des notifications.</div>`;
             });
     }
 
     // Toggle dropdown on bell click
     bellContainer.addEventListener('click', function (event) {
         event.stopPropagation();
+        const isVisible = dropdown.classList.contains('show');
+        if (!isVisible) {
+            // Fetch fresh notifications only when opening the dropdown
+            fetchNotifications();
+        }
         dropdown.classList.toggle('show');
     });
 
@@ -485,8 +495,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initial fetch of notifications
     fetchNotifications();
 
-    // Optionally, refresh notifications every minute
-    setInterval(fetchNotifications, 60000); 
+    // Optionally, refresh notifications every 5 minutes
+    setInterval(fetchNotifications, 300000); 
 
 });
 </script>
