@@ -418,6 +418,43 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<script>
+// This script manages the custom notification permission pop-up
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if the necessary functions and browser features are available
+    if ('Notification' in window && 'serviceWorker' in navigator && typeof subscribeUser === 'function') {
+
+        const popup = document.getElementById('notification-popup');
+        const enableBtn = document.getElementById('enable-notifications');
+        const disableBtn = document.getElementById('disable-notifications');
+
+        // Show the custom pop-up only if the user hasn't made a choice yet
+        if (Notification.permission === 'default') {
+            // Use a small delay to let the user see the page first
+            setTimeout(() => {
+                if(popup) popup.style.display = 'block';
+            }, 2000); // Show after 2 seconds
+        }
+
+        // When the user clicks "Yes, enable"
+        if (enableBtn) {
+            enableBtn.addEventListener('click', function() {
+                subscribeUser(); // This will trigger the browser's native permission prompt
+                if(popup) popup.style.display = 'none'; // Hide our custom pop-up
+            });
+        }
+
+        // When the user clicks "No, thanks"
+        if (disableBtn) {
+            disableBtn.addEventListener('click', function() {
+                if(popup) popup.style.display = 'none'; // Just hide our custom pop-up
+            });
+        }
+    }
+});
+</script>
+
 <?php if (isset($user)): ?>
     <script src="push-client.js"></script>
 <?php endif; ?>
+
