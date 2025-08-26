@@ -10,7 +10,7 @@ $user = getCurrentUser();
 $user_id = $user['user_id'];
 
 define('APP_TIMEZONE', 'Europe/Paris');
-define('MAX_DISTANCE_METERS', 100);
+define('MAX_DISTANCE_METERS', 50);
 
 $action = isset($_POST['action']) ? $_POST['action'] : '';
 
