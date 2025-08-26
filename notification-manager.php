@@ -14,6 +14,36 @@ use Minishlink\WebPush\Subscription;
  * @param string $body The body text of the notification.
  * @param string $iconUrl Optional URL to an icon for the notification.
  */
+
+function addNotification($userId, $message) {
+    $conn = getDbConnection();
+    $stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+    $stmt->bind_param("is", $userId, $message);
+    $stmt->execute();
+    $stmt->close();
+    $conn->close();
+}
+
+function getUnreadNotifications($userId) {
+    $conn = getDbConnection();
+    $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $notifications = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    $conn->close();
+    return $notifications;
+}
+
+function markNotificationsAsRead($userId) {
+    $conn = getDbConnection();
+    $stmt = $conn->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $stmt->close();
+    $conn->close();
+}
 function sendNotificationByRole(string $role, string $title, string $body, string $iconUrl = '/Logo.png') {
     global $conn;
 
