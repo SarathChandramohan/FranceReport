@@ -289,6 +289,48 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         background-color: #e5e7eb;
         color: #374151;
     }
+    
+    /* NEW: Notification Dropdown Styles */
+    .notification-dropdown {
+        display: none;
+        position: absolute;
+        top: 150%;
+        right: 0;
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        width: 300px;
+        z-index: 1030;
+    }
+    .notification-dropdown.show {
+        display: block;
+    }
+    .notification-dropdown-header {
+        padding: 0.75rem 1rem;
+        font-weight: 600;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .notification-dropdown-body {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .notification-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.9rem;
+    }
+    .notification-item:last-child {
+        border-bottom: none;
+    }
+    .notification-dropdown-footer {
+        padding: 0.75rem 1rem;
+        border-top: 1px solid #e5e7eb;
+        text-align: center;
+    }
+    .notification-dropdown-footer .btn {
+        width: 100%;
+    }
 
     /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
@@ -331,9 +373,19 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     </div>
 
     <div class="header-right">
-        <div id="notification-bell" class="notification-bell">
+        <div id="notification-bell-container" class="notification-bell">
             <i class="fas fa-bell"></i>
             <span class="notification-badge"></span>
+            <div id="notification-dropdown" class="notification-dropdown">
+                <div class="notification-dropdown-header">
+                    Notifications
+                </div>
+                <div class="notification-dropdown-body" id="notification-history">
+                    </div>
+                <div class="notification-dropdown-footer">
+                    <button id="allow-notifications-btn" class="btn btn-primary">Autoriser les notifications</button>
+                </div>
+            </div>
         </div>
         
         <div class="user-menu-container">
@@ -451,10 +503,47 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+    
+    // Notification dropdown logic
+    const notificationBellContainer = document.getElementById('notification-bell-container');
+    const notificationDropdown = document.getElementById('notification-dropdown');
+    const notificationHistory = document.getElementById('notification-history');
+    const allowNotificationsBtn = document.getElementById('allow-notifications-btn');
+
+    notificationBellContainer.addEventListener('click', function(event) {
+        event.stopPropagation();
+        notificationDropdown.classList.toggle('show');
+        // Load notification history (dummy data for now)
+        notificationHistory.innerHTML = `
+            <div class="notification-item">Notification 1: Something happened.</div>
+            <div class="notification-item">Notification 2: Another thing happened.</div>
+            <div class="notification-item">Notification 3: A third event occurred.</div>
+        `;
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!notificationBellContainer.contains(event.target)) {
+            notificationDropdown.classList.remove('show');
+        }
+    });
+
+    allowNotificationsBtn.addEventListener('click', function() {
+        if ('Notification' in window) {
+            Notification.requestPermission().then(function(permission) {
+                if (permission === 'granted') {
+                    alert('Notifications activées!');
+                } else {
+                    alert('Notifications non autorisées.');
+                }
+            });
+        } else {
+            alert('Ce navigateur ne supporte pas les notifications.');
+        }
+    });
 });
 </script>
 
 <?php if (isset($user)): ?>
     <script src="push-client.js"></script>
 <?php endif; ?>
-
