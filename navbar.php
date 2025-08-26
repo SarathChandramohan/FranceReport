@@ -1,9 +1,11 @@
 <?php
 require_once 'session-management.php';
+require_once 'notification-manager.php'; // <-- Added this line
 requireLogin();
 $user = getCurrentUser();
 $current_page = basename($_SERVER['PHP_SELF']);
 $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.php' : 'timesheet.php';
+$notifications = getUnreadNotifications($user['id']); // <-- Added this line
 ?>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -335,8 +337,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
         .site-header .header-center,
-        .site-header .user-menu-container,
-        .site-header .notification-bell { /* Hide new elements on mobile too */
+        .site-header .user-menu-container {
             display: none;
         }
     }
@@ -375,13 +376,20 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     <div class="header-right">
         <div id="notification-bell-container" class="notification-bell">
             <i class="fas fa-bell"></i>
-            <span class="notification-badge"></span>
+            <span class="notification-badge" <?php if (count($notifications) > 0) echo 'style="display: block;"'; ?>><?php echo count($notifications); ?></span>
             <div id="notification-dropdown" class="notification-dropdown">
                 <div class="notification-dropdown-header">
                     Notifications
                 </div>
                 <div class="notification-dropdown-body" id="notification-history">
-                    </div>
+                    <?php if (empty($notifications)): ?>
+                        <div class="notification-item">Vous n'avez aucune nouvelle notification.</div>
+                    <?php else: ?>
+                        <?php foreach ($notifications as $notification): ?>
+                            <div class="notification-item"><?php echo htmlspecialchars($notification['message']); ?></div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
                 <div class="notification-dropdown-footer">
                     <button id="allow-notifications-btn" class="btn btn-primary">Autoriser les notifications</button>
                 </div>
@@ -507,18 +515,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Notification dropdown logic
     const notificationBellContainer = document.getElementById('notification-bell-container');
     const notificationDropdown = document.getElementById('notification-dropdown');
-    const notificationHistory = document.getElementById('notification-history');
     const allowNotificationsBtn = document.getElementById('allow-notifications-btn');
 
     notificationBellContainer.addEventListener('click', function(event) {
         event.stopPropagation();
         notificationDropdown.classList.toggle('show');
-        // Load notification history (dummy data for now)
-        notificationHistory.innerHTML = `
-            <div class="notification-item">Notification 1: Something happened.</div>
-            <div class="notification-item">Notification 2: Another thing happened.</div>
-            <div class="notification-item">Notification 3: A third event occurred.</div>
-        `;
     });
 
     // Close dropdown when clicking outside
