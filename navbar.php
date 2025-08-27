@@ -117,67 +117,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         display: none; /* Hidden by default */
     }
     
-    /* NEW: Styles for Notification Dropdown */
-    .notification-dropdown {
-        display: none;
-        position: absolute;
-        top: 150%;
-        right: 0;
-        background-color: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        width: 320px;
-        z-index: 1030;
-    }
-    .notification-dropdown.show {
-        display: block;
-    }
-    .notification-dropdown-header {
-        padding: 0.75rem 1rem;
-        font-weight: 600;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    .notification-dropdown-body {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    .notification-item {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #f0f0f0;
-        font-size: 0.9rem;
-        color: #333;
-        line-height: 1.4;
-    }
-    .notification-item:last-child {
-        border-bottom: none;
-    }
-    .notification-item.no-notifications {
-        color: #888;
-        text-align: center;
-        padding: 1.5rem 1rem;
-    }
-    .notification-dropdown-footer {
-        padding: 0.75rem 1rem;
-        border-top: 1px solid #e5e7eb;
-        background-color: #f9f9f9;
-    }
-     .notification-dropdown-footer button {
-        background-color: var(--theme-color-violet);
-        color: white;
-        border: none;
-        padding: 8px 12px;
-        border-radius: 5px;
-        cursor: pointer;
-        width: 100%;
-        font-weight: 500;
-    }
-    .notification-dropdown-footer button:hover {
-        opacity: 0.9;
-    }
-
+    /* NEW: Container for the user menu hover effect */
     .site-header .user-menu-container {
-        position: relative;
+        position: relative; /* Needed for positioning the logout button */
     }
 
     .site-header .user-info {
@@ -186,11 +128,11 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         gap: 0.75rem;
         color: #374151;
         font-weight: 500;
-        cursor: pointer;
+        cursor: pointer; /* Indicates it's interactive */
     }
 
     .site-header .user-avatar {
-        background-color: var(--theme-color-violet);
+        background-color: var(--theme-color-violet); /* Violet avatar background */
         color: white;
         border-radius: 50%;
         width: 36px;
@@ -203,9 +145,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     }
 
     .site-header .logout-button {
-        display: none;
+        display: none; /* Hide logout button by default */
         position: absolute;
-        top: 110%;
+        top: 110%; /* Position below the user info */
         right: 0;
         background-color: #ffffff;
         border: 1px solid #e5e7eb;
@@ -216,7 +158,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         font-size: 0.9rem;
         color: #374151;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        white-space: nowrap;
+        white-space: nowrap; /* Prevent "Déconnexion" from wrapping */
         transition: all 0.2s ease-in-out;
     }
     
@@ -226,10 +168,12 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         background-color: #f9fafb;
     }
     
+    /* NEW: Show logout button on hover of the container */
     .site-header .user-menu-container:hover .logout-button {
         display: block;
     }
 
+    /* Mobile Hamburger Toggler */
     .site-header .navbar-toggler {
         background: none;
         border: none;
@@ -238,50 +182,119 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         cursor: pointer;
     }
 
+    /* Mobile Navigation Panel */
     .mobile-nav-panel {
-        position: fixed; top: 0; left: -300px; width: 280px; height: 100%;
-        background-color: #ffffff; z-index: 1030; transition: left 0.3s ease-in-out;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column;
+        position: fixed;
+        top: 0;
+        left: -300px;
+        width: 280px;
+        height: 100%;
+        background-color: #ffffff;
+        z-index: 1030;
+        transition: left 0.3s ease-in-out;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
         padding: 1.5rem;
     }
-    .mobile-nav-panel.show { left: 0; }
-    .mobile-nav-panel .close-btn {
-        background: none; border: none; font-size: 1.8rem; color: #6b7280;
-        position: absolute; top: 1rem; right: 1.5rem; cursor: pointer;
-    }
-    .mobile-nav-panel .mobile-nav-links {
-        display: flex; flex-direction: column; gap: 1rem; margin-top: 3rem;
-    }
-    .mobile-nav-panel .mobile-nav-links a {
-        text-decoration: none; color: #374151; font-weight: 500; font-size: 1.1rem;
-        padding: 0.75rem 1rem; border-radius: 8px; transition: background-color 0.2s;
-    }
-    .mobile-nav-panel .mobile-nav-links a:hover, .mobile-nav-panel .mobile-nav-links a.active {
-        background-color: #f3f4f6; color: var(--theme-color-violet);
-    }
-    .mobile-nav-overlay {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.4); z-index: 1025; display: none;
-    }
-    .mobile-nav-overlay.show { display: block; }
 
+    .mobile-nav-panel.show {
+        left: 0;
+    }
+    
+    .mobile-nav-panel .close-btn {
+        background: none;
+        border: none;
+        font-size: 1.8rem;
+        color: #6b7280;
+        position: absolute;
+        top: 1rem;
+        right: 1.5rem;
+        cursor: pointer;
+    }
+
+    .mobile-nav-panel .mobile-nav-links {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 3rem;
+    }
+
+    .mobile-nav-panel .mobile-nav-links a {
+        text-decoration: none;
+        color: #374151;
+        font-weight: 500;
+        font-size: 1.1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+    }
+    
+    .mobile-nav-panel .mobile-nav-links a:hover,
+    .mobile-nav-panel .mobile-nav-links a.active {
+        background-color: #f3f4f6;
+        color: var(--theme-color-violet); /* Violet for mobile active state */
+    }
+    
+    /* Overlay for when mobile menu is open */
+    .mobile-nav-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        z-index: 1025;
+        display: none;
+    }
+    
+    .mobile-nav-overlay.show {
+        display: block;
+    }
+
+    /* NEW: Notification Popup Styles */
     #notification-popup {
-        display: none; position: fixed; bottom: 20px; left: 20px;
-        background-color: #fff; border-radius: 8px; padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 1050; max-width: 350px;
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        z-index: 1050;
+        max-width: 350px;
     }
-    #notification-popup h5 { margin-top: 0; font-weight: 600; }
-    #notification-popup .popup-buttons { margin-top: 15px; display: flex; gap: 10px; }
+    #notification-popup h5 {
+        margin-top: 0;
+        font-weight: 600;
+    }
+    #notification-popup .popup-buttons {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
     #notification-popup button {
-        border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: 500;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 500;
     }
-    #notification-popup #enable-notifications { background-color: var(--theme-color-violet); color: white; }
-    #notification-popup #disable-notifications { background-color: #e5e7eb; color: #374151; }
+    #notification-popup #enable-notifications {
+        background-color: var(--theme-color-violet);
+        color: white;
+    }
+    #notification-popup #disable-notifications {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
 
     /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
         .site-header .header-center,
-        .site-header .user-menu-container {
+        .site-header .user-menu-container,
+        .site-header .notification-bell { /* Hide new elements on mobile too */
             display: none;
         }
     }
@@ -318,18 +331,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     </div>
 
     <div class="header-right">
-        <div id="notification-bell-container" class="notification-bell">
+        <div id="notification-bell" class="notification-bell">
             <i class="fas fa-bell"></i>
-            <span id="notification-badge" class="notification-badge"></span>
-            <div id="notification-dropdown" class="notification-dropdown">
-                <div class="notification-dropdown-header">Notifications</div>
-                <div class="notification-dropdown-body" id="notification-history">
-                    <div class="notification-item no-notifications">Chargement...</div>
-                </div>
-                <div class="notification-dropdown-footer">
-                    <button id="allow-notifications-btn">Autoriser les notifications</button>
-                </div>
-            </div>
+            <span class="notification-badge"></span>
         </div>
         
         <div class="user-menu-container">
@@ -394,6 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
             overlay.classList.add('show');
         }
     }
+
     function closeMobileNav() {
         if (mobileNav && overlay) {
             mobileNav.classList.remove('show');
@@ -401,103 +406,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    if (toggler) { toggler.addEventListener('click', openMobileNav); }
-    if (closeBtn) { closeBtn.addEventListener('click', closeMobileNav); }
-    if (overlay) { overlay.addEventListener('click', closeMobileNav); }
-
-    // --- NEW NOTIFICATION SCRIPT ---
-
-    const bellContainer = document.getElementById('notification-bell-container');
-    const dropdown = document.getElementById('notification-dropdown');
-    const badge = document.getElementById('notification-badge');
-    const historyContainer = document.getElementById('notification-history');
-    const allowBtn = document.getElementById('allow-notifications-btn');
-
-    // Function to fetch and display notifications
-    function fetchNotifications() {
-        fetch('get-notifications.php') // <-- CORRECTED PATH
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    historyContainer.innerHTML = `<div class="notification-item no-notifications">Erreur: ${data.error}</div>`;
-                    return;
-                }
-
-                // Update badge
-                if (data.unread_count > 0) {
-                    badge.textContent = data.unread_count;
-                    badge.style.display = 'block';
-                } else {
-                    badge.style.display = 'none';
-                }
-
-                // Update dropdown list
-                historyContainer.innerHTML = ''; // Clear previous items
-                if (data.notifications.length > 0) {
-                    data.notifications.forEach(notif => {
-                        const item = document.createElement('div');
-                        item.className = 'notification-item';
-                        item.textContent = notif.message;
-                        historyContainer.appendChild(item);
-                    });
-                } else {
-                    historyContainer.innerHTML = `<div class="notification-item no-notifications">Aucune nouvelle notification.</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching notifications:', error);
-                historyContainer.innerHTML = `<div class="notification-item no-notifications">Erreur de chargement des notifications.</div>`;
-            });
+    if (toggler) {
+        toggler.addEventListener('click', openMobileNav);
     }
-
-    // Toggle dropdown on bell click
-    bellContainer.addEventListener('click', function (event) {
-        event.stopPropagation();
-        const isVisible = dropdown.classList.contains('show');
-        if (!isVisible) {
-            // Fetch fresh notifications only when opening the dropdown
-            fetchNotifications();
-        }
-        dropdown.classList.toggle('show');
-    });
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function () {
-        if (dropdown.classList.contains('show')) {
-            dropdown.classList.remove('show');
-        }
-    });
-    
-    // Prevent dropdown from closing when clicking inside it
-    dropdown.addEventListener('click', function (event) {
-        event.stopPropagation();
-    });
-
-    // Handle permission button
-    allowBtn.addEventListener('click', function() {
-        if ('Notification' in window && 'serviceWorker' in navigator) {
-             // Assuming subscribeUser() is defined in push-client.js
-            if (typeof subscribeUser === 'function') {
-                subscribeUser();
-            } else {
-                 alert('La fonction de souscription aux notifications n\'est pas disponible.');
-            }
-        } else {
-            alert('Ce navigateur ne supporte pas les notifications.');
-        }
-    });
-    
-    // Initial fetch of notifications
-    fetchNotifications();
-
-    // Optionally, refresh notifications every 5 minutes
-    setInterval(fetchNotifications, 300000); 
-
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeMobileNav);
+    }
+    if (overlay) {
+        overlay.addEventListener('click', closeMobileNav);
+    }
 });
 </script>
 
