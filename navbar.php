@@ -95,6 +95,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     }
     
     /* NEW: Styles for Notification Bell */
+    .site-header .notification-bell-container {
+        position: relative;
+    }
     .site-header .notification-bell {
         position: relative;
         cursor: pointer;
@@ -251,44 +254,6 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     .mobile-nav-overlay.show {
         display: block;
     }
-
-    /* NEW: Notification Popup Styles */
-    #notification-popup {
-        display: none;
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        background-color: #fff;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        z-index: 1050;
-        max-width: 350px;
-    }
-    #notification-popup h5 {
-        margin-top: 0;
-        font-weight: 600;
-    }
-    #notification-popup .popup-buttons {
-        margin-top: 15px;
-        display: flex;
-        gap: 10px;
-    }
-    #notification-popup button {
-        border: none;
-        padding: 8px 16px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: 500;
-    }
-    #notification-popup #enable-notifications {
-        background-color: var(--theme-color-violet);
-        color: white;
-    }
-    #notification-popup #disable-notifications {
-        background-color: #e5e7eb;
-        color: #374151;
-    }
     
     /* NEW: Styles for notification dropdown */
     .notification-dropdown {
@@ -352,12 +317,11 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         color: #6b7280;
     }
 
-
     /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
         .site-header .header-center,
         .site-header .user-menu-container,
-        .site-header .notification-bell { /* Hide new elements on mobile too */
+        .site-header .notification-bell-container { /* Hide new elements on mobile too */
             display: none;
         }
     }
@@ -437,7 +401,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
             <a href="seeplanning.php" class="<?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
         <?php endif; ?>
         <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">véhicules / outillage</a>
-        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' ? 'active' : ''; ?>">Messages</a>
+        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
         <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
         <hr>
         <a href="logout.php">Déconnexion</a>
@@ -594,6 +558,9 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
             });
         }
         fetchUnreadCount();
+        
+        // Poll for new notifications every minute
+        setInterval(fetchUnreadCount, 60000);
 
     });
 </script>
