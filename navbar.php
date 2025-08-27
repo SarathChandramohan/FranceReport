@@ -289,6 +289,69 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         background-color: #e5e7eb;
         color: #374151;
     }
+    
+    /* NEW: Styles for notification dropdown */
+    .notification-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        width: 350px;
+        max-height: 400px;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 0;
+        z-index: 1000;
+        transform: translateY(10px);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease-in-out;
+    }
+    .notification-dropdown.show {
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+    }
+    .notification-dropdown h6 {
+        margin: 0;
+        padding: 15px;
+        font-weight: 600;
+        border-bottom: 1px solid #e5e7eb;
+        background-color: #f9fafb;
+    }
+    .notification-item {
+        display: block;
+        padding: 15px;
+        text-decoration: none;
+        color: #374151;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .notification-item.unread {
+        background-color: #f0f8ff;
+        font-weight: 600;
+    }
+    .notification-item:hover {
+        background-color: #f3f4f6;
+    }
+    .notification-message {
+        font-size: 0.9rem;
+    }
+    .notification-date {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-top: 5px;
+    }
+    .notification-item:last-child {
+        border-bottom: none;
+    }
+    .no-notifications {
+        padding: 20px;
+        text-align: center;
+        color: #6b7280;
+    }
+
 
     /* Hide/show elements based on screen size */
     @media (max-width: 991.98px) {
@@ -331,9 +394,16 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     </div>
 
     <div class="header-right">
-        <div id="notification-bell" class="notification-bell">
-            <i class="fas fa-bell"></i>
-            <span class="notification-badge"></span>
+        <div id="notification-bell-container" class="notification-bell-container">
+            <div id="notification-bell" class="notification-bell">
+                <i class="fas fa-bell"></i>
+                <span id="notification-badge" class="notification-badge"></span>
+            </div>
+            <div id="notification-dropdown" class="notification-dropdown">
+                <h6>Notifications</h6>
+                <div id="notification-list">
+                    </div>
+            </div>
         </div>
         
         <div class="user-menu-container">
@@ -367,7 +437,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
             <a href="seeplanning.php" class="<?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
         <?php endif; ?>
         <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">véhicules / outillage</a>
-        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
+        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' ? 'active' : ''; ?>">Messages</a>
         <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
         <hr>
         <a href="logout.php">Déconnexion</a>
@@ -385,37 +455,147 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const toggler = document.querySelector('.site-header .navbar-toggler');
-    const mobileNav = document.getElementById('mobileNavPanel');
-    const closeBtn = document.querySelector('.mobile-nav-panel .close-btn');
-    const overlay = document.getElementById('mobileNavOverlay');
+    document.addEventListener('DOMContentLoaded', function () {
+        const toggler = document.querySelector('.site-header .navbar-toggler');
+        const mobileNav = document.getElementById('mobileNavPanel');
+        const closeBtn = document.querySelector('.mobile-nav-panel .close-btn');
+        const overlay = document.getElementById('mobileNavOverlay');
+        const bellIcon = document.getElementById('notification-bell');
+        const dropdown = document.getElementById('notification-dropdown');
 
-    function openMobileNav() {
-        if (mobileNav && overlay) {
-            mobileNav.classList.add('show');
-            overlay.classList.add('show');
+        function openMobileNav() {
+            if (mobileNav && overlay) {
+                mobileNav.classList.add('show');
+                overlay.classList.add('show');
+            }
         }
-    }
 
-    function closeMobileNav() {
-        if (mobileNav && overlay) {
-            mobileNav.classList.remove('show');
-            overlay.classList.remove('show');
+        function closeMobileNav() {
+            if (mobileNav && overlay) {
+                mobileNav.classList.remove('show');
+                overlay.classList.remove('show');
+            }
         }
-    }
 
-    if (toggler) {
-        toggler.addEventListener('click', openMobileNav);
-    }
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeMobileNav);
-    }
-    if (overlay) {
-        overlay.addEventListener('click', closeMobileNav);
-    }
-});
+        if (toggler) {
+            toggler.addEventListener('click', openMobileNav);
+        }
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeMobileNav);
+        }
+        if (overlay) {
+            overlay.addEventListener('click', closeMobileNav);
+        }
+
+        // Notification Bell Toggle
+        if (bellIcon) {
+            bellIcon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                } else {
+                    loadNotifications();
+                    dropdown.classList.add('show');
+                }
+            });
+        }
+        
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (dropdown && !dropdown.contains(e.target) && !bellIcon.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // Function to load notifications via AJAX
+        function loadNotifications() {
+            const notificationList = $('#notification-list');
+            notificationList.html('<div class="no-notifications">Chargement...</div>');
+
+            $.ajax({
+                url: 'notifications-handler.php',
+                type: 'GET',
+                data: { action: 'get_notifications' },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        renderNotifications(response.data);
+                        updateBadge(response.unread_count);
+                        markNotificationsAsRead(); // Mark them as read once the list is loaded
+                    } else {
+                        notificationList.html('<div class="no-notifications text-danger">Erreur de chargement.</div>');
+                    }
+                },
+                error: function() {
+                    notificationList.html('<div class="no-notifications text-danger">Erreur de communication.</div>');
+                }
+            });
+        }
+        
+        // Function to render notifications in the dropdown
+        function renderNotifications(notifications) {
+            const notificationList = $('#notification-list');
+            notificationList.empty();
+
+            if (notifications.length === 0) {
+                notificationList.html('<div class="no-notifications">Aucune notification.</div>');
+                return;
+            }
+
+            notifications.forEach(function(notif) {
+                const itemClass = notif.is_read == 0 ? 'notification-item unread' : 'notification-item';
+                const link = notif.link || '#';
+                notificationList.append(`
+                    <a href="${link}" class="${itemClass}">
+                        <div class="notification-message">${notif.message}</div>
+                        <div class="notification-date">${new Date(notif.created_at).toLocaleString('fr-FR')}</div>
+                    </a>
+                `);
+            });
+        }
+        
+        // Function to update the unread count badge
+        function updateBadge(count) {
+            const badge = $('#notification-badge');
+            if (count > 0) {
+                badge.text(count);
+                badge.show();
+            } else {
+                badge.hide();
+            }
+        }
+        
+        // Function to mark all notifications as read via AJAX
+        function markNotificationsAsRead() {
+            $.ajax({
+                url: 'notifications-handler.php',
+                type: 'POST',
+                data: { action: 'mark_as_read' },
+                success: function() {
+                    updateBadge(0);
+                }
+            });
+        }
+
+        // Initial fetch of the unread count on page load
+        function fetchUnreadCount() {
+            $.ajax({
+                url: 'notifications-handler.php',
+                type: 'GET',
+                data: { action: 'get_notifications' },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        updateBadge(response.unread_count);
+                    }
+                }
+            });
+        }
+        fetchUnreadCount();
+
+    });
 </script>
 
 <?php if (isset($user)): ?>
