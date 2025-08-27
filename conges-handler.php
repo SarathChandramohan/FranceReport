@@ -325,6 +325,23 @@ function submitLeaveRequest($user_id) {
         $notification_title = "Nouvelle demande de congé";
         $notification_body = $user['prenom'] . ' ' . $user['nom'] . " a demandé un congé du " . date('d/m/Y', strtotime($date_debut)) . " au " . date('d/m/Y', strtotime($date_fin)) . ".";
         sendNotificationByRole('admin', $notification_title, $notification_body);
+
+        // NEW: Get all users with the 'admin' role
+                $get_admins_sql = "SELECT user_id FROM Users WHERE role = 'admin'";
+                $get_admins_stmt = $conn->prepare($get_admins_sql);
+                $get_admins_stmt->execute();
+                $admins = $get_admins_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Insert a notification for each admin
+                $notification_message = 'Une nouvelle demande de congé a été soumise par ' . $user['prenom'] . ' ' . $user['nom'] . '.';
+                $notification_link = 'conges.php'; // Link to the leave requests page
+
+                foreach ($admins as $admin) {
+                    $admin_user_id = $admin['user_id'];
+                    $insert_notif_sql = "INSERT INTO Notifications (user_id, message, link) VALUES (?, ?, ?)";
+                    $insert_notif_stmt = $conn->prepare($insert_notif_sql);
+                    $insert_notif_stmt->execute([$admin_user_id, $notification_message, $notification_link]);
+                }
         
         // ---- 👆 END OF NEW LINES 👆 ----
 
