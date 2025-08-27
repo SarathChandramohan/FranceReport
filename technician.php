@@ -14,7 +14,7 @@ $user = getCurrentUser();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
             --primary-color: #007aff;
@@ -354,6 +354,7 @@ $user = getCurrentUser();
             </div>
             <div class="modal-body text-center">
                 <video id="scanner-preview" playsinline></video>
+                <canvas id="qr-canvas" hidden></canvas>
                 <p class="text-muted mt-2">Veuillez aligner le code-barres avec la caméra.</p>
             </div>
         </div>
@@ -490,7 +491,6 @@ $user = getCurrentUser();
     let itemToProcess = null;
     let selectedFuelLevel = null;
     let actionAfterFuelModal = null;
-    const codeReader = new ZXing.BrowserMultiFormatReader();
     let returnDatePicker = null;
     const currentUserId = <?php echo $user['user_id']; ?>;
 
@@ -625,16 +625,45 @@ $user = getCurrentUser();
 
     // Initializes and shows the barcode scanner modal
     function startScanner() {
-        $('#scanner-modal').modal('show');
-        codeReader.decodeFromVideoDevice(undefined, 'scanner-preview', (result, err) => {
-            if (result) {
-                codeReader.reset();
+    $('#scanner-modal').modal('show');
+    const video = document.getElementById("scanner-preview");
+    const canvasElement = document.getElementById("qr-canvas");
+    const canvas = canvasElement.getContext("2d");
+
+    // Use facingMode: "environment" to locate the rear camera.
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
+        video.play();
+        requestAnimationFrame(tick);
+    }).catch(function(err) {
+        console.error("Error accessing camera:", err);
+        alert("Impossible d'accéder à la caméra. Veuillez vérifier les permissions.");
+    });
+
+    function tick() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvasElement.height = video.videoHeight;
+            canvasElement.width = video.videoWidth;
+            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+            var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+            var code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert", 
+            });
+
+            if (code) {
+                // Stop the video stream and hide the modal
+                video.srcObject.getTracks().forEach(track => track.stop());
                 $('#scanner-modal').modal('hide');
-                processAction(result.text); // Process the scanned barcode
+
+                // Process the scanned QR code
+                processAction(code.data);
+                return; // Stop the animation loop
             }
-            // No action on error, allows user to keep trying
-        });
+        }
+        requestAnimationFrame(tick);
     }
+}
 
     // Main logic to decide what to do with a scanned/entered barcode
     function processAction(barcode) {
