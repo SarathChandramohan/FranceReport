@@ -250,6 +250,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
                     <h3 class="text-center mb-4"><i class="fas fa-barcode mr-2"></i>Scanner un Actif</h3>
                     <div class="scanner-container">
                         <video id="video" autoplay playsinline></video>
+                        <canvas id="qr-canvas" hidden></canvas>
                     </div>
                     <div class="text-center mt-3">
                         <button id="startScanBtn" class="btn btn-success"><i class="fas fa-play"></i> Démarrer le Scan</button>
@@ -381,7 +382,7 @@ $isAdmin = ($currentUser['role'] === 'admin');
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
@@ -397,7 +398,7 @@ let missingItems = [];
 let itemsForVerification = [];
 let allUsers = [];
 let selectedCategoryId = 'all'; 
-let codeReader = null;
+let videoStream = null;
 let datePicker = null;
 
 const inventoryGrid = document.getElementById('inventoryGrid');
@@ -1059,34 +1060,51 @@ async function openHistoryModal(assetId, assetName) {
 }
 
 
+let videoStream = null;
 function startScanning() {
-    if (codeReader) codeReader.reset();
-    codeReader = new ZXing.BrowserMultiFormatReader();
     $('#startScanBtn').hide();
     $('#stopScanBtn').show();
-    codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
-        if (result) {
-            stopScanning();
-            processScanResult(result.text);
-        }
-        if (err && !(err instanceof ZXing.NotFoundException)) {
-          console.error(err);
-          stopScanning();
-        }
-    }).catch(err => {
+    const video = document.getElementById("video");
+    const canvasElement = document.getElementById("qr-canvas");
+    const canvas = canvasElement.getContext("2d");
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+        videoStream = stream;
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+        requestAnimationFrame(tick);
+    }).catch(function(err) {
         console.error("Camera Error:", err);
         showNotification("Erreur de caméra. Vérifiez les permissions.", "error");
         stopScanning();
     });
+
+    function tick() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvasElement.height = video.videoHeight;
+            canvasElement.width = video.videoWidth;
+            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+            var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+            var code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+
+            if (code) {
+                stopScanning();
+                processScanResult(code.data);
+                return;
+            }
+        }
+        requestAnimationFrame(tick);
+    }
 }
 
 function stopScanning() {
-    if (codeReader) {
-        codeReader.reset();
-        codeReader = null;
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
     }
-    const videoElem = document.getElementById('video');
-    if (videoElem && videoElem.srcObject) videoElem.srcObject.getTracks().forEach(track => track.stop());
     $('#startScanBtn').show();
     $('#stopScanBtn').hide();
 }
