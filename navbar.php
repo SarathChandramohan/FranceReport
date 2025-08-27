@@ -254,6 +254,44 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
     .mobile-nav-overlay.show {
         display: block;
     }
+
+    /* NEW: Notification Popup Styles */
+    #notification-popup {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        z-index: 1050;
+        max-width: 350px;
+    }
+    #notification-popup h5 {
+        margin-top: 0;
+        font-weight: 600;
+    }
+    #notification-popup .popup-buttons {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
+    #notification-popup button {
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    #notification-popup #enable-notifications {
+        background-color: var(--theme-color-violet);
+        color: white;
+    }
+    #notification-popup #disable-notifications {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
     
     /* NEW: Styles for notification dropdown */
     .notification-dropdown {
@@ -452,7 +490,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         if (overlay) {
             overlay.addEventListener('click', closeMobileNav);
         }
-
+        
         // Notification Bell Toggle
         if (bellIcon) {
             bellIcon.addEventListener('click', function(e) {
