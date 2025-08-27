@@ -1060,7 +1060,7 @@ async function openHistoryModal(assetId, assetName) {
 }
 
 
-let videoStream = null;
+
 function startScanning() {
     $('#startScanBtn').hide();
     $('#stopScanBtn').show();
@@ -1069,6 +1069,7 @@ function startScanning() {
     const canvas = canvasElement.getContext("2d");
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+        // Corrected line: 'videoStream' is now being assigned, not re-declared
         videoStream = stream;
         video.srcObject = stream;
         video.setAttribute("playsinline", true);
