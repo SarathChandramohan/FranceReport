@@ -20,7 +20,7 @@
   ],
   "splash_pages": [
     {
-      "src": "/splashscreen.png",
+      "src": "/logo.png",
       "sizes": "512x512"
     }
   ]
