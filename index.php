@@ -182,7 +182,7 @@ function connectDB() {
     **<meta name="apple-mobile-web-app-capable" content="yes">**
     **<meta name="apple-mobile-web-app-status-bar-style" content="black">**
     **<link rel="apple-touch-icon" href="/icon.png">**
-    **<link rel="apple-touch-startup-image" href="/splashscreen.png">**
+    **<link rel="apple-touch-startup-image" href="/logo.png">**
     <style>
         /* Your existing CSS here (no changes) */
         /* --- Apple Inspired Theme --- */
