@@ -1,0 +1,27 @@
+{
+  "name": "FranceReport",
+  "short_name": "FranceReport",
+  "start_url": "/index.php",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6A0DAD",
+  "description": "The official app for FranceReport.",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "splash_pages": [
+    {
+      "src": "/splashscreen.png",
+      "sizes": "512x512"
+    }
+  ]
+}
