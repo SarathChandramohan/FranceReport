@@ -177,6 +177,12 @@ function connectDB() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - Gestion des Ouvriers</title>
+    **<link rel="manifest" href="/manifest.json">**
+    **<meta name="theme-color" content="#6A0DAD">**
+    **<meta name="apple-mobile-web-app-capable" content="yes">**
+    **<meta name="apple-mobile-web-app-status-bar-style" content="black">**
+    **<link rel="apple-touch-icon" href="/icon.png">**
+    **<link rel="apple-touch-startup-image" href="/splashscreen.png">**
     <style>
         /* Your existing CSS here (no changes) */
         /* --- Apple Inspired Theme --- */
