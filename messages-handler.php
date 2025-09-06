@@ -107,7 +107,22 @@ function sendMessage($conn, $user) {
         foreach (array_unique($recipientIds) as $recipientId) {
             $stmtRecipient->execute([$messageId, $recipientId]);
         }
+        // Add this code inside the sendMessage function before the commit.
+        $notification_title = "Nouveau message de " . $user['prenom'] . ' ' . $user['nom'];
+        $notification_body = $_POST['subject'];
+        $notification_link = 'messages.php?message_id=' . $messageId;
         
+        $insert_notif_sql = "INSERT INTO Notifications (user_id, message, link) VALUES (?, ?, ?)";
+        $insert_notif_stmt = $conn->prepare($insert_notif_sql);
+
+        foreach (array_unique($recipientIds) as $recipientId) {
+            // Send push notification to the individual recipient
+            sendNotificationToUser($recipientId, $notification_title, $notification_body);
+            
+            // Insert notification into the database
+            $insert_notif_stmt->execute([$recipientId, $notification_message, $notification_link]);
+        }
+// This is the end of the code you need to add.
         $conn->commit();
         echo json_encode(['status' => 'success', 'message' => 'Message envoyé avec succès.']);
 
