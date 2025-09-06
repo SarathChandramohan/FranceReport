@@ -188,7 +188,43 @@ function updateEvent($conn) {
     $conn->commit();
     echo json_encode(['status' => 'success', 'message' => 'Événement mis à jour avec succès']);
 }
+// Add this new function to events_handler.php
+function sendEventReminders($conn) {
+    // This function will be triggered by a cron job or scheduled task on your server.
+    // It should run, for example, once every hour.
+    $now = new DateTime('now', new DateTimeZone('Europe/Paris'));
+    $check_start = clone $now;
+    $check_end = clone $now;
+    
+    // Check for events that start between 23 and 25 hours from now
+    $check_start->modify('+23 hours');
+    $check_end->modify('+25 hours');
 
+    $sql = "SELECT e.event_id, e.title, u.user_id, u.prenom, u.nom
+            FROM Events e
+            JOIN Event_AssignedUsers eau ON e.event_id = eau.event_id
+            JOIN Users u ON eau.user_id = u.user_id
+            WHERE e.start_datetime BETWEEN :start_time AND :end_time";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        ':start_time' => $check_start->format('Y-m-d H:i:s'),
+        ':end_time' => $check_end->format('Y-m-d H:i:s')
+    ]);
+    $upcoming_events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Call the notification function for each assigned user
+    if (!empty($upcoming_events)) {
+        foreach ($upcoming_events as $event) {
+            $notification_title = "Rappel: Événement à venir";
+            $notification_body = "L'événement '" . $event['title'] . "' commence dans moins de 24 heures.";
+            
+            // You will need a notification function that sends to a specific user.
+            // Let's assume you've added one as suggested above.
+            sendNotificationToUser($event['user_id'], $notification_title, $notification_body);
+        }
+    }
+}
 function deleteEvent($conn) {
     if (empty($_POST['event_id'])) {
         echo json_encode(['status' => 'error', 'message' => 'ID de l\'événement manquant.']);
@@ -204,3 +240,4 @@ function deleteEvent($conn) {
     echo json_encode(['status' => 'success', 'message' => 'Événement supprimé avec succès']);
 }
 ?>
+
