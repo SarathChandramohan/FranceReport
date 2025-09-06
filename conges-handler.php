@@ -204,6 +204,26 @@ function approveLeaveRequest() {
         ");
         $stmt->execute([$commentaire, $leave_id]);
 
+        // ---- 👇 ADD THE FOLLOWING CODE BLOCK HERE 👇 ----
+        $stmt_get_user = $conn->prepare("SELECT user_id, date_debut, date_fin FROM Conges WHERE conge_id = ?");
+        $stmt_get_user->execute([$leave_id]);
+        $leave_details = $stmt_get_user->fetch(PDO::FETCH_ASSOC);
+
+        if ($leave_details) {
+            $notification_title = "Demande de congé approuvée";
+            $notification_body = "Votre demande de congé du " . date('d/m/Y', strtotime($leave_details['date_debut'])) . " au " . date('d/m/Y', strtotime($leave_details['date_fin'])) . " a été approuvée.";
+            $notification_link = 'conges.php'; // Link to the leave history page
+
+            // Send web push notification to the user
+            sendNotificationToUser($leave_details['user_id'], $notification_title, $notification_body);
+            
+            // Insert bell icon notification into the database
+            $insert_notif_sql = "INSERT INTO Notifications (user_id, message, link, is_read) VALUES (?, ?, ?, 0)";
+            $insert_notif_stmt = $conn->prepare($insert_notif_sql);
+            $insert_notif_stmt->execute([$leave_details['user_id'], $notification_body, $notification_link]);
+        }
+        // ---- 👆 END OF NEW CODE 👆 ----
+
         respondWithSuccess('Demande de congé approuvée avec succès.');
 
     } catch(PDOException $e) {
