@@ -14,6 +14,61 @@ use Minishlink\WebPush\Subscription;
  * @param string $body The body text of the notification.
  * @param string $iconUrl Optional URL to an icon for the notification.
  */
+// Add this function to notification-manager.php
+function sendNotificationToUser(int $userId, string $title, string $body, string $iconUrl = '/Logo.png') {
+    global $conn;
+
+    // VAPID keys are already defined in this file.
+    // ...
+
+    $auth = [
+        'VAPID' => [
+            'subject' => 'mailto:sarath90941@gmail.com', // Your admin email
+            'publicKey' => $vapidPublicKey,
+            'privateKey' => $vapidPrivateKey,
+        ],
+    ];
+
+    try {
+        $stmt = $conn->prepare("
+            SELECT s.subscription_endpoint, s.subscription_p256dh, s.subscription_auth 
+            FROM WebPushSubscriptions s
+            WHERE s.user_id = ?
+        ");
+        $stmt->execute([$userId]);
+        $subscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($subscriptions)) {
+            return;
+        }
+
+        $webPush = new WebPush($auth);
+        $notificationPayload = json_encode([
+            'title' => $title,
+            'body' => $body,
+            'icon' => $iconUrl,
+        ]);
+
+        foreach ($subscriptions as $sub) {
+            $subscription = Subscription::create([
+                'endpoint' => $sub['subscription_endpoint'],
+                'publicKey' => $sub['subscription_p256dh'],
+                'authToken' => $sub['subscription_auth'],
+            ]);
+            $webPush->queueNotification($subscription, $notificationPayload);
+        }
+        foreach ($webPush->flush() as $report) {
+            if (!$report->isSuccess() && $report->isSubscriptionExpired()) {
+                $endpoint = $report->getEndpoint();
+                $stmt_delete = $conn->prepare("DELETE FROM WebPushSubscriptions WHERE subscription_endpoint = ?");
+                $stmt_delete->execute([$endpoint]);
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Error sending push notification to user: " . $e->getMessage());
+    }
+}
+
 function sendNotificationByRole(string $role, string $title, string $body, string $iconUrl = '/Logo.png') {
     global $conn;
 
