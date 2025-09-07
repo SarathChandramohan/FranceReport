@@ -424,13 +424,13 @@ if(isset($_POST['login'])) {
                 }, 2800);
             }
 
-            // --- NEW: Handle Button Loading State ---
+            // --- CORRECTED SCRIPT ---
             const handleFormSubmit = (event) => {
                 const form = event.target;
                 const submitButton = form.querySelector('button[type="submit"]');
                 if (submitButton) {
                     submitButton.classList.add('loading');
-                    submitButton.disabled = true;
+                    // The line that disabled the button has been removed.
                 }
             };
 
