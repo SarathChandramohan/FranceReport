@@ -1,14 +1,9 @@
-<?php
-    // You can define variables here to use in your HTML below.
-    $appName = "Aircraft Cabin Leaders";
-    $pageTitle = "Install " . $appName;
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $pageTitle; ?></title>
+    <title>Install Aircraft Cabin Leaders</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#6A0DAD">
@@ -23,17 +18,26 @@
 
     <style>
         :root {
-            --primary-color: #6A0DAD;
-            --primary-hover: #520a86;
+            --primary-color: #6A0DAD;     /* Your specified primary purple */
+            --primary-hover: #520a86;     /* Your specified darker purple for hover */
             --light-bg: #f9fafb;
             --card-bg: #ffffff;
             --input-bg: #ffffff;
             --text-primary: #111827;
             --text-secondary: #6b7280;
             --border-color: #d1d5db;
-            --shadow-color: rgba(0, 0, 0, 0.1);
+            /* Error and success colors as per your theme */
+            --error-bg: rgba(239, 68, 68, 0.1);
+            --error-border: rgba(239, 68, 68, 0.3);
+            --error-text: #b91c1c;
+            --success-bg: rgba(34, 197, 94, 0.1);
+            --success-border: rgba(34, 197, 94, 0.3);
+            --success-text: #15803d;
+
+            --shadow-color: rgba(0, 0, 0, 0.1); /* Soft, professional shadow */
         }
 
+        /* --- Base & Body Styles --- */
         * {
             margin: 0;
             padding: 0;
@@ -42,20 +46,22 @@
 
         body {
             font-family: 'Poppins', sans-serif;
-            color: var(--text-secondary);
+            color: var(--text-secondary); /* Using your text-secondary for general body text */
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             padding: 20px;
             text-align: center;
-            background-image: url('https://images.unsplash.com/photo-1542296332-9e5433553492?q=80&w=2070&auto=format&fit=crop');
+            /* Professional aviation-themed background */
+            background-image: url('https://images.unsplash.com/photo-1542296332-9e5433553492?q=80&w=2070&auto=format&fit=crop'); /* High-res aviation background */
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
             position: relative;
         }
         
+        /* Add a subtle overlay to ensure text readability and hint at purple */
         body::before {
             content: '';
             position: absolute;
@@ -63,11 +69,12 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(106, 13, 173, 0.4), rgba(106, 13, 173, 0.2));
-            backdrop-filter: blur(3px);
+            background: linear-gradient(135deg, rgba(106, 13, 173, 0.4), rgba(106, 13, 173, 0.2)); /* Purple gradient overlay */
+            backdrop-filter: blur(3px); /* Slightly stronger blur for depth */
             -webkit-backdrop-filter: blur(3px);
         }
 
+        /* --- Animations --- */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -79,23 +86,25 @@
             }
         }
 
+        /* --- Main Install Card --- */
         .install-card {
-            background: var(--card-bg);
+            background: var(--card-bg); /* Using your card-bg variable */
             padding: 40px;
             border-radius: 20px;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border-color); /* Using your border-color variable */
             box-shadow: 0 10px 40px var(--shadow-color);
             max-width: 500px;
             width: 100%;
             animation: fadeInUp 0.6s ease-out forwards;
-            position: relative;
+            position: relative; /* Ensure card is on top of the overlay */
             z-index: 1;
         }
 
+        /* --- Logo & Typography --- */
         .logo img {
             width: 80px;
             height: 80px;
-            border-radius: 16px;
+            border-radius: 16px; /* Squircle shape is more modern */
             margin-bottom: 20px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             animation: fadeInUp 0.5s 0.2s ease-out forwards;
@@ -106,7 +115,7 @@
             font-size: 2rem;
             font-weight: 700;
             margin-bottom: 10px;
-            color: var(--text-primary);
+            color: var(--text-primary); /* Using your text-primary for headings */
             animation: fadeInUp 0.5s 0.4s ease-out forwards;
             opacity: 0;
         }
@@ -115,14 +124,15 @@
             font-size: 1rem;
             line-height: 1.6;
             margin-bottom: 30px;
-            color: var(--text-secondary);
+            color: var(--text-secondary); /* Using your text-secondary for paragraphs */
             animation: fadeInUp 0.5s 0.6s ease-out forwards;
             opacity: 0;
         }
 
+        /* --- Install Button --- */
         .install-button {
-            background: var(--primary-color);
-            color: var(--card-bg);
+            background: var(--primary-color); /* Your primary purple color */
+            color: var(--card-bg); /* White text on button */
             padding: 15px 35px;
             border: none;
             border-radius: 12px;
@@ -132,17 +142,18 @@
             text-decoration: none;
             display: inline-block;
             transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-            box-shadow: 0 4px 20px rgba(106, 13, 173, 0.4);
+            box-shadow: 0 4px 20px rgba(106, 13, 173, 0.4); /* Purple shadow for button */
             animation: fadeInUp 0.5s 0.8s ease-out forwards;
             opacity: 0;
         }
 
         .install-button:hover {
             transform: translateY(-3px);
-            background-color: var(--primary-hover);
+            background-color: var(--primary-hover); /* Darker purple on hover */
             box-shadow: 0 8px 25px rgba(106, 13, 173, 0.5);
         }
 
+        /* --- iOS Instructions --- */
         .instructions ol {
             list-style: none;
             padding: 0;
@@ -158,12 +169,13 @@
             animation: fadeInUp 0.5s ease-out forwards;
         }
         
+        /* Staggered animation for list items */
         .instructions li:nth-child(1) { animation-delay: 0.8s; }
         .instructions li:nth-child(2) { animation-delay: 1.0s; }
         .instructions li:nth-child(3) { animation-delay: 1.2s; }
 
         .step-icon {
-            background-color: var(--light-bg);
+            background-color: var(--light-bg); /* Using your light-bg for step icons */
             border-radius: 8px;
             padding: 10px;
             margin-right: 15px;
@@ -177,23 +189,32 @@
         .step-icon svg {
             width: 24px;
             height: 24px;
-            fill: var(--primary-color);
+            fill: var(--primary-color); /* Purple icons */
         }
         
         .instructions strong {
-            color: var(--text-primary);
+            color: var(--text-primary); /* Primary text color for strong tags */
             font-weight: 500;
         }
 
+        /* --- Utility & Responsive --- */
         .hidden {
             display: none;
         }
 
         @media (max-width: 576px) {
-            .install-card { padding: 30px 25px; }
-            h1 { font-size: 1.8rem; }
-            p { font-size: 0.95rem; }
-            .instructions li { align-items: flex-start; }
+            .install-card {
+                padding: 30px 25px;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+            p {
+                font-size: 0.95rem;
+            }
+            .instructions li {
+                align-items: flex-start; /* Better alignment on small screens */
+            }
         }
     </style>
 </head>
@@ -201,13 +222,13 @@
     
     <div class="install-card">
         <div class="logo">
-            <img src="/Logo.png" alt="<?php echo $appName; ?> Logo">
+            <img src="/Logo.png" alt="Aircraft Cabin Leaders Logo">
         </div>
         <h1>Install the App</h1>
         
         <div id="android-instructions" class="hidden">
             <p>
-                Get the full experience. Install the <strong><?php echo $appName; ?></strong> app on your device with a single click.
+                Get the full experience. Install the <strong>Aircraft Cabin Leaders</strong> app on your device with a single click.
             </p>
             <button id="install-button" class="install-button">Install Now</button>
         </div>
@@ -242,31 +263,31 @@
     </div>
 
     <script>
-        // Check if the app is running in standalone mode (already installed)
-        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-
-        // --- Redirect if already installed ---
-        // This runs first. If the app is installed, the rest of the script is irrelevant.
-        if (isInStandaloneMode()) {
-            console.log('App is already installed. Redirecting...');
-            window.location.replace('/index.php');
-        }
-
-        // --- If not installed, continue with installation logic ---
         let deferredPrompt;
         const installButton = document.getElementById('install-button');
         const androidInstructions = document.getElementById('android-instructions');
         const iosInstructions = document.getElementById('ios-instructions');
 
+        // Check for iOS
         const isIOS = () => {
             const userAgent = window.navigator.userAgent.toLowerCase();
             return /iphone|ipad|ipod/.test(userAgent) && !window.MSStream;
         }
         
+        // Check if the app is running in standalone mode (already installed)
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+        // --- Redirect if already installed ---
+        if (isInStandaloneMode()) {
+            console.log('App is already installed and running in standalone mode. Redirecting to /index.php');
+            window.location.replace('/index.php');
+        }
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            if (!isIOS()) { // Only show for non-iOS devices
+            // Only show android instructions if not on iOS AND not already installed
+            if (!isIOS() && !isInStandaloneMode()) {
                 androidInstructions.classList.remove('hidden');
             }
         });
@@ -277,15 +298,34 @@
                     deferredPrompt.prompt();
                     const { outcome } = await deferredPrompt.userChoice;
                     console.log(`User response to the install prompt: ${outcome}`);
+                    if (outcome === 'accepted') {
+                        // User accepted the prompt, likely installing. You might want to redirect after a short delay.
+                        console.log('User accepted the PWA installation prompt.');
+                        // Optional: Redirect after successful install, though browser handles the app launch.
+                        // setTimeout(() => window.location.replace('/index.php'), 1000); 
+                    }
                     deferredPrompt = null;
                 }
             });
         }
         
-        // Show iOS instructions if on iOS and not already installed
-        if (isIOS()) {
+        // Show the iOS instructions if on iOS and not in standalone mode
+        if (isIOS() && !isInStandaloneMode()) {
             iosInstructions.classList.remove('hidden');
+            // Hide Android instructions just in case (e.g., if beforeinstallprompt fired then iOS check runs)
+            androidInstructions.classList.add('hidden'); 
         }
+
+        // Fallback or additional logic if needed
+        window.addEventListener('load', () => {
+            // If neither Android nor iOS instructions are shown, and not in standalone mode,
+            // it means the device might not support PWA installation or it's a desktop browser.
+            // You could add a message for desktop users here, e.g., "Access on desktop, install on mobile."
+            if (androidInstructions.classList.contains('hidden') && iosInstructions.classList.contains('hidden') && !isInStandaloneMode()) {
+                console.log('No specific install instructions shown. Possibly desktop browser or PWA not supported.');
+                // Example: document.querySelector('.install-card p').innerText = "Access the full experience on your desktop, or install the app on a compatible mobile device.";
+            }
+        });
     </script>
 </body>
 </html>
