@@ -1,5 +1,5 @@
 <?php
-// session_check.php - Include this file at the top of each protected page
+// session-management.php - Include this file at the top of each protected page
 
 // Start the session
 session_start();
@@ -11,13 +11,17 @@ function isLoggedIn() {
 
 // Redirect to login page if not logged in
 function requireLogin() {
-    if (!isLoggedIn()) {
-        // Check for "remember me" cookie
-        if (isset($_COOKIE['remember_me'])) {
-            $token = $_COOKIE['remember_me'];
-            list($user_id, $token, $series_identifier) = explode(':', $token);
+    if (isLoggedIn()) {
+        return; // User is already logged in
+    }
 
-            $isValidToken = false; // Flag to check token validity
+    // Check for "remember me" cookie
+    if (isset($_COOKIE['remember_me'])) {
+        $parts = explode(':', $_COOKIE['remember_me']);
+
+        // --- BUG FIX: Ensure the cookie is well-formed ---
+        if (count($parts) === 3) {
+            list($user_id, $token, $series_identifier) = $parts;
 
             if ($user_id && $token && $series_identifier) {
                 // Validate the token against the database
@@ -28,9 +32,9 @@ function requireLogin() {
                 $userToken = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 
                 if ($userToken && hash_equals($userToken['token_hash'], hash('sha256', $token))) {
-                    $isValidToken = true; // Token is valid
                     // Token is valid, log the user in
                     $user = getUserById($db, $user_id); // You'll need a getUserById function
+
                     if ($user) {
                         // Log the user in
                         $_SESSION['user_id'] = $user['user_id'];
@@ -40,7 +44,7 @@ function requireLogin() {
                         $_SESSION['logged_in'] = true;
                         $_SESSION['role'] = $user['role'];
 
-                        // Issue a new token
+                        // Issue a new token for added security
                         $new_token = bin2hex(random_bytes(32));
                         $new_token_hash = hash('sha256', $new_token);
                         $sql = "UPDATE UserTokens SET token_hash = ? WHERE token_id = ?";
@@ -55,21 +59,15 @@ function requireLogin() {
                     }
                 }
             }
-            
-            // ---- START: BUG FIX ----
-            // If the token was not valid, clear the cookie
-            if (!$isValidToken) {
-                setcookie('remember_me', '', time() - 3600, '/');
-            }
-            // ---- END: BUG FIX ----
-
         }
-
-        header("Location: index.php");
-        exit;
+        
+        // --- BUG FIX: If the code reaches here, the cookie was invalid ---
+        logoutUser();
     }
-}
 
+    header("Location: index.php");
+    exit;
+}
 
 // Get current user information
 function getCurrentUser() {
@@ -79,36 +77,35 @@ function getCurrentUser() {
             'nom' => $_SESSION['nom'],
             'prenom' => $_SESSION['prenom'],
             'email' => $_SESSION['email'],
-            'role' => $_SESSION['role']  // Default to 'User' if not set
+            'role' => $_SESSION['role']
         ];
     }
     return null;
 }
 
 // Log out the user
-// Log out the user
 function logoutUser() {
-    // ---- START: BUG FIX ----
-    // Clear the remember_me cookie and database token
     if (isset($_COOKIE['remember_me'])) {
         // Delete the cookie by setting its expiration date in the past
         setcookie('remember_me', '', time() - 3600, '/');
 
-        // Remove the token from the database
-        list($user_id, $token, $series_identifier) = explode(':', $_COOKIE['remember_me']);
-        if ($user_id && $series_identifier) {
-            $db = connectDB();
-            $sql = "DELETE FROM UserTokens WHERE user_id = ? AND series_identifier = ?";
-            $params = array($user_id, $series_identifier);
-            sqlsrv_query($db, $sql, $params);
+        $parts = explode(':', $_COOKIE['remember_me']);
+        // --- BUG FIX: Ensure the cookie is well-formed before accessing parts ---
+        if (count($parts) === 3) {
+            list($user_id, $token, $series_identifier) = $parts;
+            if ($user_id && $series_identifier) {
+                $db = connectDB();
+                $sql = "DELETE FROM UserTokens WHERE user_id = ? AND series_identifier = ?";
+                $params = array($user_id, $series_identifier);
+                sqlsrv_query($db, $sql, $params);
+            }
         }
     }
-    // ---- END: BUG FIX ----
 
-    // Unset all session variables
+    // Unset all of the session variables
     $_SESSION = [];
 
-    // If it's desired to kill the session, also delete the session cookie
+    // Delete the session cookie
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000,
@@ -125,10 +122,8 @@ function logoutUser() {
     exit;
 }
 
-
-
 // Implement session timeout
-function checkSessionTimeout($maxIdleTime = 5400) { // 5400 seconds = 30 minutes
+function checkSessionTimeout($maxIdleTime = 5400) { // 5400 seconds = 90 minutes
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $maxIdleTime) {
         logoutUser();
     }
@@ -136,7 +131,10 @@ function checkSessionTimeout($maxIdleTime = 5400) { // 5400 seconds = 30 minutes
 }
 
 // Call this function on each page to check session timeout
-checkSessionTimeout();
+if (isLoggedIn()) {
+    checkSessionTimeout();
+}
+
 
 function getUserById($conn, $user_id) {
     $sql = "SELECT user_id, nom, prenom, role, email FROM Users WHERE user_id = ?";
