@@ -1,7 +1,6 @@
 <?php
 require_once 'db-connection.php';
 require_once 'session-management.php';
-require_once 'notification-manager.php';
 
 header('Content-Type: application/json');
 
@@ -108,30 +107,29 @@ function sendMessage($conn, $user) {
         foreach (array_unique($recipientIds) as $recipientId) {
             $stmtRecipient->execute([$messageId, $recipientId]);
         }
+        // Add this code block before the final `commit` statement in the `sendMessage` function.
+// This sends notifications to all message recipients.
 
-        // --- Corrected Notifications Block ---
-        $notification_title = "Nouveau message de " . $user['prenom'] . ' ' . $user['nom'];
-        $notification_body = $_POST['subject'];
-        $notification_link = 'messages.php?message_id=' . $messageId;
+// We require the notification-manager to use its functions.
+require_once 'notification-manager.php';
 
-        foreach (array_unique($recipientIds) as $recipientId) {
-            // Get the recipient's subscription information from the database
-            $stmt = $conn->prepare("SELECT subscription_endpoint, subscription_p256dh, subscription_auth FROM WebPushSubscriptions WHERE user_id = ?");
-            $stmt->execute([$recipientId]);
-            $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
+$notification_title = "Nouveau message de " . $user['prenom'] . ' ' . $user['nom'];
+$notification_body = $_POST['subject'];
+$notification_link = 'messages.php?message_id=' . $messageId;
 
-            // Send web push notification to the individual recipient
-            if ($subscription && function_exists('sendNotificationToUser')) {
-                sendNotificationToUser($subscription, $notification_title, $notification_body);
-            }
-            
-            // Insert bell icon notification into the database
-            $insert_notif_sql = "INSERT INTO Notifications (user_id, message, link) VALUES (?, ?, ?)";
-            $insert_notif_stmt = $conn->prepare($insert_notif_sql);
-            $insert_notif_stmt->execute([$recipientId, $notification_body, $notification_link]);
-        }
-        // --- End Corrected Notifications Block ---
+$insert_notif_sql = "INSERT INTO Notifications (user_id, message, link, is_read) VALUES (?, ?, ?, 0)";
+$insert_notif_stmt = $conn->prepare($insert_notif_sql);
 
+foreach (array_unique($recipientIds) as $recipientId) {
+    // Send web push notification to the individual recipient
+    // You need to ensure the sendNotificationToUser function exists in notification-manager.php
+    if (function_exists('sendNotificationToUser')) {
+        sendNotificationToUser($recipientId, $notification_title, $notification_body);
+    }
+    
+    // Insert bell icon notification into the database
+    $insert_notif_stmt->execute([$recipientId, $notification_body, $notification_link]);
+}
         $conn->commit();
         echo json_encode(['status' => 'success', 'message' => 'Message envoyé avec succès.']);
 
