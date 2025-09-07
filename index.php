@@ -338,9 +338,8 @@ if(isset($_POST['login'])) {
     <main class="container" id="main-content">
         <div class="card">
             <div class="logo-section">
-                <h1><?php echo $showLogin ? 'Bienvenue' : 'Créer un Compte'; ?></h1>
-                <p>Système de pointage et gestion du personnel</p>
-            </div>
+    <img src="Logo.png" alt="Company Logo" style="width: 200px; height: auto;">
+</div>
 
             <?php if(!empty($errorMsg)): ?>
                 <div class="alert alert-danger"><?php echo htmlspecialchars($errorMsg); ?></div>
