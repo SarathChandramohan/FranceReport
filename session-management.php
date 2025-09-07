@@ -86,6 +86,7 @@ function getCurrentUser() {
 }
 
 // Log out the user
+// Log out the user
 function logoutUser() {
     // ---- START: BUG FIX ----
     // Clear the remember_me cookie and database token
@@ -123,6 +124,8 @@ function logoutUser() {
     header("Location: index.php");
     exit;
 }
+
+
 
 // Implement session timeout
 function checkSessionTimeout($maxIdleTime = 5400) { // 5400 seconds = 30 minutes
