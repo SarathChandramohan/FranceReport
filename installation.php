@@ -103,8 +103,6 @@
         /* --- Logo & Typography --- */
         .logo img {
             width: 80px;
-            height: 80px;
-            border-radius: 16px; /* Squircle shape is more modern */
             margin-bottom: 20px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             animation: fadeInUp 0.5s 0.2s ease-out forwards;
