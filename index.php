@@ -1,7 +1,7 @@
 <?php
 session_start(); // <-- session_start is at the top.
 
-// --- Core PHP Functions (Unchanged as requested) ---
+// --- Core PHP Functions (Unchanged) ---
 function connectDB() {
     $connectionInfo = array(
         "UID" => "francerecordloki",
@@ -79,7 +79,7 @@ function authenticateUser($conn, $email, $password) {
     return false;
 }
 
-// --- Form Handling Logic (Remember Me logic modified) ---
+// --- Form Handling Logic (Unchanged) ---
 $showLogin = true;
 $errorMsg = "";
 $successMsg = "";
@@ -89,6 +89,7 @@ if(isset($_POST['toggleForm'])) {
 }
 
 if(isset($_POST['register'])) {
+    // ... (This entire block is unchanged)
     $nom = trim($_POST['nom']);
     $prenom = trim($_POST['prenom']);
     $email = trim($_POST['email']);
@@ -121,13 +122,13 @@ if(isset($_POST['register'])) {
             $errorMsg = "Erreur de connexion à la base de données.";
         }
     }
-    // To ensure the register form is shown if there's an error
     if (!empty($errorMsg)) {
         $showLogin = false;
     }
 }
 
 if(isset($_POST['login'])) {
+    // ... (This entire block is unchanged, including the always-on remember me)
     $email = trim($_POST['email']);
     $password = $_POST['password'];
 
@@ -145,22 +146,18 @@ if(isset($_POST['login'])) {
                 $_SESSION['logged_in'] = true;
                 $_SESSION['role'] = $user['role'];
 
-                // --- MODIFICATION: "Remember Me" is now always active ---
-                // The checkbox is removed, and this logic runs for every successful login.
                 $token = bin2hex(random_bytes(32));
                 $series_identifier = bin2hex(random_bytes(32));
                 $token_hash = hash('sha256', $token);
-                $expires_at = date('Y-m-d H:i:s', time() + (86400 * 30)); // 30 days
+                $expires_at = date('Y-m-d H:i:s', time() + (86400 * 30)); 
 
                 $sql_token = "INSERT INTO UserTokens (user_id, token_hash, series_identifier, expires_at) VALUES (?, ?, ?, ?)";
                 $params_token = array($user['user_id'], $token_hash, $series_identifier, $expires_at);
                 sqlsrv_query($conn, $sql_token, $params_token);
 
                 $cookie_value = $user['user_id'] . ':' . $token . ':' . $series_identifier;
-                setcookie('remember_me', $cookie_value, time() + (86400 * 30), "/"); // 30 day cookie
-                // --- END MODIFICATION ---
+                setcookie('remember_me', $cookie_value, time() + (86400 * 30), "/");
 
-                // Redirect based on role
                 if ($_SESSION['role'] === 'admin') {
                     header("Location: dashboard.php");
                 } else {
@@ -186,21 +183,22 @@ if(isset($_POST['login'])) {
     <style>
         /* --- Font and Basic Reset --- */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         :root {
             --primary-color: #6A0DAD;
             --primary-hover: #520a86;
-            --dark-bg: #111;
-            --card-bg: rgba(34, 33, 34, 0.85);
-            --input-bg: #2c2c2e;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --border-color: #3a3a3c;
-            --error-bg: rgba(255, 59, 48, 0.1);
-            --error-border: rgba(255, 59, 48, 0.3);
-            --error-text: #ff453a;
-            --success-bg: rgba(52, 199, 89, 0.1);
-            --success-border: rgba(52, 199, 89, 0.3);
-            --success-text: #32d74b;
+            --light-bg: #f9fafb;
+            --card-bg: #ffffff;
+            --input-bg: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #d1d5db;
+            --error-bg: rgba(239, 68, 68, 0.1);
+            --error-border: rgba(239, 68, 68, 0.3);
+            --error-text: #b91c1c;
+            --success-bg: rgba(34, 197, 94, 0.1);
+            --success-border: rgba(34, 197, 94, 0.3);
+            --success-text: #15803d;
         }
 
         * {
@@ -211,12 +209,7 @@ if(isset($_POST['login'])) {
         }
 
         body {
-            background-image: url('Login.webp');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            background-color: var(--dark-bg);
+            background-color: var(--light-bg);
             color: var(--text-primary);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
@@ -234,7 +227,7 @@ if(isset($_POST['login'])) {
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: var(--dark-bg);
+            background-color: var(--light-bg);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -242,193 +235,95 @@ if(isset($_POST['login'])) {
             z-index: 9999;
             transition: opacity 0.5s ease;
         }
-        .loading-logo {
-            width: 150px;
-            margin-bottom: 25px;
-        }
-        .loading-bar {
-            width: 220px;
-            height: 5px;
-            background-color: #333;
-            border-radius: 5px;
-            overflow: hidden;
-        }
+        .loading-logo { width: 150px; margin-bottom: 25px; }
+        .loading-bar { width: 220px; height: 5px; background-color: #e5e7eb; border-radius: 5px; overflow: hidden; }
         .loading-progress {
-            width: 0;
-            height: 100%;
-            background-color: var(--primary-color);
-            border-radius: 5px;
-            animation: loading 2.5s ease-in-out forwards;
+            width: 0; height: 100%; background-color: var(--primary-color);
+            border-radius: 5px; animation: loading 2.5s ease-in-out forwards;
         }
-        @keyframes loading {
-            from { width: 0; }
-            to { width: 100%; }
-        }
+        @keyframes loading { from { width: 0; } to { width: 100%; } }
 
         /* --- Main Container & Card --- */
         .container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            max-width: 450px;
-            padding: 20px;
-            opacity: 0;
-            transform: translateY(20px);
+            display: flex; justify-content: center; align-items: center;
+            width: 100%; max-width: 450px; padding: 20px;
+            opacity: 0; transform: translateY(20px);
             transition: opacity 0.6s ease-out, transform 0.6s ease-out;
         }
-        .container.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .container.visible { opacity: 1; transform: translateY(0); }
 
         .card {
-            width: 100%;
-            background-color: var(--card-bg);
-            border-radius: 18px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            border: 1px solid var(--border-color);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            width: 100%; background-color: var(--card-bg);
+            border-radius: 18px; padding: 40px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 1px solid #e5e7eb;
         }
 
-        .logo-section {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .logo-section h1 {
-            font-size: 26px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-        .logo-section p {
-            color: var(--text-secondary);
-            font-size: 16px;
-            margin-top: 8px;
-        }
+        .logo-section { text-align: center; margin-bottom: 30px; }
+        .logo-section h1 { font-size: 26px; font-weight: 700; color: var(--text-primary); }
+        .logo-section p { color: var(--text-secondary); font-size: 16px; margin-top: 8px; }
         
         /* --- Forms --- */
-        .form-group {
-            margin-bottom: 22px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+        .form-group { margin-bottom: 22px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); font-size: 14px; }
         .form-control {
-            width: 100%;
-            padding: 14px 16px;
-            font-size: 16px;
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            background-color: var(--input-bg);
-            color: var(--text-primary);
+            width: 100%; padding: 14px 16px; font-size: 16px; border: 1px solid var(--border-color);
+            border-radius: 10px; background-color: var(--input-bg); color: var(--text-primary);
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .form-control::placeholder {
-            color: #6c6c70;
-        }
+        .form-control::placeholder { color: #9ca3af; }
         .form-control:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(106, 13, 173, 0.3);
-            outline: none;
+            border-color: var(--primary-color); outline: none;
+            box-shadow: 0 0 0 3px rgba(106, 13, 173, 0.1);
         }
 
         /* --- Buttons --- */
         .btn-primary {
-            background: var(--primary-color);
-            color: white;
-            width: 100%;
-            padding: 15px 20px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 16px;
+            background: var(--primary-color); color: white; width: 100%;
+            padding: 15px 20px; border: none; border-radius: 10px; cursor: pointer;
+            font-weight: 600; font-size: 16px;
             transition: background-color 0.2s ease-in-out, transform 0.1s ease;
-            margin-top: 10px;
+            margin-top: 10px; position: relative;
         }
-        .btn-primary:hover {
-            background: var(--primary-hover);
-        }
-        .btn-primary:active {
-            transform: scale(0.98);
-        }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:active { transform: scale(0.98); }
 
-        /* --- Toggle Link --- */
-        .toggle-container {
-            text-align: center;
-            margin-top: 25px;
-            font-size: 14px;
-            color: var(--text-secondary);
+        /* --- NEW: Button Loading State --- */
+        .btn-primary.loading {
+            cursor: not-allowed; color: transparent !important;
         }
+        .btn-primary.loading::after {
+            content: ''; display: block; width: 20px; height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.5); border-top-color: #ffffff;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            position: absolute; top: 50%; left: 50%;
+            margin-top: -10px; margin-left: -10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- Toggle Link & Alerts --- */
+        .toggle-container { text-align: center; margin-top: 25px; font-size: 14px; color: var(--text-secondary); }
         .btn-link {
-            background: none;
-            border: none;
-            color: var(--primary-color);
-            text-decoration: none;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-            padding: 5px;
-            margin-left: 5px;
-            transition: color 0.2s;
+            background: none; border: none; color: var(--primary-color); text-decoration: none;
+            cursor: pointer; font-weight: 600; font-size: 14px; padding: 5px;
+            margin-left: 5px; transition: color 0.2s;
         }
-        .btn-link:hover {
-            color: var(--text-primary);
-            text-decoration: underline;
-        }
-
-        /* --- Alerts --- */
+        .btn-link:hover { color: var(--text-primary); text-decoration: underline; }
         .alert {
-            padding: 12px 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            text-align: center;
-            animation: fadeIn 0.3s ease;
+            padding: 12px 15px; margin-bottom: 20px; border-radius: 8px;
+            font-size: 14px; text-align: center; animation: fadeIn 0.3s ease;
         }
-        .alert-danger {
-            background-color: var(--error-bg);
-            border: 1px solid var(--error-border);
-            color: var(--error-text);
-        }
-        .alert-success {
-            background-color: var(--success-bg);
-            border: 1px solid var(--success-border);
-            color: var(--success-text);
-        }
-        
-        .name-group {
-            display: flex;
-            gap: 15px;
-        }
-        .name-group .form-group {
-            flex: 1;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .alert-danger { background-color: var(--error-bg); border: 1px solid var(--error-border); color: var(--error-text); }
+        .alert-success { background-color: var(--success-bg); border: 1px solid var(--success-border); color: var(--success-text); }
+        .name-group { display: flex; gap: 15px; }
+        .name-group .form-group { flex: 1; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* --- Responsive Design --- */
         @media (max-width: 480px) {
-            .card {
-                padding: 30px 25px;
-                border: none;
-                background-color: transparent;
-                backdrop-filter: none;
-                box-shadow: none;
-            }
-            .name-group {
-                flex-direction: column;
-                gap: 0;
-            }
+            body { align-items: flex-start; padding-top: 20px; }
+            .card { padding: 30px 25px; border: none; box-shadow: none; background-color: transparent; }
+            .name-group { flex-direction: column; gap: 0; }
         }
     </style>
 </head>
@@ -455,7 +350,7 @@ if(isset($_POST['login'])) {
             <?php endif; ?>
 
             <?php if($showLogin): ?>
-                <form method="post" action="">
+                <form method="post" action="" id="login-form">
                     <div class="form-group">
                         <label for="email">Email</label>
                         <input type="email" id="email" name="email" class="form-control" required placeholder="nom@exemple.com">
@@ -474,7 +369,7 @@ if(isset($_POST['login'])) {
                     </form>
                 </div>
             <?php else: ?>
-                <form method="post" action="">
+                <form method="post" action="" id="register-form">
                     <div class="name-group">
                         <div class="form-group">
                             <label for="nom">Nom</label>
@@ -518,22 +413,35 @@ if(isset($_POST['login'])) {
             const rememberMeCookie = document.cookie.split('; ').find(row => row.startsWith('remember_me='));
 
             if (rememberMeCookie) {
-                // If cookie exists, redirect immediately. The server-side logic in protected
-                // pages will handle the actual validation. This is a client-side optimization.
                 window.location.href = 'dashboard.php'; 
             } else {
-                // If no cookie, show the loading screen, then fade in the login page.
                 setTimeout(() => {
                     loadingScreen.style.opacity = '0';
-                    // Wait for fade out transition to end before hiding it
                     loadingScreen.addEventListener('transitionend', () => {
                         loadingScreen.style.display = 'none';
                     });
-                    
-                    // Show and fade in the main content
                     mainContent.classList.add('visible');
+                }, 2800);
+            }
 
-                }, 2800); // Slightly longer than the animation to ensure it completes
+            // --- NEW: Handle Button Loading State ---
+            const handleFormSubmit = (event) => {
+                const form = event.target;
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.classList.add('loading');
+                    submitButton.disabled = true;
+                }
+            };
+
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleFormSubmit);
+            }
+
+            const registerForm = document.getElementById('register-form');
+            if (registerForm) {
+                registerForm.addEventListener('submit', handleFormSubmit);
             }
         });
     </script>
