@@ -17,6 +17,8 @@ function requireLogin() {
             $token = $_COOKIE['remember_me'];
             list($user_id, $token, $series_identifier) = explode(':', $token);
 
+            $isValidToken = false; // Flag to check token validity
+
             if ($user_id && $token && $series_identifier) {
                 // Validate the token against the database
                 $db = connectDB(); // You'll need a connectDB function here.
@@ -26,6 +28,7 @@ function requireLogin() {
                 $userToken = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 
                 if ($userToken && hash_equals($userToken['token_hash'], hash('sha256', $token))) {
+                    $isValidToken = true; // Token is valid
                     // Token is valid, log the user in
                     $user = getUserById($db, $user_id); // You'll need a getUserById function
                     if ($user) {
@@ -48,10 +51,18 @@ function requireLogin() {
                         $cookie_value = $user_id . ':' . $new_token . ':' . $series_identifier;
                         setcookie('remember_me', $cookie_value, time() + (86400 * 30), "/"); // 30 day cookie
 
-                        return;
+                        return; // User is now logged in, exit the function
                     }
                 }
             }
+            
+            // ---- START: BUG FIX ----
+            // If the token was not valid, clear the cookie
+            if (!$isValidToken) {
+                setcookie('remember_me', '', time() - 3600, '/');
+            }
+            // ---- END: BUG FIX ----
+
         }
 
         header("Location: index.php");
@@ -130,5 +141,4 @@ function getUserById($conn, $user_id) {
     $stmt = sqlsrv_query($conn, $sql, $params);
     return sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 }
-
 ?>
