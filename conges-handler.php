@@ -159,7 +159,6 @@ function getPendingRequests() {
     }
 }
 
-// Existing code...
 /**
  * Approves a leave request (admin only).
  */
@@ -181,7 +180,7 @@ function approveLeaveRequest() {
     }
 
     try {
-        // Check if the request is pending before approving
+        // First, check if the request is pending and get the user_id
         $stmt_check = $conn->prepare("SELECT status, user_id, date_debut, date_fin FROM Conges WHERE conge_id = ?");
         $stmt_check->execute([$leave_id]);
         $leave = $stmt_check->fetch(PDO::FETCH_ASSOC);
@@ -205,15 +204,18 @@ function approveLeaveRequest() {
         ");
         $stmt->execute([$commentaire, $leave_id]);
 
-        // Send web push notification to the user who requested the leave
+        // Send notification to the user who requested the leave
+        // This is the missing piece of code
         $notification_title = "Demande de congé approuvée";
         $notification_body = "Votre demande de congé du " . date('d/m/Y', strtotime($leave['date_debut'])) . " au " . date('d/m/Y', strtotime($leave['date_fin'])) . " a été approuvée.";
+        
+        // This function call will now work because we have the correct user_id
         sendNotificationToUser($leave['user_id'], $notification_title, $notification_body);
 
-        // Insert bell icon notification into the database
+        // Also insert bell icon notification
         $insert_notif_sql = "INSERT INTO Notifications (user_id, message, link) VALUES (?, ?, ?)";
         $insert_notif_stmt = $conn->prepare($insert_notif_sql);
-        $insert_notif_link = 'conges.php'; // Link to the leave history page
+        $insert_notif_link = 'conges.php';
         $insert_notif_stmt->execute([$leave['user_id'], $notification_body, $insert_notif_link]);
 
         respondWithSuccess('Demande de congé approuvée avec succès.');
@@ -222,10 +224,7 @@ function approveLeaveRequest() {
         respondWithError('Erreur de base de données: ' . $e->getMessage());
     }
 }
-/**
- * Rejects a leave request (admin only).
- */
-// Existing code...
+
 /**
  * Rejects a leave request (admin only).
  */
@@ -276,14 +275,17 @@ function rejectLeaveRequest() {
         $stmt->execute([$commentaire, $leave_id]);
 
         // Send web push notification to the user who requested the leave
+        // This is the missing piece of code
         $notification_title = "Demande de congé refusée";
         $notification_body = "Votre demande de congé du " . date('d/m/Y', strtotime($leave['date_debut'])) . " au " . date('d/m/Y', strtotime($leave['date_fin'])) . " a été refusée.";
+
+        // This function call will now work because we have the correct user_id
         sendNotificationToUser($leave['user_id'], $notification_title, $notification_body);
 
-        // Insert bell icon notification into the database
+        // Also insert bell icon notification
         $insert_notif_sql = "INSERT INTO Notifications (user_id, message, link) VALUES (?, ?, ?)";
         $insert_notif_stmt = $conn->prepare($insert_notif_sql);
-        $insert_notif_link = 'conges.php'; // Link to the leave history page
+        $insert_notif_link = 'conges.php';
         $insert_notif_stmt->execute([$leave['user_id'], $notification_body, $insert_notif_link]);
 
         respondWithSuccess('Demande de congé refusée avec succès.');
@@ -292,6 +294,7 @@ function rejectLeaveRequest() {
         respondWithError('Erreur de base de données: ' . $e->getMessage());
     }
 }
+
 
 /**
  * Submits a new leave request for the current user.
@@ -345,7 +348,6 @@ function submitLeaveRequest($user_id) {
 
         $conge_id = $conn->lastInsertId();
 
-        // ---- 👇 ADD THESE LINES HERE 👇 ----
         // This is the perfect spot: right after the request is saved, and before you respond to the user.
 
         $notification_title = "Nouvelle demande de congé";
@@ -369,9 +371,6 @@ function submitLeaveRequest($user_id) {
                     $insert_notif_stmt->execute([$admin_user_id, $notification_message, $notification_link]);
                 }
         
-        // ---- 👆 END OF NEW LINES 👆 ----
-
-
         respondWithSuccess('Demande de congé soumise avec succès.', ['conge_id' => $conge_id]);
 
     } catch(PDOException $e) {
