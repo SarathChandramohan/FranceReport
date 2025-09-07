@@ -386,6 +386,7 @@ $user = getCurrentUser();
 </head>
 <body>
 <?php include 'navbar.php'; ?>
+<div id="page-content">
     <div class="container-fluid">
         <div id="conges">
             <h2>Congés</h2>
@@ -521,6 +522,7 @@ $user = getCurrentUser();
                 </div>
             </div>
         </div>
+    </div>
     </div>
 <?php include('footer.php'); ?>
     <script>
