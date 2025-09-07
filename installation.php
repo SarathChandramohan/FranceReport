@@ -8,9 +8,9 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#6A0DAD">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <link rel="apple-touch-icon" href="/Logo.png">
-    <link rel="apple-touch-startup-image" href="/splashscreen.png">
+    <link rel="apple-touch-startup-image" href="/Logo.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
