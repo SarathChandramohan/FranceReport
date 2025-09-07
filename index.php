@@ -156,6 +156,21 @@ function connectDB() {
                         $_SESSION['logged_in'] = true;
                         $_SESSION['role'] = $user['role']; // Store the user's role in the session
 
+                        // Handle "Remember Me"
+                        if (!empty($_POST["remember"])) {
+                            $token = bin2hex(random_bytes(32));
+                            $series_identifier = bin2hex(random_bytes(32));
+                            $token_hash = hash('sha256', $token);
+                            $expires_at = date('Y-m-d H:i:s', time() + (86400 * 30)); // 30 days
+
+                            $sql = "INSERT INTO UserTokens (user_id, token_hash, series_identifier, expires_at) VALUES (?, ?, ?, ?)";
+                            $params = array($user['user_id'], $token_hash, $series_identifier, $expires_at);
+                            sqlsrv_query($conn, $sql, $params);
+
+                            $cookie_value = $user['user_id'] . ':' . $token . ':' . $series_identifier;
+                            setcookie('remember_me', $cookie_value, time() + (86400 * 30), "/"); // 30 day cookie
+                        }
+
                         // Redirect based on role
                         if ($_SESSION['role'] === 'admin') {
                             header("Location: dashboard.php");
@@ -309,6 +324,41 @@ function connectDB() {
             border: 1px solid #ccffcc;
             color: #2ca048;
         }
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #222122;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .loading-logo {
+            width: 150px;
+            margin-bottom: 20px;
+        }
+        .loading-bar {
+            width: 200px;
+            height: 5px;
+            background-color: #555;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .loading-progress {
+            width: 0;
+            height: 100%;
+            background-color: #007aff;
+            border-radius: 5px;
+            animation: loading 3s ease-in-out forwards;
+        }
+        @keyframes loading {
+            from { width: 0; }
+            to { width: 100%; }
+        }
         @media (max-width: 480px) {
             .container {
                 padding: 15px;
@@ -329,16 +379,18 @@ function connectDB() {
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="loading-screen" id="loading-screen">
+        <img src="Logo.png" alt="Logo" class="loading-logo">
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+
+    <div class="container" style="display: none;" id="main-content">
         <div class="logo-section">
             <h1>Gestion des Ouvriers</h1>
             <p>Système de pointage et gestion du personnel</p>
         </div>
-
-
-
-
-      
 
         <div class="card">
             <?php if(!empty($errorMsg)): ?>
@@ -358,6 +410,10 @@ function connectDB() {
                     <div class="form-group">
                         <label for="password">Mot de passe</label>
                         <input type="password" id="password" name="password" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="remember" name="remember" value="1">
+                        <label for="remember">Se souvenir de moi</label>
                     </div>
                     <button type="submit" name="login" class="btn-primary">Se connecter</button>
                 </form>
@@ -403,5 +459,27 @@ function connectDB() {
             <?php endif; ?>
         </div>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            const mainContent = document.getElementById('main-content');
+
+            // Check for remember me cookie
+            const rememberMeCookie = document.cookie.split('; ').find(row => row.startsWith('remember_me='));
+
+            if (rememberMeCookie) {
+                // If the cookie exists, redirect to the dashboard.
+                // The server-side logic in requireLogin() will handle the validation.
+                window.location.href = 'dashboard.php';
+            } else {
+                // If no cookie, show the loading screen for 3 seconds, then the login page.
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    mainContent.style.display = 'block';
+                }, 3000);
+            }
+        });
+    </script>
 </body>
 </html>
