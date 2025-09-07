@@ -55,7 +55,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         gap: 2rem;
     }
 
-    .site-header .header-center .nav-link { /* Added .nav-link class for easier selection */
+    .site-header .header-center a {
         font-family: 'Inter', sans-serif;
         text-decoration: none;
         color: #4b5563;
@@ -66,7 +66,7 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         position: relative;
     }
 
-    .site-header .header-center .nav-link:after {
+    .site-header .header-center a:after {
         content: '';
         position: absolute;
         width: 0;
@@ -78,12 +78,12 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
         transform: translateX(-50%);
     }
 
-    .site-header .header-center .nav-link:hover,
-    .site-header .header-center .nav-link.active {
+    .site-header .header-center a:hover,
+    .site-header .header-center a.active {
         color: var(--theme-color-violet); /* Violet for hover and active states */
     }
 
-    .site-header .header-center .nav-link.active:after {
+    .site-header .header-center a.active:after {
         width: 100%;
     }
 
@@ -373,26 +373,26 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
 
 <nav class="site-header">
     <div class="header-left">
-        <a href="<?php echo $home_page; ?>" class="nav-link">
+        <a href="<?php echo $home_page; ?>">
             <img src="Logo.png" alt="Company Logo" class="company-logo">
         </a>
     </div>
 
     <div class="header-center">
         <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
-            <a href="dashboard.php" class="nav-link <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Administrateur</a>
+            <a href="dashboard.php" class="<?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Administrateur</a>
         <?php endif; ?>
-        <a href="timesheet.php" class="nav-link <?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a>
-        <a href="conges.php" class="nav-link <?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a>
+        <a href="timesheet.php" class="<?php echo $current_page == 'timesheet.php' ? 'active' : ''; ?>">Pointage</a>
+        <a href="conges.php" class="<?php echo $current_page == 'conges.php' ? 'active' : ''; ?>">Congés</a>
         <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
-            <a href="planning.php" class="nav-link <?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a>
-            <a href="inventory.php" class="nav-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventaire</a>
+            <a href="planning.php" class="<?php echo $current_page == 'planning.php' ? 'active' : ''; ?>">Planning</a>
+            <a href="inventory.php" class="<?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>">Inventaire</a>
         <?php else: ?>
-            <a href="seeplanning.php" class="nav-link <?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
+            <a href="seeplanning.php" class="<?php echo $current_page == 'seeplanning.php' ? 'active' : ''; ?>">Mission</a>
         <?php endif; ?>
-        <a href="technician.php" class="nav-link <?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">véhicules / outillage</a>
-        <a href="messages.php" class="nav-link <?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
-        <a href="events.php" class="nav-link <?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
+        <a href="technician.php" class="<?php echo $current_page == 'technician.php' ? 'active' : ''; ?>">véhicules / outillage</a>
+        <a href="messages.php" class="<?php echo $current_page == 'messages.php' ? 'active' : ''; ?>">Messages</a>
+        <a href="events.php" class="<?php echo $current_page == 'events.php' ? 'active' : ''; ?>">Événements</a>
     </div>
 
     <div class="header-right">
@@ -606,63 +606,3 @@ $home_page = (isset($user['role']) && $user['role'] === 'admin') ? 'dashboard.ph
 <?php if (isset($user)): ?>
     <script src="push-client.js"></script>
 <?php endif; ?>
-
-
-<script>
-$(document).ready(function() {
-
-    /**
-     * This function loads new page content into the #page-content div.
-     * @param {string} pageUrl - The URL of the page to load.
-     * @param {boolean} pushState - Whether to add this action to the browser's history.
-     */
-    function loadPage(pageUrl, pushState = true) {
-        // The core of the solution. This command tells jQuery to:
-        // 1. Fetch the HTML from the 'pageUrl'.
-        // 2. Find the div with ID '#page-content' inside that HTML.
-        // 3. Take all of its direct child elements (`> *`).
-        // 4. Replace the content of the *current* page's #page-content div with the new content.
-        $('#page-content').load(pageUrl + ' #page-content > *', function(response, status, xhr) {
-            if (status == "error") {
-                // If the page fails to load, show an error message.
-                $(this).html("<div class='alert alert-danger text-center'>Erreur de chargement de la page: " + xhr.status + " " + xhr.statusText + "</div>");
-            }
-        });
-
-        // If pushState is true, update the browser URL and history.
-        if (pushState) {
-            history.pushState({ path: pageUrl }, '', pageUrl);
-        }
-    }
-
-    // Intercept clicks on all navigation links within the header.
-    // Using $(document).on() ensures this works even after the content is replaced.
-    $(document).on('click', '.site-header .nav-link', function(e) {
-        // Prevent the browser's default full page refresh.
-        e.preventDefault();
-
-        const pageUrl = $(this).attr('href');
-
-        // Do nothing if we are trying to navigate to the same page.
-        if (window.location.pathname.endsWith(pageUrl)) {
-            return;
-        }
-
-        // Load the new page content.
-        loadPage(pageUrl);
-        
-        // Update the 'active' class on the nav links for visual feedback.
-        $('.site-header .nav-link').removeClass('active');
-        $(this).addClass('active');
-    });
-
-    // Handle the browser's back and forward buttons.
-    $(window).on('popstate', function(e) {
-        // When the user navigates using back/forward, load the correct page content
-        // without adding a new entry to the history (pushState = false).
-        if (e.originalEvent.state && e.originalEvent.state.path) {
-            loadPage(e.originalEvent.state.path, false);
-        }
-    });
-});
-</script>
