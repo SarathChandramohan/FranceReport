@@ -1,12 +1,17 @@
+<?php
+    // You can define variables here to use in your HTML below.
+    $appName = "Aircraft Cabin Leaders";
+    $pageTitle = "Install " . $appName;
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Install Aircraft Cabin Leaders</title>
+    <title><?php echo $pageTitle; ?></title>
     
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#8A2BE2">
+    <meta name="theme-color" content="#6A0DAD">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="/Logo.png">
@@ -18,15 +23,17 @@
 
     <style>
         :root {
-            --primary-violet: #8A2BE2; /* BlueViolet */
-            --primary-violet-dark: #7B24CB;
-            --text-light: #f0f0f0;
-            --text-dark: #1e1e1e;
-            --card-background: rgba(30, 30, 30, 0.6);
-            --border-color: rgba(255, 255, 255, 0.2);
+            --primary-color: #6A0DAD;
+            --primary-hover: #520a86;
+            --light-bg: #f9fafb;
+            --card-bg: #ffffff;
+            --input-bg: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #d1d5db;
+            --shadow-color: rgba(0, 0, 0, 0.1);
         }
 
-        /* --- Base & Body Styles --- */
         * {
             margin: 0;
             padding: 0;
@@ -35,23 +42,30 @@
 
         body {
             font-family: 'Poppins', sans-serif;
-            color: var(--text-light);
+            color: var(--text-secondary);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             padding: 20px;
             text-align: center;
-            background: linear-gradient(135deg, #1d1d2d, #3c1e5a, #1d1d2d, #6a0dad);
-            background-size: 400% 400%;
-            animation: gradient-animation 15s ease infinite;
+            background-image: url('https://images.unsplash.com/photo-1542296332-9e5433553492?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            position: relative;
         }
-
-        /* --- Animations --- */
-        @keyframes gradient-animation {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(106, 13, 173, 0.4), rgba(106, 13, 173, 0.2));
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
         }
 
         @keyframes fadeInUp {
@@ -65,41 +79,34 @@
             }
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        /* --- Main Install Card --- */
         .install-card {
-            background: var(--card-background);
+            background: var(--card-bg);
             padding: 40px;
             border-radius: 20px;
             border: 1px solid var(--border-color);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            box-shadow: 0 10px 40px var(--shadow-color);
             max-width: 500px;
             width: 100%;
-            animation: fadeInUp 0.5s ease-out forwards;
+            animation: fadeInUp 0.6s ease-out forwards;
+            position: relative;
+            z-index: 1;
         }
 
-        /* --- Logo & Typography --- */
         .logo img {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
             margin-bottom: 20px;
-            box-shadow: 0 0 25px rgba(138, 43, 226, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             animation: fadeInUp 0.5s 0.2s ease-out forwards;
-            opacity: 0; /* Initially hidden for animation */
+            opacity: 0;
         }
 
         h1 {
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 15px;
-            color: white;
+            margin-bottom: 10px;
+            color: var(--text-primary);
             animation: fadeInUp 0.5s 0.4s ease-out forwards;
             opacity: 0;
         }
@@ -108,15 +115,14 @@
             font-size: 1rem;
             line-height: 1.6;
             margin-bottom: 30px;
-            color: var(--text-light);
+            color: var(--text-secondary);
             animation: fadeInUp 0.5s 0.6s ease-out forwards;
             opacity: 0;
         }
 
-        /* --- Install Button --- */
         .install-button {
-            background: linear-gradient(45deg, var(--primary-violet), var(--primary-violet-dark));
-            color: var(--text-light);
+            background: var(--primary-color);
+            color: var(--card-bg);
             padding: 15px 35px;
             border: none;
             border-radius: 12px;
@@ -125,18 +131,18 @@
             font-size: 1.1rem;
             text-decoration: none;
             display: inline-block;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            animation: pulse 2s infinite ease-in-out, fadeInUp 0.5s 0.8s ease-out forwards;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            box-shadow: 0 4px 20px rgba(106, 13, 173, 0.4);
+            animation: fadeInUp 0.5s 0.8s ease-out forwards;
             opacity: 0;
         }
 
         .install-button:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(138, 43, 226, 0.6);
+            background-color: var(--primary-hover);
+            box-shadow: 0 8px 25px rgba(106, 13, 173, 0.5);
         }
 
-        /* --- iOS Instructions --- */
         .instructions ol {
             list-style: none;
             padding: 0;
@@ -152,48 +158,42 @@
             animation: fadeInUp 0.5s ease-out forwards;
         }
         
-        /* Staggered animation for list items */
         .instructions li:nth-child(1) { animation-delay: 0.8s; }
         .instructions li:nth-child(2) { animation-delay: 1.0s; }
         .instructions li:nth-child(3) { animation-delay: 1.2s; }
 
         .step-icon {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: var(--light-bg);
             border-radius: 8px;
-            padding: 8px;
+            padding: 10px;
             margin-right: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
         .step-icon svg {
             width: 24px;
             height: 24px;
-            fill: var(--text-light);
+            fill: var(--primary-color);
         }
         
         .instructions strong {
-            color: white;
+            color: var(--text-primary);
             font-weight: 500;
         }
 
-        /* --- Utility & Responsive --- */
         .hidden {
             display: none;
         }
 
         @media (max-width: 576px) {
-            .install-card {
-                padding: 30px 25px;
-            }
-            h1 {
-                font-size: 1.8rem;
-            }
-            p {
-                font-size: 0.9rem;
-            }
+            .install-card { padding: 30px 25px; }
+            h1 { font-size: 1.8rem; }
+            p { font-size: 0.95rem; }
+            .instructions li { align-items: flex-start; }
         }
     </style>
 </head>
@@ -201,13 +201,13 @@
     
     <div class="install-card">
         <div class="logo">
-            <img src="/Logo.png" alt="Aircraft Cabin Leaders Logo">
+            <img src="/Logo.png" alt="<?php echo $appName; ?> Logo">
         </div>
         <h1>Install the App</h1>
         
         <div id="android-instructions" class="hidden">
             <p>
-                Get the full experience. Install the <strong>Aircraft Cabin Leaders</strong> app on your device with a single click.
+                Get the full experience. Install the <strong><?php echo $appName; ?></strong> app on your device with a single click.
             </p>
             <button id="install-button" class="install-button">Install Now</button>
         </div>
@@ -220,19 +220,19 @@
                 <ol>
                     <li>
                         <div class="step-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 2H7C5.89543 2 5 2.89543 5 4V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V4C19 2.89543 18.1046 2 17 2ZM12 18.5C11.313 18.5 10.75 17.937 10.75 17.25C10.75 16.563 11.313 16 12 16C12.687 16 13.25 16.563 13.25 17.25C13.25 17.937 12.687 18.5 12 18.5ZM12.75 13.25H11.25V7.75H9.5V6.25H14.5V7.75H12.75V13.25Z" transform="translate(-2 -2) scale(1.2)"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="none" d="M0 0h24v24H0z"/><path d="M13 14h-2a8.999 8.999 0 0 0-7.968 4.81A10.004 10.004 0 0 1 12 2c2.79 0 5.337.89 7.468 2.395-.783-.862-1.875-1.395-3.068-1.395A4.4 4.4 0 0 0 12 5.4a4.4 4.4 0 0 0-4.4 4.4c0 1.193.533 2.285 1.395 3.068A8.995 8.995 0 0 0 13 14zm-1 2c-3.309 0-6 2.691-6 6h12c0-3.309-2.691-6-6-6zm-6.18-7.968A6.402 6.402 0 0 1 12 7.4a6.402 6.402 0 0 1 6.18 4.632A8.99 8.99 0 0 0 19 12a9 9 0 1 0-14.18-6.968z"/></svg>
                         </div>
-                        <span>Tap the <strong>Share</strong> icon in the browser menu.</span>
+                        <span>Tap the <strong>Share</strong> icon in your browser's menu.</span>
                     </li>
                     <li>
                         <div class="step-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
+                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="none" d="M0 0h24v24H0z"/><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
                         </div>
                         <span>Scroll down and select <strong>"Add to Home Screen"</strong>.</span>
                     </li>
                     <li>
                         <div class="step-icon">
-                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="none" d="M0 0h24v24H0z"/><path d="M10 15.172l9.192-9.193 1.415 1.414L10 18l-6.364-6.364 1.414-1.414z"/></svg>
                         </div>
                         <span>Confirm by tapping <strong>"Add"</strong> in the top-right corner.</span>
                     </li>
@@ -242,15 +242,33 @@
     </div>
 
     <script>
+        // Check if the app is running in standalone mode (already installed)
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+        // --- Redirect if already installed ---
+        // This runs first. If the app is installed, the rest of the script is irrelevant.
+        if (isInStandaloneMode()) {
+            console.log('App is already installed. Redirecting...');
+            window.location.replace('/index.php');
+        }
+
+        // --- If not installed, continue with installation logic ---
         let deferredPrompt;
         const installButton = document.getElementById('install-button');
         const androidInstructions = document.getElementById('android-instructions');
         const iosInstructions = document.getElementById('ios-instructions');
 
+        const isIOS = () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            return /iphone|ipad|ipod/.test(userAgent) && !window.MSStream;
+        }
+        
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            androidInstructions.classList.remove('hidden');
+            if (!isIOS()) { // Only show for non-iOS devices
+                androidInstructions.classList.remove('hidden');
+            }
         });
 
         if (installButton) {
@@ -264,17 +282,8 @@
             });
         }
         
-        // Check for iOS
-        const isIOS = () => {
-            const userAgent = window.navigator.userAgent.toLowerCase();
-            return /iphone|ipad|ipod/.test(userAgent);
-        }
-        
-        // Check if the app is running in standalone mode (already installed)
-        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
-        
-        // Show the iOS instructions if on iOS and not in standalone mode
-        if (isIOS() && !isInStandaloneMode()) {
+        // Show iOS instructions if on iOS and not already installed
+        if (isIOS()) {
             iosInstructions.classList.remove('hidden');
         }
     </script>
