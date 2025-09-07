@@ -59,6 +59,7 @@ $user = getCurrentUser();
 </head>
 <body class="timesheet-page">
     <?php include 'navbar.php'; ?>
+<div id="page-content">
     <div class="container-fluid">
         <div id="pointage">
             <h2>Pointage</h2>
@@ -144,7 +145,7 @@ $user = getCurrentUser();
         </div>
       </div>
     </div>
-
+</div>
     <?php include('footer.php'); ?>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
