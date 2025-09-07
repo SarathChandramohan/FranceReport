@@ -76,6 +76,23 @@ function getCurrentUser() {
 
 // Log out the user
 function logoutUser() {
+    // ---- START: BUG FIX ----
+    // Clear the remember_me cookie and database token
+    if (isset($_COOKIE['remember_me'])) {
+        // Delete the cookie by setting its expiration date in the past
+        setcookie('remember_me', '', time() - 3600, '/');
+
+        // Remove the token from the database
+        list($user_id, $token, $series_identifier) = explode(':', $_COOKIE['remember_me']);
+        if ($user_id && $series_identifier) {
+            $db = connectDB();
+            $sql = "DELETE FROM UserTokens WHERE user_id = ? AND series_identifier = ?";
+            $params = array($user_id, $series_identifier);
+            sqlsrv_query($db, $sql, $params);
+        }
+    }
+    // ---- END: BUG FIX ----
+
     // Unset all session variables
     $_SESSION = [];
 
