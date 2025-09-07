@@ -146,6 +146,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
 </head>
 <body>
     <?php if (file_exists('navbar.php')) include 'navbar.php'; ?>
+    <div id="page-content">
     <div class="container-fluid">
         <h1>Administrateur</h1>
 
@@ -270,7 +271,7 @@ $initial_employee_list = getInitialEmployeeList($conn);
             </div>
         </div>
     </div>
-    
+    </div>
     <?php if (file_exists('footer.php')) include 'footer.php'; ?>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
