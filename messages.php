@@ -3,11 +3,9 @@ require_once 'session-management.php';
 requireLogin();
 $user = getCurrentUser();
 
-// Fetch users for the recipient list
 require_once 'db-connection.php';
 $usersList = [];
 try {
-    // Exclude the current user from the list
     $stmt = $conn->prepare("SELECT user_id, nom, prenom FROM Users WHERE status = 'Active' AND user_id != ? ORDER BY nom, prenom");
     $stmt->execute([$user['user_id']]);
     $usersList = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -23,54 +21,152 @@ try {
     <title>Messagerie - Gestion des Ouvriers</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #007bff; --primary-hover: #0056b3; --background-light: #f8f9fa;
-            --card-bg: #ffffff; --text-dark: #212529; --text-light: #6c757d; --border-color: #dee2e6;
-            --priority-urgente-bg: #dc3545; --priority-importante-bg: #ffc107; --priority-normale-bg: #6c757d;
-            --unread-bg: #eaf4ff;
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --background-color: #f7f8fc;
+            --sidebar-bg: #ffffff;
+            --pane-border: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --unread-bg: #e9f5ff;
+            --priority-urgente: #dc3545;
+            --priority-importante: #ffc107;
+            --priority-normale: #6c757d;
+            --animation-speed: 0.3s;
+            --animation-timing: ease-in-out;
         }
-        body { background-color: var(--background-light); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .messaging-container { display: flex; height: calc(100vh - 80px); background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        
-        /* Sidebar Navigation */
-        .sidebar { width: 240px; background: #f5f5f7; border-right: 1px solid var(--border-color); padding: 20px 0; display: flex; flex-direction: column; }
-        .compose-btn { margin: 0 20px 20px; }
-        .nav-link { color: var(--text-dark); font-weight: 500; padding: 12px 20px; border-left: 3px solid transparent; display: flex; align-items: center; gap: 15px; }
-        .nav-link:hover { background-color: #e9e9eb; }
-        .nav-link.active { background-color: var(--unread-bg); color: var(--primary-color); border-left-color: var(--primary-color); font-weight: 600; }
-        .nav-link .badge { font-size: 0.75rem; }
-        
-        /* Message List Pane */
-        .message-list-pane { width: 350px; border-right: 1px solid var(--border-color); overflow-y: auto; }
-        .message-list-header { padding: 20px; border-bottom: 1px solid var(--border-color); }
+
+        /* --- Base & Layout --- */
+        body {
+            background-color: var(--background-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .messaging-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            background: var(--sidebar-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.07);
+            border: 1px solid var(--pane-border);
+        }
+
+        /* --- Custom Scrollbar --- */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+        /* --- Animations --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -468px 0; }
+            100% { background-position: 468px 0; }
+        }
+        .fade-in { animation: fadeIn var(--animation-speed) var(--animation-timing) forwards; }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--pane-border);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            transition: width var(--animation-speed) var(--animation-timing);
+        }
+        .compose-btn {
+            margin: 0 20px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+            transition: all var(--animation-speed) var(--animation-timing);
+        }
+        .compose-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 123, 255, 0.3); }
+        .nav-link {
+            color: var(--text-secondary);
+            font-weight: 500;
+            padding: 14px 25px;
+            border-left: 4px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all var(--animation-speed) var(--animation-timing);
+        }
+        .nav-link:hover { background-color: #f8f9fa; color: var(--text-primary); }
+        .nav-link.active {
+            background-color: var(--unread-bg);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+            font-weight: 600;
+        }
+        .nav-link .badge { font-size: 0.75rem; transition: transform var(--animation-speed); }
+        .nav-link.active .badge { transform: scale(1.1); }
+
+        /* --- Message List Pane --- */
+        .message-list-pane {
+            width: 380px;
+            border-right: 1px solid var(--pane-border);
+            overflow-y: auto;
+            background-color: #fcfdff;
+        }
+        .message-list-header { padding: 25px; border-bottom: 1px solid var(--pane-border); }
         .message-list { list-style: none; padding: 0; margin: 0; }
-        .message-item { padding: 15px 20px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.2s; }
-        .message-item:hover { background-color: #f8f9fa; }
-        .message-item.active { background-color: var(--unread-bg); }
-        .message-item.unread .sender, .message-item.unread .subject { font-weight: bold; color: var(--text-dark); }
-        .sender { font-size: 0.95rem; display: block; margin-bottom: 2px; }
-        .subject { font-size: 0.85rem; color: var(--text-dark); margin-bottom: 4px; }
-        .timestamp { font-size: 0.75rem; color: var(--text-light); }
-        .priority-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        
-        /* Content Pane */
-        .content-pane { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .content-placeholder, .message-view, .compose-view { padding: 30px; }
-        .content-placeholder { text-align: center; margin: auto; color: var(--text-light); }
-        .message-header { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
-        .message-header h4 { margin: 0; }
-        .message-meta { font-size: 0.9rem; color: var(--text-light); }
-        .message-body { line-height: 1.6; }
-        .message-actions { margin-top: 25px; }
-        
-        /* Responsive */
+        .message-item {
+            padding: 18px 25px;
+            border-bottom: 1px solid var(--pane-border);
+            cursor: pointer;
+            transition: all var(--animation-speed) var(--animation-timing);
+            opacity: 0; /* For staggered animation */
+        }
+        .message-item:hover { background-color: #f8f9fa; transform: translateX(5px); }
+        .message-item.active { background-color: var(--unread-bg); border-right: 4px solid var(--primary-color); }
+        .message-item.unread .sender, .message-item.unread .subject { font-weight: 600; color: var(--text-primary); }
+        .sender { font-size: 1rem; display: block; margin-bottom: 4px; color: var(--text-primary); }
+        .subject { font-size: 0.9rem; margin-bottom: 5px; color: var(--text-secondary); }
+        .timestamp { font-size: 0.8rem; color: #999; }
+        .priority-dot { height: 9px; width: 9px; border-radius: 50%; display: inline-block; margin-right: 8px; vertical-align: middle; }
+
+        /* --- Skeleton Loader for Message List --- */
+        .skeleton-item { padding: 18px 25px; border-bottom: 1px solid var(--pane-border); }
+        .skeleton-line { height: 16px; border-radius: 4px; background: #e0e0e0; margin-bottom: 8px; }
+        .skeleton-line.short { width: 60%; }
+        .shimmer {
+            background: linear-gradient(to right, #e0e0e0 8%, #f0f0f0 18%, #e0e0e0 33%);
+            background-size: 800px 104px;
+            animation: shimmer 1.5s linear infinite;
+        }
+
+        /* --- Content Pane --- */
+        .content-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        #content-pane-inner { padding: 35px; }
+        .content-placeholder { text-align: center; margin: auto; color: var(--text-secondary); }
+        .message-header { border-bottom: 1px solid var(--pane-border); padding-bottom: 20px; margin-bottom: 25px; }
+        .message-header h3 { margin: 0; font-weight: 600; }
+        .message-meta { font-size: 0.9rem; color: var(--text-secondary); margin-top: 10px; }
+        .message-body { line-height: 1.7; font-size: 1.05rem; color: #333; }
+        .message-actions .btn { border-radius: 8px; font-weight: 500; transition: transform 0.2s, box-shadow 0.2s; }
+        .message-actions .btn:hover { transform: translateY(-2px); }
+
+        /* --- Responsive Design --- */
         @media (max-width: 992px) {
             .messaging-container { flex-direction: column; height: auto; }
-            .sidebar { width: 100%; flex-direction: row; justify-content: space-around; padding: 0; border-right: 0; border-bottom: 1px solid var(--border-color); }
+            .sidebar, .message-list-pane { width: 100%; border-right: 0; }
+            .sidebar { flex-direction: row; justify-content: space-around; padding: 0; border-bottom: 1px solid var(--pane-border); }
             .compose-btn { display: none; }
-            .message-list-pane { width: 100%; border-right: 0; height: 40vh; }
-            .content-pane { flex-basis: auto; height: 60vh; }
+            .message-list-pane { height: 45vh; }
         }
     </style>
 </head>
@@ -78,18 +174,19 @@ try {
     <?php include 'navbar.php'; ?>
     <div class="container-fluid my-4">
         <div class="messaging-container">
+            
             <aside class="sidebar">
-                <button class="btn btn-primary compose-btn" onclick="showComposeView()"><i class="fas fa-plus mr-2"></i>Nouveau message</button>
+                <button class="btn btn-primary compose-btn" onclick="showComposeView()"><i class="fas fa-edit mr-2"></i>Composer</button>
                 <ul class="nav flex-column">
                     <li class="nav-item">
                         <a class="nav-link active" href="#" onclick="loadMessages('inbox', this)">
-                            <i class="fas fa-inbox"></i> Boîte de réception
+                            <i class="fas fa-inbox fa-fw"></i> Boîte de réception
                             <span id="inbox-notification" class="badge badge-primary ml-auto"></span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" onclick="loadMessages('sent', this)">
-                            <i class="fas fa-paper-plane"></i> Messages Envoyés
+                            <i class="fas fa-paper-plane fa-fw"></i> Messages Envoyés
                         </a>
                     </li>
                 </ul>
@@ -97,18 +194,21 @@ try {
             
             <section class="message-list-pane">
                 <div class="message-list-header">
-                    <h3 id="pane-title" class="h5">Boîte de réception</h3>
+                    <h3 id="pane-title" class="h5 mb-0 font-weight-bold">Boîte de réception</h3>
                 </div>
-                <ul class="message-list" id="message-list-body">
-                    </ul>
+                <div id="skeleton-loader" style="display: none;"></div>
+                <ul class="message-list" id="message-list-body"></ul>
             </section>
             
             <main class="content-pane" id="content-pane">
-                <div class="content-placeholder" id="content-placeholder">
-                    <i class="fas fa-envelope-open-text fa-3x mb-3"></i>
-                    <p>Sélectionnez un message pour le lire ou rédigez un nouveau message.</p>
+                <div id="content-pane-inner">
+                    <div class="content-placeholder">
+                        <i class="fas fa-envelope-open-text fa-4x mb-4 text-black-50"></i>
+                        <h4>Votre centre de messagerie</h4>
+                        <p>Sélectionnez un message pour le lire ou composez un nouveau message.</p>
+                    </div>
                 </div>
-                </main>
+            </main>
         </div>
     </div>
     
@@ -119,7 +219,13 @@ try {
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let currentView = 'inbox'; // 'inbox' or 'sent'
+        let currentView = 'inbox';
+        const SKELETON_TEMPLATE = `
+            <div class="skeleton-item">
+                <div class="skeleton-line shimmer" style="width: 50%; height: 20px; margin-bottom: 12px;"></div>
+                <div class="skeleton-line shimmer" style="width: 80%;"></div>
+                <div class="skeleton-line shimmer short"></div>
+            </div>`.repeat(5);
 
         function showPopupMessage(message, type) {
             $('#statusModalTitle').text(type === 'success' ? 'Succès' : 'Erreur');
@@ -127,74 +233,75 @@ try {
             $('#statusModal').modal('show');
         }
 
-        function makeAjaxRequest(params, callback) {
-            $.ajax({
-                url: 'messages-handler.php',
-                type: params instanceof FormData ? 'POST' : 'GET',
-                data: params,
-                dataType: 'json',
-                processData: params instanceof FormData ? false : undefined,
-                contentType: params instanceof FormData ? false : undefined,
-                success: response => callback(null, response),
-                error: (xhr, status, error) => callback(`Erreur: ${status} - ${error}`)
+        function setContentPane(htmlContent, placeholderMessage = null) {
+            const contentPaneInner = $('#content-pane-inner');
+            contentPaneInner.fadeOut(150, function() {
+                const newHtml = placeholderMessage ?
+                    `<div class="content-placeholder">
+                        <i class="fas fa-info-circle fa-3x mb-3"></i><p>${placeholderMessage}</p>
+                    </div>` :
+                    htmlContent;
+                $(this).html(newHtml).fadeIn(150);
             });
-        }
-        
-        function showPlaceholder(message) {
-            $('#content-pane').html(`<div class="content-placeholder" id="content-placeholder">
-                <i class="fas fa-info-circle fa-3x mb-3"></i><p>${message}</p></div>`);
         }
 
         function loadMessages(type, navElement = null) {
             currentView = type;
-            const action = type === 'inbox' ? 'get_received_messages' : 'get_sent_messages';
-            
             if (navElement) {
                 $('.nav-link').removeClass('active');
                 $(navElement).addClass('active');
             }
             $('#pane-title').text(type === 'inbox' ? 'Boîte de réception' : 'Messages Envoyés');
-            showPlaceholder("Chargement des messages...");
+            
+            const listBody = $('#message-list-body');
+            listBody.empty();
+            $('#skeleton-loader').html(SKELETON_TEMPLATE).show();
+            setContentPane(null, "Chargement des messages...");
 
-            makeAjaxRequest(`action=${action}`, (err, res) => {
-                const listBody = $('#message-list-body');
-                listBody.empty();
-                if (err || res.status !== 'success') {
-                    showPopupMessage(err || (res ? res.message : 'Erreur de chargement.'), 'danger');
-                    listBody.html('<li class="text-center p-3">Erreur de chargement.</li>');
-                    return;
-                }
-                if (!res.data || res.data.length === 0) {
-                    listBody.html(`<li class="text-center p-3 text-muted">Aucun message ${type === 'inbox' ? 'reçu' : 'envoyé'}.</li>`);
-                    showPlaceholder(`Votre boîte de ${type === 'inbox' ? 'réception' : 'messages envoyés'} est vide.`);
-                    return;
-                }
-                
-                let unreadCount = 0;
-                res.data.forEach(msg => {
-                    const isUnread = type === 'inbox' && !msg.is_read;
-                    if(isUnread) unreadCount++;
+            const action = type === 'inbox' ? 'get_received_messages' : 'get_sent_messages';
+            $.ajax({
+                url: 'messages-handler.php', type: 'GET', data: { action: action }, dataType: 'json',
+                success: res => {
+                    $('#skeleton-loader').hide();
+                    if (res.status !== 'success' || !res.data || res.data.length === 0) {
+                        const message = res.status !== 'success' ? 'Erreur de chargement.' : `Aucun message ${type === 'inbox' ? 'reçu' : 'envoyé'}.`;
+                        listBody.html(`<li class="text-center p-4 text-muted">${message}</li>`);
+                        setContentPane(null, `Votre boîte de ${type === 'inbox' ? 'réception' : 'messages envoyés'} est vide.`);
+                        return;
+                    }
+                    
+                    let unreadCount = 0;
+                    res.data.forEach((msg, index) => {
+                        const isUnread = type === 'inbox' && !msg.is_read;
+                        if (isUnread) unreadCount++;
 
-                    const itemHtml = `
-                        <li class="message-item ${isUnread ? 'unread' : ''}" onclick="viewMessage(${msg.message_id}, this)">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="sender">${type === 'inbox' ? msg.sender_name : msg.recipient_display}</span>
-                                <span class="timestamp">${msg.sent_at}</span>
-                            </div>
-                            <div class="subject">
-                                <span class="priority-dot" style="background-color: var(--priority-${msg.priority}-bg);" title="Priorité: ${msg.priority}"></span>
-                                ${msg.subject}
-                            </div>
-                        </li>
-                    `;
-                    listBody.append(itemHtml);
-                });
+                        const item = $(`
+                            <li class="message-item ${isUnread ? 'unread' : ''}" onclick="viewMessage(${msg.message_id}, this)">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="sender">${type === 'inbox' ? msg.sender_name : msg.recipient_display}</span>
+                                    <span class="timestamp">${msg.sent_at}</span>
+                                </div>
+                                <div class="subject">
+                                    <span class="priority-dot" style="background-color: var(--priority-${msg.priority});" title="Priorité: ${msg.priority}"></span>
+                                    ${msg.subject}
+                                </div>
+                            </li>
+                        `).appendTo(listBody);
 
-                const notificationBadge = $('#inbox-notification');
-                if(type === 'inbox') {
-                    notificationBadge.text(unreadCount > 0 ? unreadCount : '').toggle(unreadCount > 0);
-                } else {
-                    notificationBadge.hide();
+                        // Staggered animation
+                        setTimeout(() => item.css({ 'opacity': '1', 'animation': 'fadeIn 0.5s ease forwards' }), index * 70);
+                    });
+
+                    $('#inbox-notification').text(unreadCount > 0 ? unreadCount : '').toggle(unreadCount > 0);
+                    if ($('.message-item').length > 0) {
+                        $('.message-item:first').click();
+                    } else {
+                        cancelCompose();
+                    }
+                },
+                error: (xhr, status, error) => {
+                    $('#skeleton-loader').hide();
+                    showPopupMessage(`Erreur: ${status} - ${error}`, 'danger');
                 }
             });
         }
@@ -203,73 +310,48 @@ try {
             $('.message-item').removeClass('active');
             if (element) $(element).addClass('active');
 
-            makeAjaxRequest(`action=get_message_details&message_id=${messageId}`, (err, res) => {
-                if(err || res.status !== 'success') {
-                    showPopupMessage(err || res.message, 'danger');
-                    return;
-                }
-                const details = res.data;
-                const isSentMessage = currentView === 'sent';
-                let attachmentsHtml = '';
-                if(details.attachment_path) {
-                    attachmentsHtml = `<div class="mt-4">
-                        <strong><i class="fas fa-paperclip"></i> Pièce jointe:</strong>
-                        <a href="${details.attachment_path}" class="btn btn-sm btn-outline-primary ml-2" target="_blank">Télécharger</a>
-                    </div>`;
-                }
+            $.get('messages-handler.php', { action: 'get_message_details', message_id: messageId }, res => {
+                if (res.status !== 'success') { showPopupMessage(res.message, 'danger'); return; }
+                const d = res.data;
+                const attachmentsHtml = d.attachment_path ? `<div class="mt-4"><strong><i class="fas fa-paperclip"></i> Pièce jointe:</strong> <a href="${d.attachment_path}" class="btn btn-sm btn-outline-primary ml-2" target="_blank">Télécharger</a></div>` : '';
+                const isSent = currentView === 'sent';
 
                 const contentHtml = `
                     <div class="message-view">
                         <div class="message-header">
-                            <h4>${details.subject}</h4>
+                            <h3>${d.subject}</h3>
                             <div class="message-meta">
-                                <strong>De:</strong> ${details.sender_name}<br>
-                                <strong>Date:</strong> ${details.sent_at}
+                                <strong>De:</strong> ${d.sender_name}<br>
+                                <strong>Date:</strong> ${d.sent_at}
                             </div>
                         </div>
-                        <div class="message-body">
-                            ${details.content.replace(/\n/g, '<br>')}
-                        </div>
+                        <div class="message-body">${d.content.replace(/\n/g, '<br>')}</div>
                         ${attachmentsHtml}
-                        <div class="message-actions">
-                            ${!isSentMessage ? `<button class="btn btn-primary" onclick="showReplyView(${messageId})"><i class="fas fa-reply mr-1"></i> Répondre</button>` : ''}
-                            ${isSentMessage ? `<button class="btn btn-info" onclick="showReadReceipts('${btoa(JSON.stringify(details.receipts))}')"><i class="fas fa-check-double mr-1"></i> Voir les confirmations</button>` : ''}
+                        <div class="message-actions mt-4">
+                            ${!isSent ? `<button class="btn btn-primary" onclick="showReplyView(${messageId})"><i class="fas fa-reply mr-1"></i> Répondre</button>` : ''}
+                            ${isSent ? `<button class="btn btn-info" onclick='showReadReceipts(${JSON.stringify(d.receipts)})'><i class="fas fa-check-double mr-1"></i> Voir les confirmations</button>` : ''}
                         </div>
                     </div>`;
-                $('#content-pane').html(contentHtml);
-                
-                // If it was an unread message from the inbox, refresh the list to update its state
-                if(!isSentMessage && $(element).hasClass('unread')) {
-                   setTimeout(() => loadMessages('inbox'), 500);
-                }
-            });
+                setContentPane(contentHtml);
+                if (!isSent && $(element).hasClass('unread')) setTimeout(() => loadMessages('inbox'), 500);
+            }, 'json');
         }
         
-        function showReadReceipts(receiptsData) {
-            const receipts = JSON.parse(atob(receiptsData));
-            let modalBodyHtml = '<ul class="list-group">';
-            if (receipts && receipts.length > 0) {
-                receipts.forEach(r => {
-                    modalBodyHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        ${r.recipient_name} 
-                        <span class="badge badge-${r.is_read ? 'success' : 'secondary'}">${r.is_read ? 'Lu le ' + r.read_at : 'Non lu'}</span>
-                    </li>`;
-                });
-            } else {
-                modalBodyHtml += '<li class="list-group-item">Aucune information de lecture disponible.</li>';
-            }
-            modalBodyHtml += '</ul>';
-            $('#receiptsModalBody').html(modalBodyHtml);
+        function showReadReceipts(receipts) {
+            let bodyHtml = receipts && receipts.length > 0 ?
+                '<ul class="list-group">' + receipts.map(r => `<li class="list-group-item d-flex justify-content-between align-items-center">${r.recipient_name} <span class="badge badge-${r.is_read ? 'success' : 'secondary'}">${r.is_read ? 'Lu le ' + r.read_at : 'Non lu'}</span></li>`).join('') + '</ul>' :
+                '<p>Aucune information de lecture disponible.</p>';
+            $('#receiptsModalBody').html(bodyHtml);
             $('#receiptsModal').modal('show');
         }
 
         function showComposeView(isReply = false, originalMessage = null) {
             const formHtml = `
                 <div class="compose-view">
-                    <h3 id="compose-title">Nouveau Message</h3>
+                    <h3 id="compose-title" class="mb-4">${isReply ? 'Répondre au message' : 'Nouveau Message'}</h3>
                     <form id="message-form" enctype="multipart/form-data">
                         <input type="hidden" name="parent_message_id" id="parent_message_id">
-                        <div id="reply-info" class="alert alert-info" style="display:none;"></div>
+                        ${isReply ? `<div class="alert alert-info">Réponse à <strong>${originalMessage.sender_name}</strong></div>` : ''}
                         
                         <div class="form-row">
                             <div class="form-group col-md-6">
@@ -285,9 +367,7 @@ try {
                             <div class="form-group col-md-6" id="individual-recipient-group" style="display:none;">
                                 <label for="individual_recipients">Choisir le(s) destinataire(s)</label>
                                 <select id="individual_recipients" name="individual_recipients[]" class="form-control" multiple>
-                                    <?php foreach ($usersList as $u): ?>
-                                        <option value="<?= $u['user_id']; ?>"><?= htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?></option>
-                                    <?php endforeach; ?>
+                                    <?php foreach ($usersList as $u): ?><option value="<?= $u['user_id']; ?>"><?= htmlspecialchars($u['prenom'] . ' ' . $u['nom']); ?></option><?php endforeach; ?>
                                 </select>
                             </div>
                         </div>
@@ -303,66 +383,57 @@ try {
                     </form>
                 </div>
             `;
-            $('#content-pane').html(formHtml);
+            setContentPane(formHtml);
             
-            // Event Listeners for the new form
-            $('#recipient_type').change(function() {
-                $('#individual-recipient-group').toggle($(this).val() === 'individual');
-            });
-
-            $('#message-form').on('submit', function(e) {
-                e.preventDefault();
-                const formData = new FormData(this);
-                formData.append('action', 'send_message');
-                
-                // If it's a reply, ensure disabled fields are added to FormData
-                if ($('#parent_message_id').val()) {
-                    formData.set('recipient_type', 'individual');
-                    formData.set('individual_recipients[]', $('#individual_recipients').val());
-                }
-
-                makeAjaxRequest(formData, (err, res) => {
-                    if (err || res.status !== 'success') {
-                        showPopupMessage(err || res.message, 'danger');
-                    } else {
-                        showPopupMessage(res.message, 'success');
-                        cancelCompose();
-                        // Switch to sent messages view to see the new message
-                        loadMessages('sent', $('a[onclick*="\'sent\'"]'));
-                    }
-                });
-            });
+            $('#recipient_type').change(function() { $('#individual-recipient-group').toggle($(this).val() === 'individual'); });
+            $('#message-form').on('submit', handleFormSubmit);
 
             if (isReply && originalMessage) {
-                $('#compose-title').text("Répondre au message");
-                $('#reply-info').html(`Réponse à <strong>${originalMessage.sender_name}</strong>`).show();
-                
                 $('#parent_message_id').val(originalMessage.message_id);
                 $('#subject').val(`Re: ${originalMessage.subject}`);
                 const replyContent = `\n\n\n----- Message original le ${originalMessage.sent_at} -----\n> ${originalMessage.content.replace(/\n/g, '\n> ')}`;
                 $('#content').val(replyContent).focus();
-                
                 $('#recipient_type').val('individual').prop('disabled', true).trigger('change');
                 $('#individual_recipients').val(originalMessage.sender_user_id).prop('disabled', true);
             }
         }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            formData.append('action', 'send_message');
+            if ($('#parent_message_id').val()) {
+                formData.set('recipient_type', 'individual');
+                formData.set('individual_recipients[]', $('#individual_recipients').val());
+            }
+
+            $.ajax({
+                url: 'messages-handler.php', type: 'POST', data: formData, dataType: 'json',
+                contentType: false, processData: false,
+                success: res => {
+                    if (res.status !== 'success') { showPopupMessage(res.message, 'danger'); } 
+                    else {
+                        showPopupMessage(res.message, 'success');
+                        loadMessages('sent', $('a[onclick*="\'sent\'"]'));
+                    }
+                },
+                error: (xhr, status, error) => showPopupMessage(`Erreur: ${status} - ${error}`, 'danger')
+            });
+        }
         
         function showReplyView(messageId) {
-            makeAjaxRequest(`action=get_message_details&message_id=${messageId}`, (err, res) => {
-                 if(err || res.status !== 'success') { showPopupMessage(err || res.message, 'danger'); return; }
-                 res.data.message_id = messageId; // Make sure ID is in the object
+            $.get('messages-handler.php', { action: 'get_message_details', message_id: messageId }, res => {
+                 if(res.status !== 'success') { showPopupMessage(res.message, 'danger'); return; }
+                 res.data.message_id = messageId;
                  showComposeView(true, res.data);
-            });
+            }, 'json');
         }
 
         function cancelCompose() {
-            showPlaceholder("Sélectionnez un message pour le lire ou rédigez un nouveau message.");
+            setContentPane(null, "Sélectionnez un message pour le lire ou rédigez un nouveau message.");
         }
 
-        // Initial Load
-        $(document).ready(() => {
-            loadMessages('inbox', $('a[onclick*="\'inbox\'"]'));
-        });
+        $(document).ready(() => { loadMessages('inbox', $('a[onclick*="\'inbox\'"]')); });
     </script>
 </body>
 </html>
