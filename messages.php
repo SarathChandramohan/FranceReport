@@ -93,7 +93,6 @@ try {
                         <select id="priority" name="priority" class="form-control"><option value="normale">Normale</option><option value="importante">Importante</option><option value="urgente">Urgente</option></select>
                     </div>
                     <div class="form-group"><label for="content">Message</label><textarea id="content" name="content" class="form-control" rows="5" required></textarea></div>
-                    <div class="form-group"><label for="attachment">Pièce jointe (Max 2MB)</label><br><input type="file" id="attachment" name="attachment" class="form-control-file"></div>
                     <button type="submit" class="btn btn-primary">Envoyer</button>
                 </form>
             </div>
