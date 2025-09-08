@@ -8,7 +8,8 @@ $user_id = $user['user_id'];
 
 header('Content-Type: application/json');
 
-$action = $_GET['action'] ?? '';
+// --- FIX: Use $_REQUEST to handle both GET and POST actions ---
+$action = $_REQUEST['action'] ?? '';
 
 try {
     switch ($action) {
