@@ -37,7 +37,7 @@ $default_color = $predefined_colors[0];
         .assignment-count { font-size: 0.5rem; color: #fff; background-color: #dc3545; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 5px; }
         .daily-planning-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; min-height: 100%; }
         .day-column { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; }
-        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:center; align-items:center; cursor: pointer; }
+        .day-header { padding: 10px; text-align: center; font-weight: 600; border-bottom: 1px solid var(--border-color); background-color: #f1f3f5; display:flex; justify-content:center; align-items-center; cursor: pointer; }
         .day-header.selected { background-color: var(--primary); color: white; }
         
         .mission-card { background-color: #fff; border-left: 5px solid; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
@@ -69,6 +69,55 @@ $default_color = $predefined_colors[0];
         #missionFormModal.compact-modal label { font-size: 0.65rem; margin-bottom: 0.2rem; }
         #missionFormModal.compact-modal .form-control, #missionFormModal.compact-modal .btn { font-size: 0.7rem; padding: 0.25rem 0.5rem; height: auto; }
         #missionFormModal.compact-modal textarea.form-control { min-height: 50px; }
+
+        /* Styles for Mobile Devices */
+        @media (max-width: 768px) {
+            html, body {
+                height: auto;
+                overflow: auto;
+            }
+
+            .main-container {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .planning-col {
+                order: 1; /* Show planning board on top */
+                height: auto; 
+                overflow-y: visible;
+                padding-bottom: 0;
+            }
+
+            .workers-list-col {
+                order: 2; /* Show workers list at the bottom */
+                flex: 0 0 auto;
+                width: 100%;
+                height: 50vh; /* Give it a fixed height for scrolling */
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+            }
+
+            .daily-planning-container {
+                /* Make the 7-day view scroll horizontally */
+                grid-template-columns: repeat(7, 80vw);
+                overflow-x: auto;
+                padding-bottom: 10px;
+                min-height: 0;
+            }
+            
+            /* Make the header controls stack nicely */
+            .planning-col > .d-flex {
+                flex-wrap: wrap;
+                justify-content: center !important;
+                gap: 10px;
+            }
+
+            #currentWeekRange {
+                order: -1; /* Move week range text to the top */
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
