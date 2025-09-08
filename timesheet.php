@@ -78,16 +78,16 @@ $user = getCurrentUser();
                         Activation de la géolocalisation...
                     </div>
                     <div class="clock-buttons">
-                        <button class="btn-success" id="btn-entree">Enregistrer Entrée</button>
-                        <div class="dropdown" id="break-dropdown">
-                            <button class="btn-warning" id="btn-break">Ajouter Pause</button>
-                            <div class="dropdown-content">
-                                <a href="#" onclick="addBreak(30)">30 min</a>
-                                <a href="#" onclick="addBreak(60)">1 heure</a>
-                            </div>
-                        </div>
-                        <button class="btn-danger" id="btn-sortie" onclick="enregistrerPointage('record_exit')">Enregistrer Sortie</button>
-                    </div>
+    <button class="btn-success" id="btn-entree" disabled>Enregistrer Entrée</button>
+    <div class="dropdown" id="break-dropdown">
+        <button class="btn-warning" id="btn-break" disabled>Ajouter Pause</button>
+        <div class="dropdown-content">
+            <a href="#" onclick="addBreak(30)">30 min</a>
+            <a href="#" onclick="addBreak(60)">1 heure</a>
+        </div>
+    </div>
+    <button class="btn-danger" id="btn-sortie" onclick="enregistrerPointage('record_exit')" disabled>Enregistrer Sortie</button>
+</div>
                 </div>
             </div>
             <div class="card">
