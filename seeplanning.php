@@ -15,7 +15,7 @@ $user = getCurrentUser();
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
         :root {
-            --primary-bg: #3c8dbc;
+            --primary-bg: #252525;
             --secondary-bg: #ecf0f5;
             --content-bg: #ffffff;
             --primary-text: #ffffff;
